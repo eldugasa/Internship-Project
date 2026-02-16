@@ -1,153 +1,136 @@
 // src/context/AuthContext.jsx
 import { createContext, useState, useContext, useEffect } from 'react';
-import DataService from '../services/dataservices';
+import { loginApi, registerApi, logoutApi, getCurrentUser } from '../services/authService';
 
 const AuthContext = createContext();
 
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('current_user');
-      return saved ? JSON.parse(saved) : null;
-    }
-    return null;
-  });
-  
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
+  // Initialize auth state on mount
   useEffect(() => {
-    // Check for existing user on mount
-    const savedUser = localStorage.getItem('current_user');
-    if (savedUser) {
+    const initializeAuth = async () => {
       try {
-        const parsedUser = JSON.parse(savedUser);
-        // Ensure role is normalized when loading from localStorage
-        if (parsedUser.role === 'team_member') {
-          parsedUser.role = 'team-member';
-        } else if (parsedUser.role === 'project_manager') {
-          parsedUser.role = 'project-manager';
+        const storedUser = getCurrentUser();
+        if (storedUser) {
+          setUser(storedUser);
         }
-        setUser(parsedUser);
       } catch (error) {
-        console.error('Error parsing saved user:', error);
-        localStorage.removeItem('current_user');
+        console.error('Error initializing auth:', error);
+      } finally {
+        setLoading(false);
       }
-    }
-    setLoading(false);
+    };
+
+    initializeAuth();
   }, []);
 
-const login = async (email, password) => {
-  try {
-    const response = await fetch("http://localhost:5000/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Login failed");
+  // Login function
+  const login = async (email, password) => {
+    try {
+      setError(null);
+      const userData = await loginApi(email, password);
+      setUser(userData);
+      return { success: true, user: userData };
+    } catch (error) {
+      console.error("Login error:", error);
+      setError(error.message);
+      return { success: false, error: error.message };
     }
-
-    const data = await response.json();
-    const { token, user } = data;
-
-    // Normalize role
-    let normalizedRole = user.role;
-    if (normalizedRole === "TEAM_MEMBER" || normalizedRole === "team_member") {
-      normalizedRole = "team-member";
-    } else if (normalizedRole === "PROJECT_MANAGER" || normalizedRole === "project_manager") {
-      normalizedRole = "project-manager";
-    } else if (normalizedRole === "ADMIN") {
-      normalizedRole = "admin";
-    }
-
-    const finalUser = { ...user, role: normalizedRole };
-
-    localStorage.setItem("token", token);
-    localStorage.setItem("current_user", JSON.stringify(finalUser));
-    setUser(finalUser);
-
-    return finalUser;
-  } catch (error) {
-    console.error("Login error:", error);
-    throw error;
-  }
-};
-
-
-
-const signup = async (data) => {
-  try {
-    const response = await fetch("http://localhost:5000/api/auth/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        name: data.name,
-        email: data.email,
-        password: data.password,
-        role: "TEAM_MEMBER" // ✅ always default to team member
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Signup failed");
-    }
-
-    const newUser = await response.json();
-
-    // Store user without password
-    const { password, ...userData } = newUser;
-    localStorage.setItem("current_user", JSON.stringify(userData));
-    setUser(userData);
-
-    return userData;
-  } catch (error) {
-    console.error("Signup error:", error);
-    throw error;
-  }
-};
-
-
-
-  const logout = () => {
-    localStorage.removeItem('current_user');
-    localStorage.removeItem('token'); 
-    setUser(null);
   };
 
-  // Helper function to get user role for redirection
+  // Signup function
+  const signup = async (userData) => {
+    try {
+      setError(null);
+      const newUser = await registerApi({
+        name: userData.name,
+        email: userData.email,
+        password: userData.password
+      });
+      setUser(newUser);
+      return { success: true, user: newUser };
+    } catch (error) {
+      console.error("Signup error:", error);
+      setError(error.message);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Logout function
+  const logout = () => {
+    logoutApi();
+    setUser(null);
+    setError(null);
+  };
+
+  // Get user's dashboard path based on role
   const getUserDashboardPath = () => {
     if (!user) return '/login';
     
-    const userRole = user.role === 'team_member' ? 'team-member' : 
-                    user.role === 'project_manager' ? 'project-manager' : 
-                    user.role;
+    const role = user.role?.toLowerCase() || '';
     
-    switch (userRole) {
+    switch (role) {
       case 'admin':
         return '/admin/dashboard';
       case 'project-manager':
+      case 'project_manager':
         return '/manager/dashboard';
       case 'team-member':
+      case 'team_member':
         return '/team-member/dashboard';
       default:
         return '/login';
     }
   };
 
+  // Check if user has specific role
+  const hasRole = (roles) => {
+    if (!user || !user.role) return false;
+    
+    const userRole = user.role.toLowerCase();
+    
+    if (Array.isArray(roles)) {
+      return roles.some(role => role.toLowerCase() === userRole);
+    }
+    
+    return roles.toLowerCase() === userRole;
+  };
+
+  // Check if user is admin
+  const isAdmin = () => {
+    return user?.role?.toLowerCase() === 'admin';
+  };
+
+  // Check if user is project manager
+  const isProjectManager = () => {
+    const role = user?.role?.toLowerCase();
+    return role === 'project-manager' || role === 'project_manager';
+  };
+
+  // Check if user is team member
+  const isTeamMember = () => {
+    const role = user?.role?.toLowerCase();
+    return role === 'team-member' || role === 'team_member';
+  };
+
   const value = {
     user,
     loading,
+    error,
     login,
     signup,
     logout,
-    getUserDashboardPath
+    getUserDashboardPath,
+    hasRole,
+    isAdmin,
+    isProjectManager,
+    isTeamMember,
+    isAuthenticated: !!user
   };
 
   return (
