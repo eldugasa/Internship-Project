@@ -1,5 +1,19 @@
 // src/hooks/useAdminData.js
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
+import {
+  getUsers,
+  updateUserRole as updateUserRoleApi,
+  deleteUser as deleteUserApi,
+} from "../services/usersService";
+import {
+  getTeams,
+  createTeam as createTeamApi,
+  deleteTeam as deleteTeamApi,
+} from "../services/teamsService";
+import { getProjects } from "../services/projectsService";
+
+// Normalize role key for UI fallback updates (project-manager -> project_manager)
+const getRoleKey = (role = "") => role.toLowerCase().replace(/-/g, "_");
 
 export const useAdminData = () => {
   const [users, setUsers] = useState([]);
@@ -8,81 +22,129 @@ export const useAdminData = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [stats, setStats] = useState([]);
 
-  useEffect(() => {
-    setTimeout(() => {
-      const usersData = [
-        { id: 1, name: 'John Doe', email: 'john@company.com', role: 'team_member', team: 'Engineering', status: 'active', avatar: 'JD', joinDate: '2024-01-15' },
-        { id: 2, name: 'Jane Smith', email: 'jane@company.com', role: 'project_manager', team: 'Design', status: 'active', avatar: 'JS', joinDate: '2023-11-20' },
-        { id: 3, name: 'Bob Johnson', email: 'bob@company.com', role: 'admin', team: 'Management', status: 'active', avatar: 'BJ', joinDate: '2023-08-10' },
-        { id: 4, name: 'Alice Brown', email: 'alice@company.com', role: 'team_member', team: 'QA', status: 'inactive', avatar: 'AB', joinDate: '2024-02-01' },
-        { id: 5, name: 'Mike Wilson', email: 'mike@company.com', role: 'team_member', team: 'DevOps', status: 'active', avatar: 'MW', joinDate: '2024-01-05' },
-      ];
-      
-      const teamsData = [
-        { id: 1, name: 'Engineering', lead: 'John Doe', members: 12, projects: 5, color: '#4DA5AD' },
-        { id: 2, name: 'Design', lead: 'Jane Smith', members: 8, projects: 3, color: '#FF6B6B' },
-        { id: 3, name: 'QA', lead: 'Alice Brown', members: 6, projects: 4, color: '#51CF66' },
-        { id: 4, name: 'DevOps', lead: 'Mike Wilson', members: 4, projects: 2, color: '#FF922B' },
-      ];
-      
-      const projectsData = [
-        { id: 1, name: 'Website Redesign', team: 'Design', manager: 'Jane Smith', progress: 75, status: 'active', priority: 'high', dueDate: '2024-06-15' },
-        { id: 2, name: 'Mobile App v2', team: 'Engineering', manager: 'John Doe', progress: 45, status: 'active', priority: 'medium', dueDate: '2024-07-30' },
-        { id: 3, name: 'API Migration', team: 'Engineering', manager: 'Bob Johnson', progress: 90, status: 'completed', priority: 'low', dueDate: '2024-03-01' },
-      ];
+  // Build dashboard stats from fetched backend data
+  const buildStats = (usersData, teamsData, projectsData) => {
+    setStats([
+      { label: "Total Users", value: usersData.length, change: "" },
+      { label: "Active Teams", value: teamsData.length, change: "" },
+      { label: "Total Projects", value: projectsData.length, change: "" },
+      {
+        label: "Active Users",
+        value: usersData.filter((u) => (u.status || "active") === "active").length,
+        change: "",
+      },
+    ]);
+  };
+
+  // Load all admin data in parallel for better performance
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [usersData, teamsData, projectsData] = await Promise.all([
+        getUsers(),
+        getTeams(),
+        getProjects(),
+      ]);
 
       setUsers(usersData);
       setTeams(teamsData);
       setProjects(projectsData);
-      
-      setStats([
-        { label: 'Total Users', value: usersData.length, change: '+2' },
-        { label: 'Active Teams', value: teamsData.length, change: '+1' },
-        { label: 'Total Projects', value: projectsData.length, change: '+3' },
-        { label: 'Active Users', value: usersData.filter(u => u.status === 'active').length, change: '+5' },
-      ]);
-      
+      buildStats(usersData, teamsData, projectsData);
+    } catch (error) {
+      console.error("Failed to load admin data:", error);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    loadData();
   }, []);
 
-  const updateUserRole = (userId, newRole) => {
-    setUsers(users.map(user => 
-      user.id === userId ? { ...user, role: newRole } : user
-    ));
+  // Update user role:
+  // - Try backend first
+  // - If backend fails, keep UI responsive with local fallback update
+  const updateUserRole = async (userId, newRole) => {
+    try {
+      const updated = await updateUserRoleApi(userId, newRole);
+      setUsers((prev) => prev.map((user) => (user.id === userId ? updated : user)));
+    } catch (error) {
+      console.error("Failed to update user role:", error);
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId ? { ...user, role: getRoleKey(newRole) } : user,
+        ),
+      );
+    }
   };
 
+  // UI-only status update (can be connected to backend later)
   const updateUserStatus = (userId, newStatus) => {
-    setUsers(users.map(user => 
-      user.id === userId ? { ...user, status: newStatus } : user
-    ));
+    setUsers((prev) =>
+      prev.map((user) => (user.id === userId ? { ...user, status: newStatus } : user)),
+    );
   };
 
-  const deleteUser = (userId) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      setUsers(users.filter(user => user.id !== userId));
+  // Delete user:
+  // - Confirm first
+  // - Call backend
+  // - Always remove from local list to keep UX smooth
+  const deleteUser = async (userId) => {
+    if (!window.confirm("Are you sure you want to delete this user?")) return;
+
+    try {
+      await deleteUserApi(userId);
+    } catch (error) {
+      console.error("Failed to delete user on backend:", error);
     }
+
+    setUsers((prev) => prev.filter((user) => user.id !== userId));
   };
 
-  const createTeam = () => {
-    const teamName = prompt('Enter team name:');
-    if (teamName) {
-      const newTeam = {
-        id: teams.length + 1,
+  // Create team:
+  // - Prompt name
+  // - Try backend
+  // - Fallback to temporary local team if backend fails
+  const createTeam = async () => {
+    const teamName = prompt("Enter team name:");
+    if (!teamName) return;
+
+    try {
+      const newTeam = await createTeamApi({
         name: teamName,
-        lead: 'Unassigned',
-        members: 0,
+        lead: "Unassigned",
+        description: "",
+      });
+      setTeams((prev) => [...prev, newTeam]);
+    } catch (error) {
+      console.error("Failed to create team:", error);
+      const fallbackTeam = {
+        id: Date.now(),
+        name: teamName,
+        lead: "Unassigned",
+        memberCount: 0,
         projects: 0,
-        color: '#4DA5AD'
+        color: "#4DA5AD",
       };
-      setTeams([...teams, newTeam]);
+      setTeams((prev) => [...prev, fallbackTeam]);
     }
   };
 
-  const deleteTeam = (teamId) => {
-    if (window.confirm('Are you sure you want to delete this team?')) {
-      setTeams(teams.filter(team => team.id !== teamId));
+  // Delete team:
+  // - Confirm
+  // - Try backend
+  // - Remove locally for immediate feedback
+  const deleteTeam = async (teamId) => {
+    if (!window.confirm("Are you sure you want to delete this team?")) return;
+
+    try {
+      await deleteTeamApi(teamId);
+    } catch (error) {
+      console.error("Failed to delete team on backend:", error);
     }
+
+    setTeams((prev) => prev.filter((team) => team.id !== teamId));
   };
 
   return {
@@ -91,10 +153,11 @@ export const useAdminData = () => {
     projects,
     stats,
     isLoading,
+    reload: loadData,
     updateUserRole,
     updateUserStatus,
     deleteUser,
     createTeam,
-    deleteTeam
+    deleteTeam,
   };
 };
