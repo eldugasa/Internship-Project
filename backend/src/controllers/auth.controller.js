@@ -26,9 +26,12 @@ const register = async (req, res) => {
       }
     });
 
+    // Generate token for the newly registered user
+    const token = generateToken(user);
+
     res.status(201).json({
-      message: "User registered successfully",
-      user: { id: user.id, email: user.email, role: user.role }
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role }
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

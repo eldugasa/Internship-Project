@@ -40,11 +40,12 @@ export const registerApi = async ({ name, email, password }) => {
   // Note: Register might not return token, so user might need to login separately
   const user = {
     ...data.user,
-    role: normalizeRole(data.user.role)
+    role: normalizeRole(data.user.role),
+    token: data.token || null
   };
-  
+
   localStorage.setItem("user", JSON.stringify(user));
-  
+
   return user;
 };
 
