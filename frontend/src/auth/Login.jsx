@@ -46,10 +46,9 @@ const SignIn = () => {
       
       // Redirect based on role - FIXED PATHS
       if (user) {
-        const userRole = user.role === 'team_member' ? 'team-member' : 
-                        user.role === 'project_manager' ? 'project-manager' : 
-                        user.role;
-        
+        const normalizeRole = (r = '') => (r || '').toLowerCase().replace(/_/g, '-');
+        const userRole = normalizeRole(user.role);
+
         switch (userRole) {
           case 'admin':
             navigate('/admin/dashboard');
@@ -112,23 +111,22 @@ const SignIn = () => {
       try {
         const user = await login(email, password);
         if (user) {
-          const userRole = user.role === 'team_member' ? 'team-member' : 
-                          user.role === 'project_manager' ? 'project-manager' : 
-                          user.role;
-          
-          switch (userRole) {
-            case 'admin':
-              navigate('/admin/dashboard');
-              break;
-            case 'project-manager':
-              navigate('/manager/dashboard');
-              break;
-            case 'team-member':
-              navigate('/team-member/dashboard');
-              break;
-            default:
-              navigate('/team-member/dashboard');
-          }
+            const normalizeRole = (r = '') => (r || '').toLowerCase().replace(/_/g, '-');
+            const userRole = normalizeRole(user.role);
+
+            switch (userRole) {
+              case 'admin':
+                navigate('/admin/dashboard');
+                break;
+              case 'project-manager':
+                navigate('/manager/dashboard');
+                break;
+              case 'team-member':
+                navigate('/team-member/dashboard');
+                break;
+              default:
+                navigate('/team-member/dashboard');
+            }
         }
       } catch (err) {
         setError('Demo login failed. Please check demo credentials.');

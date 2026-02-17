@@ -1,6 +1,7 @@
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")      // Pooled connection for app
+  directUrl = env("DIRECT_URL")         // Direct connection for migrations
 }
 
 generator client {
@@ -19,8 +20,7 @@ model User {
   teamId Int?
   team   Team?  @relation(fields: [teamId], references: [id])
   tasks  Task[] @relation("TaskAssignee")
-
-  // ← Add this to link projects they manage
+  comments Comment[] // ✅ Added relation to comments
   managedProjects Project[] @relation("ProjectManager")
 }
 
@@ -36,26 +36,31 @@ model Project {
   team   Team @relation(fields: [teamId], references: [id])
 
   managerId Int
-  manager   User   @relation(fields: [managerId], references: [id], name: "ProjectManager") // ← specify same name
+  manager   User   @relation(fields: [managerId], references: [id], name: "ProjectManager")
   tasks     Task[]
 }
 
 model Team {
   id          Int       @id @default(autoincrement())
   name        String
-  description String?   // optional
-  lead        String?   // optional
+  description String?
+  lead        String?
   createdAt   DateTime  @default(now())
   users       User[]
   projects    Project[]
 }
 
-
+// ✅ UPDATED Task model with missing fields
 model Task {
-  id          Int     @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   title       String
   description String?
-  status      String  @default("PENDING") // PENDING, IN_PROGRESS, DONE
+  status      String   @default("PENDING") // PENDING, IN_PROGRESS, DONE, BLOCKED, REVIEW
+  progress    Int      @default(0) // ✅ ADDED: 0-100 percentage
+  dueDate     DateTime? // ✅ ADDED: Task due date
+  priority    String   @default("MEDIUM") // ✅ ADDED: LOW, MEDIUM, HIGH, CRITICAL
+  estimatedHours Float? // ✅ ADDED: Estimated time to complete
+  actualHours    Float? // ✅ ADDED: Actual time spent
 
   // Task → Project relation
   project   Project @relation(fields: [projectId], references: [id])
@@ -64,7 +69,26 @@ model Task {
   // Task → User relation
   assignee   User? @relation("TaskAssignee", fields: [assigneeId], references: [id])
   assigneeId Int?
-
+  
+  // ✅ ADDED: Task comments relation
+  comments   Comment[]
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ✅ NEW: Comment model for task discussions
+model Comment {
+  id        Int      @id @default(autoincrement())
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relation to task
+  task   Task @relation(fields: [taskId], references: [id])
+  taskId Int
+  
+  // Relation to user who commented
+  user   User @relation(fields: [userId], references: [id])
+  userId Int
 }

@@ -18,18 +18,14 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
     return <Navigate to="/login" replace />;
   }
 
+  // Normalize role helper
+  const normalizeRole = (r = '') => (r || '').toLowerCase().replace(/_/g, '-');
+
   // Normalize role
-  const userRole =
-    user.role === 'team_member' ? 'team-member' :
-    user.role === 'project_manager' ? 'project-manager' :
-    user.role;
+  const userRole = normalizeRole(user?.role);
 
   // Normalize allowed roles
-  const normalizedAllowedRoles = allowedRoles?.map(role =>
-    role === 'team_member' ? 'team-member' :
-    role === 'project_manager' ? 'project-manager' :
-    role
-  );
+  const normalizedAllowedRoles = allowedRoles?.map(role => normalizeRole(role));
 
   // If allowedRoles is provided, enforce it
   if (normalizedAllowedRoles && !normalizedAllowedRoles.includes(userRole)) {

@@ -94,7 +94,7 @@ export default function App() {
 
         {/* Team Member routes - Protected */}
         <Route path="/team-member" element={
-          <ProtectedRoute allowedRoles={['team-member', 'team_member', 'project-manager', 'project_manager', 'admin']}>
+          <ProtectedRoute allowedRoles={['team-member', 'team_member', 'admin']}>
             <TeamMemberLayout />
           </ProtectedRoute>
         }>

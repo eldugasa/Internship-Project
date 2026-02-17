@@ -35,11 +35,11 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       const userData = await loginApi(email, password);
       setUser(userData);
-      return { success: true, user: userData };
+      return userData;
     } catch (error) {
       console.error("Login error:", error);
       setError(error.message);
-      return { success: false, error: error.message };
+      throw error;
     }
   };
 
