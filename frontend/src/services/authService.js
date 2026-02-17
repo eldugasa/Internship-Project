@@ -21,6 +21,8 @@ export const loginApi = async (email, password) => {
   };
   
   localStorage.setItem("user", JSON.stringify(user));
+  // Keep legacy `userData` key in sync for layouts that read it
+  try { localStorage.setItem("userData", JSON.stringify(user)); } catch (e) {}
   
   return user;
 };
@@ -36,21 +38,34 @@ export const registerApi = async ({ name, email, password }) => {
     }),
   });
 
-  // Backend returns { message, user: { id, email, role, name } }
-  // Note: Register might not return token, so user might need to login separately
-  const user = {
-    ...data.user,
-    role: normalizeRole(data.user.role),
-    token: data.token || null
-  };
+  // Backend should return { token, user }. If token is missing, perform login to obtain it.
+  let user;
+
+  if (data?.token) {
+    user = {
+      ...data.user,
+      role: normalizeRole(data.user.role),
+      token: data.token
+    };
+  } else {
+    // Fallback: immediately log in to get a token
+    const logged = await loginApi(email, password);
+    user = {
+      ...logged,
+      role: normalizeRole(logged.role),
+      token: logged.token || null
+    };
+  }
 
   localStorage.setItem("user", JSON.stringify(user));
+  try { localStorage.setItem("userData", JSON.stringify(user)); } catch (e) {}
 
   return user;
 };
 
 export const logoutApi = () => {
   localStorage.removeItem("user");
+  try { localStorage.removeItem("userData"); } catch (e) {}
 };
 
 export const getCurrentUser = () => {
