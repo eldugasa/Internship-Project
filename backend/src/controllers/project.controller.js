@@ -33,7 +33,7 @@ export const createProject = async (req, res) => {
 
     res.status(201).json({ message: "Project created", project });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -74,7 +74,7 @@ export const getAllProjects = async (req, res) => {
 
     res.json(projects);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -97,6 +97,6 @@ export const getProjectById = async (req, res) => {
 
     res.json(project);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };

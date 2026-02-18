@@ -113,7 +113,7 @@ const createTask = async (req, res) => {
     
     res.status(201).json({ message: "Task created", task });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -127,7 +127,7 @@ const getTasksByProject = async (req, res) => {
     });
     res.json(tasks);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -152,7 +152,7 @@ const updateTaskStatus = async (req, res) => {
 
     res.json({ message: "Task updated", task: updatedTask });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -167,7 +167,7 @@ const getAllTasks = async (req, res) => {
     });
     res.json(tasks);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 

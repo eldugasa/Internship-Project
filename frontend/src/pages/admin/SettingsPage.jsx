@@ -1,5 +1,6 @@
 // src/pages/admin/SettingsPage.jsx
 import React, { useState, useEffect } from "react";
+import { apiClient } from "../../services/apiClient";
 
 const SettingsPage = () => {
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -20,18 +21,12 @@ const SettingsPage = () => {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/users/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        const data = await res.json();
+        const data = await apiClient('/users/me');
         setUser(data);
         setName(data.name);
         setEmail(data.email);
       } catch (error) {
-        console.error("Error fetching user:", error);
+        console.error('Error fetching user:', error);
       }
     };
 
@@ -41,28 +36,18 @@ const SettingsPage = () => {
   // ---------------- UPDATE PROFILE ----------------
   const handleUpdateProfile = async () => {
     try {
-      const res = await fetch(
-        "http://localhost:5000/api/users/me/profile",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+      try {
+        const data = await apiClient('/users/me/profile', {
+          method: 'PUT',
           body: JSON.stringify({ name, email }),
-        }
-      );
+        });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || "Failed to update profile");
-        return;
+        alert('Profile updated successfully!');
+        setShowEditProfile(false);
+        setUser(data);
+      } catch (e) {
+        alert(e.message || 'Failed to update profile');
       }
-
-      alert("Profile updated successfully!");
-      setShowEditProfile(false);
-      setUser(data);
     } catch (error) {
       console.error(error);
       alert("Something went wrong");
@@ -77,33 +62,20 @@ const SettingsPage = () => {
     }
 
     try {
-      const res = await fetch(
-        "http://localhost:5000/api/users/me/password",
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            currentPassword,
-            newPassword,
-          }),
-        }
-      );
+      try {
+        await apiClient('/users/me/password', {
+          method: 'PUT',
+          body: JSON.stringify({ currentPassword, newPassword }),
+        });
 
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || "Failed to change password");
-        return;
+        alert('Password changed successfully!');
+        setShowChangePassword(false);
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } catch (e) {
+        alert(e.message || 'Failed to change password');
       }
-
-      alert("Password changed successfully!");
-      setShowChangePassword(false);
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
     } catch (error) {
       console.error(error);
       alert("Something went wrong");

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { apiClient } from "../../services/apiClient";
 
 const Reports = () => {
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -11,21 +12,8 @@ const Reports = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [dashboardRes, usersRes] = await Promise.all([
-          fetch("http://localhost:5000/api/admin/dashboard", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          fetch("http://localhost:5000/api/users", {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ]);
-
-        if (!dashboardRes.ok || !usersRes.ok) {
-          throw new Error("Failed to fetch report data");
-        }
-
-        const dashboardData = await dashboardRes.json();
-        const usersData = await usersRes.json();
+        const dashboardData = await apiClient('/admin/dashboard');
+        const usersData = await apiClient('/users');
 
         setDashboardStats(dashboardData);
         setUsers(usersData);
@@ -38,7 +26,7 @@ const Reports = () => {
     };
 
     fetchData();
-  }, [token]);
+  }, []);
 
   const completionRate = dashboardStats
     ? Math.round(

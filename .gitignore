@@ -19,3 +19,5 @@ yarn-error.log*
 
 # Build artifacts
 frontend/dist/
+admin.json
+pm.json

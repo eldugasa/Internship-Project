@@ -12,7 +12,7 @@ export const authorize = (...allowedRoles) => {
   return (req, res, next) => {
     // Reject if token/user role is missing
     if (!req.user || !req.user.role) {
-      return res.status(403).json({ error: "Access denied" });
+      return res.status(403).json({ message: "Access denied" });
     }
 
     const normalizedUserRole = normalizeRole(req.user.role);
@@ -20,7 +20,7 @@ export const authorize = (...allowedRoles) => {
     // Compare normalized values to avoid case/format mismatch bugs
     if (!normalizedAllowedRoles.includes(normalizedUserRole)) {
       return res.status(403).json({
-        error: "Forbidden: insufficient role",
+        message: "Forbidden: insufficient role",
         yourRole: req.user.role,
         normalizedRole: normalizedUserRole,
         allowedRoles,

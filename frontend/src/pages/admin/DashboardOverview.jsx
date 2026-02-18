@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { apiClient } from "../../services/apiClient";
 
 const DashboardOverview = () => {
   const [projects, setProjects] = useState([]);
@@ -23,28 +24,7 @@ const DashboardOverview = () => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-          setError("You are not logged in.");
-          setIsLoading(false);
-          return;
-        }
-
-        const res = await fetch("http://localhost:5000/api/projects", {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (res.status === 401) {
-          setError("Unauthorized. Please login again.");
-          setIsLoading(false);
-          return;
-        }
-
-        const data = await res.json();
+        const data = await apiClient('/projects');
 
         const mappedProjects = data.map((p) => ({
           id: p.id,

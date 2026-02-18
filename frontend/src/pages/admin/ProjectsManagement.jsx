@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { apiClient } from "../../services/apiClient";
 import ProjectCard from "../../Component/admin/ProjectCard";
 
 const ProjectsManagement = () => {
@@ -20,26 +21,7 @@ const ProjectsManagement = () => {
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const token = localStorage.getItem("token");
-
-        if (!token) {
-          setError("Not authenticated.");
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch("http://localhost:5000/api/projects", {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch projects");
-        }
-
-        const data = await res.json();
+        const data = await apiClient('/projects');
 
         const mappedProjects = data.map((p) => {
           const totalTasks = Array.isArray(p.tasks) ? p.tasks.length : 0;

@@ -29,7 +29,7 @@ const createTeam = async (req, res) => {
     res.status(201).json({ team });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -51,7 +51,7 @@ const getAllTeams = async (req, res) => {
 
     res.json(teams);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -78,7 +78,7 @@ const getTeamById = async (req, res) => {
 
     res.json(team);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -97,7 +97,7 @@ const assignUserToTeam = async (req, res) => {
 
     res.json({ message: "User assigned to team", user });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -115,7 +115,7 @@ const removeUserFromTeam = async (req, res) => {
 
     res.json({ message: "User removed from team", user });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ message: err.message });
   }
 };
 
