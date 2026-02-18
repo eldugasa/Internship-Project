@@ -1,12 +1,16 @@
 // src/pages/admin/SettingsPage.jsx
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../../services/apiClient";
+import { User, Lock, X, Save, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const SettingsPage = () => {
+  const navigate = useNavigate();
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
 
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -15,177 +19,340 @@ const SettingsPage = () => {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  const token = localStorage.getItem("token");
+  const [profileUpdating, setProfileUpdating] = useState(false);
+  const [passwordUpdating, setPasswordUpdating] = useState(false);
 
-  // ---------------- FETCH USER ----------------
+  // Fetch user
   useEffect(() => {
     const fetchUser = async () => {
       try {
+        setLoading(true);
         const data = await apiClient('/users/me');
         setUser(data);
         setName(data.name);
         setEmail(data.email);
       } catch (error) {
         console.error('Error fetching user:', error);
+        alert('Failed to load user profile');
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchUser();
-  }, [token]);
+  }, []);
 
-  // ---------------- UPDATE PROFILE ----------------
-  const handleUpdateProfile = async () => {
-    try {
-      try {
-        const data = await apiClient('/users/me/profile', {
-          method: 'PUT',
-          body: JSON.stringify({ name, email }),
-        });
-
-        alert('Profile updated successfully!');
-        setShowEditProfile(false);
-        setUser(data);
-      } catch (e) {
-        alert(e.message || 'Failed to update profile');
-      }
-    } catch (error) {
-      console.error(error);
-      alert("Something went wrong");
-    }
+  // Logout function
+  const logout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
   };
 
-  // ---------------- CHANGE PASSWORD ----------------
-  const handleChangePassword = async () => {
-    if (newPassword !== confirmPassword) {
-      alert("Passwords do not match");
+  // Update Profile
+  const handleUpdateProfile = async () => {
+    if (!name.trim() || !email.trim()) {
+      alert('Name and email are required');
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      alert('Please enter a valid email address');
       return;
     }
 
     try {
-      try {
-        await apiClient('/users/me/password', {
-          method: 'PUT',
-          body: JSON.stringify({ currentPassword, newPassword }),
-        });
+      setProfileUpdating(true);
+      const updatedUser = await apiClient('/users/me/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ name, email }),
+      });
 
-        alert('Password changed successfully!');
-        setShowChangePassword(false);
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-      } catch (e) {
-        alert(e.message || 'Failed to change password');
+      // Check if email changed
+      if (email !== user.email) {
+        alert('Email updated! Please login again with your new email.');
+        logout(); // Force re-login
+      } else {
+        setUser(updatedUser);
+        setShowEditProfile(false);
+        alert('Profile updated successfully!');
       }
     } catch (error) {
-      console.error(error);
-      alert("Something went wrong");
+      console.error('Error updating profile:', error);
+      alert(error.message || 'Failed to update profile');
+    } finally {
+      setProfileUpdating(false);
     }
   };
 
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">Settings</h1>
+  // Change Password
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      alert('All password fields are required');
+      return;
+    }
 
-      <div className="max-w-sm space-y-4">
+    if (newPassword !== confirmPassword) {
+      alert('New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      alert('Password must be at least 6 characters');
+      return;
+    }
+
+    try {
+      setPasswordUpdating(true);
+      await apiClient('/users/me/password', {
+        method: 'PUT',
+        body: JSON.stringify({ 
+          currentPassword, 
+          newPassword 
+        }),
+      });
+
+      alert('Password changed successfully! Please login again.');
+      logout(); // Force re-login for security
+    } catch (error) {
+      console.error('Error changing password:', error);
+      alert(error.message || 'Failed to change password');
+    } finally {
+      setPasswordUpdating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4DA5AD]"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
+
+      {/* Profile Summary Card */}
+      {user && (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h2>
+          <div className="flex items-center space-x-4">
+            <div className="w-16 h-16 bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] rounded-full flex items-center justify-center text-white text-2xl font-bold">
+              {user.name?.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <p className="text-xl font-semibold text-gray-900">{user.name}</p>
+              <p className="text-gray-600">{user.email}</p>
+              <p className="text-sm text-gray-500 mt-1 capitalize">Role: {user.role?.replace(/[_-]/g, ' ')}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Options */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <button
-          className="w-full p-4 bg-white border rounded-lg"
           onClick={() => setShowEditProfile(true)}
+          className="p-6 bg-white border border-gray-200 rounded-xl hover:shadow-md transition flex items-center space-x-4"
         >
-          Edit Profile
+          <div className="w-12 h-12 bg-blue-50 rounded-lg flex items-center justify-center">
+            <User className="w-6 h-6 text-blue-500" />
+          </div>
+          <div className="text-left">
+            <h3 className="font-semibold text-gray-900">Edit Profile</h3>
+            <p className="text-sm text-gray-500">Update your name and email</p>
+          </div>
         </button>
 
         <button
-          className="w-full p-4 bg-white border rounded-lg"
           onClick={() => setShowChangePassword(true)}
+          className="p-6 bg-white border border-gray-200 rounded-xl hover:shadow-md transition flex items-center space-x-4"
         >
-          Change Password
+          <div className="w-12 h-12 bg-green-50 rounded-lg flex items-center justify-center">
+            <Lock className="w-6 h-6 text-green-500" />
+          </div>
+          <div className="text-left">
+            <h3 className="font-semibold text-gray-900">Change Password</h3>
+            <p className="text-sm text-gray-500">Update your password</p>
+          </div>
         </button>
       </div>
 
-      {/* ---------------- EDIT PROFILE MODAL ---------------- */}
+      {/* Security Note */}
+      <div className="mt-8 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p className="text-sm text-yellow-800">
+          <strong>Security Note:</strong> If you change your email or password, you'll need to login again.
+        </p>
+      </div>
+
+      {/* Edit Profile Modal */}
       {showEditProfile && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg w-96">
-            <h2 className="text-lg font-bold mb-4">Edit Profile</h2>
-
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Full Name"
-              className="w-full mb-3 p-2 border rounded"
-            />
-
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              className="w-full mb-3 p-2 border rounded"
-            />
-
-            <div className="flex justify-end space-x-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900">Edit Profile</h2>
               <button
                 onClick={() => setShowEditProfile(false)}
-                className="px-4 py-2 border rounded"
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Full Name
+                </label>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Enter your full name"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                  disabled={profileUpdating}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                  disabled={profileUpdating}
+                />
+                {email !== user?.email && (
+                  <p className="text-xs text-yellow-600 mt-1">
+                    ⚠️ Changing email will require re-login
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowEditProfile(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                disabled={profileUpdating}
               >
                 Cancel
               </button>
-
               <button
                 onClick={handleUpdateProfile}
-                className="px-4 py-2 bg-[#4DA5AD] text-white rounded"
+                disabled={profileUpdating}
+                className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition disabled:opacity-50 flex items-center"
               >
-                Save
+                {profileUpdating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ---------------- CHANGE PASSWORD MODAL ---------------- */}
+      {/* Change Password Modal */}
       {showChangePassword && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-          <div className="bg-white p-6 rounded-lg w-96">
-            <h2 className="text-lg font-bold mb-4">Change Password</h2>
-
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Current Password"
-              className="w-full mb-3 p-2 border rounded"
-            />
-
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="New Password"
-              className="w-full mb-3 p-2 border rounded"
-            />
-
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm New Password"
-              className="w-full mb-3 p-2 border rounded"
-            />
-
-            <div className="flex justify-end space-x-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+          <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-md">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900">Change Password</h2>
               <button
                 onClick={() => setShowChangePassword(false)}
-                className="px-4 py-2 border rounded"
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                  disabled={passwordUpdating}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min. 6 characters)"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                  disabled={passwordUpdating}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                  disabled={passwordUpdating}
+                />
+              </div>
+
+              <p className="text-xs text-yellow-600">
+                ⚠️ After password change, you'll need to login again
+              </p>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowChangePassword(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                disabled={passwordUpdating}
               >
                 Cancel
               </button>
-
               <button
                 onClick={handleChangePassword}
-                className="px-4 py-2 bg-[#4DA5AD] text-white rounded"
+                disabled={passwordUpdating}
+                className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition disabled:opacity-50 flex items-center"
               >
-                Update
+                {passwordUpdating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4 mr-2" />
+                    Update Password
+                  </>
+                )}
               </button>
             </div>
           </div>

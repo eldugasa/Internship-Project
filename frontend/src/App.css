@@ -11,3 +11,16 @@ html {
 .animate-float {
   animation: float 4s ease-in-out infinite;
 }
+/* Prevent sidebar scrolling */
+.sidebar {
+  overflow: hidden !important;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+/* Allow main content to scroll */
+.main-content {
+  overflow-y: auto;
+  height: 100vh;
+}

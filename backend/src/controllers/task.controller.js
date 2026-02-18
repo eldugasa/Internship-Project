@@ -1,4 +1,7 @@
-// Add this to your existing task.controller.js
+// backend/src/controllers/task.controller.js
+import { prisma } from "../config/db.js";  // ✅ CRITICAL: This was missing!
+
+// Get task by ID
 const getTaskById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -22,7 +25,7 @@ const getTaskById = async (req, res) => {
             status: true 
           } 
         },
-        comments: { // ✅ Include comments
+        comments: {
           include: {
             user: { select: { id: true, name: true, email: true } }
           },
@@ -42,31 +45,24 @@ const getTaskById = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to view this task" });
     }
 
-    // Format response with all fields
     res.json({
       id: task.id,
       title: task.title,
       description: task.description,
       status: task.status,
-      progress: task.progress || 0, // ✅ New field
-      priority: task.priority || 'MEDIUM', // ✅ New field
-      dueDate: task.dueDate, // ✅ New field
-      estimatedHours: task.estimatedHours, // ✅ New field
-      actualHours: task.actualHours, // ✅ New field
-      
-      // Assignee info
+      progress: task.progress || 0,
+      priority: task.priority || 'MEDIUM',
+      dueDate: task.dueDate,
+      estimatedHours: task.estimatedHours,
+      actualHours: task.actualHours,
       assigneeId: task.assigneeId,
       assignee: task.assignee?.name || null,
       assigneeEmail: task.assignee?.email || null,
       assigneeRole: task.assignee?.role || null,
-      
-      // Project info
       projectId: task.projectId,
       project: task.project?.name || null,
       projectDescription: task.project?.description || null,
       projectStatus: task.project?.status || null,
-      
-      // Comments ✅ New
       comments: task.comments?.map(comment => ({
         id: comment.id,
         content: comment.content,
@@ -77,8 +73,6 @@ const getTaskById = async (req, res) => {
           email: comment.user.email
         }
       })) || [],
-      
-      // Timestamps
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     });
@@ -88,7 +82,6 @@ const getTaskById = async (req, res) => {
   }
 };
 
-// Add these new controller functions too:
 // Create a task (PROJECT_MANAGER only)
 const createTask = async (req, res) => {
   try {
@@ -113,6 +106,7 @@ const createTask = async (req, res) => {
     
     res.status(201).json({ message: "Task created", task });
   } catch (err) {
+    console.error('Error in createTask:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -127,6 +121,7 @@ const getTasksByProject = async (req, res) => {
     });
     res.json(tasks);
   } catch (err) {
+    console.error('Error in getTasksByProject:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -152,6 +147,7 @@ const updateTaskStatus = async (req, res) => {
 
     res.json({ message: "Task updated", task: updatedTask });
   } catch (err) {
+    console.error('Error in updateTaskStatus:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -167,6 +163,7 @@ const getAllTasks = async (req, res) => {
     });
     res.json(tasks);
   } catch (err) {
+    console.error('Error in getAllTasks:', err);  // This will now show in your backend console
     res.status(500).json({ message: err.message });
   }
 };
@@ -196,7 +193,6 @@ const updateTaskProgress = async (req, res) => {
       where: { id: parseInt(id) },
       data: { 
         progress,
-        // Auto-update status based on progress
         status: progress === 100 ? 'DONE' : 
                 progress > 0 ? 'IN_PROGRESS' : 'PENDING'
       }
@@ -276,7 +272,6 @@ const deleteTask = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Check if task exists
     const task = await prisma.task.findUnique({
       where: { id: parseInt(id) }
     });
@@ -285,17 +280,14 @@ const deleteTask = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Only admin or project manager can delete
     if (req.user.role !== "ADMIN" && req.user.role !== "PROJECT_MANAGER") {
       return res.status(403).json({ message: "Not authorized to delete tasks" });
     }
 
-    // Delete associated comments first
     await prisma.comment.deleteMany({
       where: { taskId: parseInt(id) }
     });
 
-    // Delete the task
     await prisma.task.delete({
       where: { id: parseInt(id) }
     });
@@ -307,7 +299,7 @@ const deleteTask = async (req, res) => {
   }
 };
 
-// Don't forget to update your exports
+// Export all functions
 export { 
   createTask, 
   getTasksByProject, 
