@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import axios from 'axios';
+import { getMyTasks } from '../../services/tasksService';
+import { updateTaskStatus } from '../../services/tasksService';
 import { 
   CheckSquare, Clock, AlertCircle, TrendingUp, 
   Calendar, FileText, ChevronRight,
@@ -22,8 +23,9 @@ const TeamMemberDashboard = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [updatingTaskId, setUpdatingTaskId] = useState(null);
 
-  // ✅ LOAD AUTH USER + TASKS FROM BACKEND
+  // Load user and tasks
   useEffect(() => {
     if (!user) {
       setIsLoading(false);
@@ -45,13 +47,13 @@ const TeamMemberDashboard = () => {
 
     const fetchTasks = async () => {
       try {
-        const res = await axios.get('http://localhost:5000/api/tasks');
-        const employeeTasks = res.data.filter(task => task.assigneeId === user.id);
+        // ✅ Use getMyTasks instead of axios.get
+        const employeeTasks = await getMyTasks();
         setTasks(employeeTasks);
         setFilteredTasks(employeeTasks);
         calculateStats(employeeTasks, currentEmployee.efficiency);
       } catch (err) {
-        console.error(err);
+        console.error('Error fetching tasks:', err);
       } finally {
         setIsLoading(false);
       }
@@ -60,7 +62,7 @@ const TeamMemberDashboard = () => {
     fetchTasks();
   }, [user]);
 
-  // ✅ FILTERING
+  // Filtering
   useEffect(() => {
     let result = tasks;
 
@@ -72,20 +74,20 @@ const TeamMemberDashboard = () => {
       const query = searchQuery.toLowerCase();
       result = result.filter(task => 
         task.title.toLowerCase().includes(query) ||
-        (task.project || task.projectName || '').toLowerCase().includes(query)
+        (task.projectName || '').toLowerCase().includes(query)
       );
     }
 
     setFilteredTasks(result);
   }, [searchQuery, statusFilter, tasks]);
 
-  // ✅ STATS CALCULATOR
+  // Stats Calculator
   const calculateStats = (employeeTasks, efficiency) => {
     const completedTasks = employeeTasks.filter(t => t.status === 'completed').length;
     const inProgressTasks = employeeTasks.filter(t => t.status === 'in-progress').length;
     const pendingTasks = employeeTasks.filter(t => t.status === 'pending').length;
     const overdueTasks = employeeTasks.filter(t => 
-      new Date(t.deadline) < new Date() && t.status !== 'completed'
+      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'
     ).length;
     
     const totalHours = employeeTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
@@ -109,12 +111,14 @@ const TeamMemberDashboard = () => {
     });
   };
 
-  // ✅ HANDLE TASK PROGRESS UPDATE
+  // Handle Task Progress Update
   const handleUpdateProgress = async (taskId, progress) => {
     const status = progress === 100 ? 'completed' : 'in-progress';
+    
+    setUpdatingTaskId(taskId);
+    
     try {
-      await axios.put(`http://localhost:5000/api/tasks/${taskId}`, { progress, status });
-      
+      // Optimistic update
       const updatedTasks = tasks.map(task => 
         task.id === taskId 
           ? { ...task, progress, status, actualHours: (task.actualHours || 0) + 1 } 
@@ -122,9 +126,19 @@ const TeamMemberDashboard = () => {
       );
       setTasks(updatedTasks);
       calculateStats(updatedTasks, stats.efficiency);
+
+      // ✅ Use updateTaskStatus service
+      await updateTaskStatus(taskId, status, progress);
     } catch (err) {
-      console.error(err);
+      console.error('Error updating task:', err);
       alert('Failed to update task progress');
+      
+      // Revert on error
+      const originalTasks = await getMyTasks();
+      setTasks(originalTasks);
+      calculateStats(originalTasks, stats.efficiency);
+    } finally {
+      setUpdatingTaskId(null);
     }
   };
 
@@ -132,20 +146,25 @@ const TeamMemberDashboard = () => {
     handleUpdateProgress(taskId, 0);
   };
 
-  // ✅ HELPER FUNCTIONS
+  // Helper Functions
   const getUrgentTasks = () => {
     return filteredTasks
       .filter(task => 
         task.priority === 'high' && 
         task.status !== 'completed' &&
-        new Date(task.deadline) <= new Date(new Date().setDate(new Date().getDate() + 3))
+        task.dueDate && 
+        new Date(task.dueDate) <= new Date(new Date().setDate(new Date().getDate() + 3))
       )
       .slice(0, 3);
   };
 
   const getTodayTasks = () => {
     const today = new Date().toISOString().split('T')[0];
-    return filteredTasks.filter(task => task.deadline === today);
+    return filteredTasks.filter(task => {
+      if (!task.dueDate) return false;
+      const taskDate = new Date(task.dueDate).toISOString().split('T')[0];
+      return taskDate === today;
+    });
   };
 
   const getUpcomingDeadlines = () => {
@@ -153,9 +172,10 @@ const TeamMemberDashboard = () => {
     nextWeek.setDate(nextWeek.getDate() + 7);
     
     return filteredTasks.filter(task => {
-      const deadline = new Date(task.deadline);
+      if (!task.dueDate || task.status === 'completed') return false;
+      const deadline = new Date(task.dueDate);
       const today = new Date();
-      return deadline >= today && deadline <= nextWeek && task.status !== 'completed';
+      return deadline >= today && deadline <= nextWeek;
     }).slice(0, 3);
   };
 
@@ -172,11 +192,25 @@ const TeamMemberDashboard = () => {
     switch (priority) {
       case 'high': return 'bg-red-100 text-red-800';
       case 'medium': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-green-100 text-green-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  // ✅ SAFE LOADING
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'No deadline';
+    try {
+      return new Date(dateStr).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return 'Invalid date';
+    }
+  };
+
+  // Safe Loading
   if (isLoading || !employee) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -188,9 +222,9 @@ const TeamMemberDashboard = () => {
     );
   }
 
-  // ✅ DASHBOARD JSX
+  // Dashboard JSX
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-2xl p-6 lg:p-8 text-white shadow-lg">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between">
@@ -223,7 +257,7 @@ const TeamMemberDashboard = () => {
 
       {/* Filters and Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
           {['all', 'pending', 'in-progress', 'completed'].map(status => (
             <button
               key={status}
@@ -314,77 +348,83 @@ const TeamMemberDashboard = () => {
             
             <div className="space-y-4">
               {filteredTasks.length > 0 ? (
-                filteredTasks.map(task => (
-                  <div key={task.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{task.title}</h3>
-                        <p className="text-sm text-gray-500 mt-1">{task.project || task.projectName}</p>
+                filteredTasks.map(task => {
+                  const isUpdating = updatingTaskId === task.id;
+                  
+                  return (
+                    <div key={task.id} className={`border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow ${isUpdating ? 'opacity-75' : ''}`}>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-gray-900">{task.title}</h3>
+                          <p className="text-sm text-gray-500 mt-1">{task.projectName || 'No Project'}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(task.priority)}`}>
+                            {task.priority}
+                          </span>
+                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(task.status)}`}>
+                            {task.status}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(task.priority)}`}>
-                          {task.priority}
-                        </span>
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(task.status)}`}>
-                          {task.status}
-                        </span>
-                      </div>
-                    </div>
 
-                    {/* Progress Bar */}
-                    <div className="mb-3">
-                      <div className="flex justify-between text-sm mb-1">
-                        <span>Progress: {task.progress}%</span>
-                        <span>{task.actualHours || 0}/{task.estimatedHours || 0} hrs</span>
+                      {/* Progress Bar */}
+                      <div className="mb-3">
+                        <div className="flex justify-between text-sm mb-1">
+                          <span>Progress: {task.progress || 0}%</span>
+                          <span>{task.actualHours || 0}/{task.estimatedHours || 0} hrs</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-[#4DA5AD] h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${task.progress || 0}%` }}
+                          ></div>
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-[#4DA5AD] h-2 rounded-full"
-                          style={{ width: `${task.progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-500">
-                        Due: {task.deadline}
-                        {new Date(task.deadline) < new Date() && task.status !== 'completed' && (
-                          <span className="ml-2 text-red-600">(Overdue)</span>
-                        )}
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        {task.status === 'pending' && (
-                          <button
-                            onClick={() => handleStartTask(task.id)}
-                            className="px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200"
-                          >
-                            Start
-                          </button>
-                        )}
+                      {/* Action Buttons */}
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm text-gray-500">
+                          Due: {formatDate(task.dueDate)}
+                          {task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed' && (
+                            <span className="ml-2 text-red-600">(Overdue)</span>
+                          )}
+                        </div>
                         
-                        {task.status === 'in-progress' && (
-                          <div className="flex gap-1">
-                            {[25, 50, 75, 100].map(percent => (
-                              <button
-                                key={percent}
-                                onClick={() => handleUpdateProgress(task.id, percent)}
-                                className={`px-2 py-1 text-xs rounded ${
-                                  task.progress === percent 
-                                    ? 'bg-[#4DA5AD] text-white' 
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
-                              >
-                                {percent}%
-                              </button>
-                            ))}
-                          </div>
-                        )}
+                        <div className="flex gap-2">
+                          {task.status === 'pending' && (
+                            <button
+                              onClick={() => handleStartTask(task.id)}
+                              disabled={isUpdating}
+                              className="px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 disabled:opacity-50"
+                            >
+                              {isUpdating ? '...' : 'Start'}
+                            </button>
+                          )}
+                          
+                          {task.status === 'in-progress' && (
+                            <div className="flex gap-1">
+                              {[25, 50, 75, 100].map(percent => (
+                                <button
+                                  key={percent}
+                                  onClick={() => handleUpdateProgress(task.id, percent)}
+                                  disabled={isUpdating}
+                                  className={`px-2 py-1 text-xs rounded ${
+                                    task.progress === percent 
+                                      ? 'bg-[#4DA5AD] text-white' 
+                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  } disabled:opacity-50`}
+                                >
+                                  {percent}%
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-8">
                   <p className="text-gray-500">No tasks found</p>
@@ -409,14 +449,14 @@ const TeamMemberDashboard = () => {
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>Due: {task.deadline}</span>
-                    <span>{task.progress}%</span>
+                    <span>Due: {formatDate(task.dueDate)}</span>
+                    <span>{task.progress || 0}%</span>
                   </div>
                 </div>
               ))}
               
               {getUpcomingDeadlines().length === 0 && (
-                <p className="text-gray-500 text-sm">No upcoming deadlines</p>
+                <p className="text-gray-500 text-sm text-center py-4">No upcoming deadlines</p>
               )}
             </div>
           </div>
@@ -432,7 +472,7 @@ const TeamMemberDashboard = () => {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
-                    className="bg-green-500 h-2 rounded-full"
+                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${stats.completionRate}%` }}
                   ></div>
                 </div>
@@ -445,7 +485,7 @@ const TeamMemberDashboard = () => {
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
-                    className="bg-blue-500 h-2 rounded-full"
+                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${stats.utilization}%` }}
                   ></div>
                 </div>

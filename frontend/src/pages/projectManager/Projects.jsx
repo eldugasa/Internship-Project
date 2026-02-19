@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Search, Filter, Trash2, X } from 'lucide-react';
 import { getProjects, deleteProject } from '../../services/projectsService';
+import { getTasksByProject } from '../../services/tasksService';
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -15,19 +16,34 @@ const Projects = () => {
   const [loading, setLoading] = useState(true);
   const [localSearch, setLocalSearch] = useState(searchFromUrl);
   const [filteredProjects, setFilteredProjects] = useState([]);
+  const [projectTasks, setProjectTasks] = useState({});
 
   // Fetch projects using service
   useEffect(() => {
     const fetchProjects = async () => {
       setLoading(true);
       try {
-        // ✅ Using service - token handled automatically by apiClient
+        // Fetch all projects
         const data = await getProjects();
         setProjects(data);
+        
+        // Fetch tasks for each project to calculate progress
+        const tasksMap = {};
+        await Promise.all(
+          data.map(async (project) => {
+            try {
+              const tasks = await getTasksByProject(project.id);
+              tasksMap[project.id] = tasks;
+            } catch (err) {
+              console.error(`Error fetching tasks for project ${project.id}:`, err);
+              tasksMap[project.id] = [];
+            }
+          })
+        );
+        setProjectTasks(tasksMap);
       } catch (err) {
         console.error('Error fetching projects:', err);
         
-        // Handle 401 specifically
         if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
           alert('Your session has expired. Please login again.');
           localStorage.removeItem('token');
@@ -44,6 +60,18 @@ const Projects = () => {
     
     fetchProjects();
   }, [navigate]);
+
+  // Calculate project progress based on tasks
+  const calculateProjectProgress = (projectId) => {
+    const tasks = projectTasks[projectId] || [];
+    if (tasks.length === 0) return 0;
+    
+    const completedTasks = tasks.filter(task => 
+      task.status === 'completed' || task.status === 'done'
+    ).length;
+    
+    return Math.round((completedTasks / tasks.length) * 100);
+  };
 
   // Filter projects based on search
   useEffect(() => {
@@ -81,9 +109,12 @@ const Projects = () => {
     if (!window.confirm('Are you sure you want to delete this project?')) return;
 
     try {
-      // ✅ Using service - token handled automatically
       await deleteProject(id);
       setProjects(projects.filter(p => p.id !== id));
+      // Also remove from tasks map
+      const newTasksMap = { ...projectTasks };
+      delete newTasksMap[id];
+      setProjectTasks(newTasksMap);
       alert('Project deleted successfully!');
     } catch (err) {
       console.error('Error deleting project:', err);
@@ -101,11 +132,6 @@ const Projects = () => {
   };
 
   const formatDate = dateStr => dateStr || 'N/A';
-
-  // Progress is already calculated in the service normalization
-  const getProgress = (project) => {
-    return project.progress || 0;
-  };
 
   if (loading) {
     return (
@@ -162,7 +188,11 @@ const Projects = () => {
       {/* Projects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProjects.length > 0 ? filteredProjects.map(project => {
-          const progress = getProgress(project);
+          const progress = calculateProjectProgress(project.id);
+          const tasks = projectTasks[project.id] || [];
+          const completedTasks = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
+          const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
+          const pendingTasks = tasks.filter(t => t.status === 'pending').length;
 
           return (
             <div key={project.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
@@ -178,24 +208,28 @@ const Projects = () => {
               <div className="mb-4">
                 <div className="flex justify-between text-sm text-gray-600 mb-1">
                   <span>Progress</span>
-                  <span>{progress}%</span>
+                  <span className="font-semibold text-[#4DA5AD]">{progress}%</span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
                   <div 
-                    className="bg-[#4DA5AD] h-2 rounded-full transition-all duration-300" 
+                    className="bg-[#4DA5AD] h-2.5 rounded-full transition-all duration-500" 
                     style={{ width: `${progress}%` }}
                   ></div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="grid grid-cols-3 gap-2 mb-4">
                 <div className="text-center p-2 bg-gray-50 rounded">
-                  <div className="text-lg font-bold text-gray-900">{project.tasks?.total || 0}</div>
-                  <div className="text-xs text-gray-500">Tasks</div>
+                  <div className="text-lg font-bold text-gray-900">{tasks.length}</div>
+                  <div className="text-xs text-gray-500">Total</div>
                 </div>
-                <div className="text-center p-2 bg-gray-50 rounded">
-                  <div className="text-lg font-bold text-gray-900">{project.teamMembers?.length || 0}</div>
-                  <div className="text-xs text-gray-500">Team</div>
+                <div className="text-center p-2 bg-green-50 rounded">
+                  <div className="text-lg font-bold text-green-600">{completedTasks}</div>
+                  <div className="text-xs text-green-600">Done</div>
+                </div>
+                <div className="text-center p-2 bg-blue-50 rounded">
+                  <div className="text-lg font-bold text-blue-600">{inProgressTasks}</div>
+                  <div className="text-xs text-blue-600">Active</div>
                 </div>
               </div>
 
@@ -205,7 +239,7 @@ const Projects = () => {
                 <div>Deadline: {formatDate(project.dueDate || project.endDate)}</div>
               </div>
 
-              <div className="mb-4">
+              <div className="mb-4 flex justify-between items-center">
                 <span className={`px-2 py-1 rounded text-xs font-medium ${
                   project.status === 'active' ? 'bg-green-100 text-green-800' :
                   project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
@@ -214,6 +248,11 @@ const Projects = () => {
                 }`}>
                   {project.status?.toUpperCase()}
                 </span>
+                {pendingTasks > 0 && (
+                  <span className="text-xs text-yellow-600">
+                    ⏳ {pendingTasks} pending
+                  </span>
+                )}
               </div>
 
               <div className="flex space-x-2">

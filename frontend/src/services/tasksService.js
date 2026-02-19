@@ -67,9 +67,13 @@ export const getTasks = async () => {
 };
 
 // Get task by ID
+// Get task by ID
 export const getTaskById = async (id) => {
-  const task = await apiClient(`/tasks/${id}`);
-  return normalizeTask(task);
+  const response = await apiClient(`/tasks/${id}`);
+  console.log('getTaskById response:', response);
+  // The response might be the task directly or nested
+  const taskData = response.task || response;
+  return normalizeTask(taskData);
 };
 
 // Get tasks by project
@@ -78,18 +82,18 @@ export const getTasksByProject = async (projectId) => {
   return tasks.map(normalizeTask);
 };
 
+
 // Create new task
-// In tasksService.js, update createTask:
+
 
 export const createTask = async (taskData) => {
   console.log('createTask received:', taskData);
   
-  // Map frontend field names to backend expectations
   const payload = {
     title: taskData.title,
     description: taskData.description || '',
     projectId: parseInt(taskData.projectId),
-    assignedTo: parseInt(taskData.assigneeId || taskData.assignedTo), // Map assigneeId to assignedTo
+    assignedTo: parseInt(taskData.assigneeId || taskData.assignedTo),
     dueDate: taskData.dueDate,
     priority: taskData.priority?.toUpperCase() || 'MEDIUM',
     estimatedHours: taskData.estimatedHours ? parseFloat(taskData.estimatedHours) : null
@@ -97,13 +101,39 @@ export const createTask = async (taskData) => {
 
   console.log('Sending payload:', payload);
 
-  const task = await apiClient('/tasks', {
+  const response = await apiClient('/tasks', {
     method: 'POST',
     body: JSON.stringify(payload)
   });
-  return normalizeTask(task);
+  
+  console.log('createTask response:', response);
+   taskData = response.task || response;
+  return normalizeTask(taskData);
 };
 
+// Get tasks assigned to current user (for Team Members)
+export const getMyTasks = async () => {
+  try {
+    const tasks = await apiClient('/tasks/my-tasks');
+    return tasks.map(normalizeTask);
+  } catch (error) {
+    console.error('Error fetching my tasks:', error);
+    return [];
+  }
+};
+
+// Update the existing getTasksByUser to use the new endpoint
+export const getTasksByUser = async (userId) => {
+  // For Team Members, they should use getMyTasks instead
+  
+  if (userId === JSON.parse(localStorage.getItem('user'))?.id) {
+    return getMyTasks();
+  }
+  const tasks = await getTasks();
+  return tasks.filter(t => t.assigneeId === userId);
+};
+
+// Update task
 // Update task
 export const updateTask = async (id, taskData) => {
   const backendStatus = {
@@ -121,7 +151,7 @@ export const updateTask = async (id, taskData) => {
     'critical': 'CRITICAL'
   }[taskData.priority] || 'MEDIUM';
 
-  const task = await apiClient(`/tasks/${id}`, {
+  const response = await apiClient(`/tasks/${id}`, {
     method: 'PUT',
     body: JSON.stringify({
       ...taskData,
@@ -129,24 +159,50 @@ export const updateTask = async (id, taskData) => {
       priority: backendPriority
     })
   });
-  return normalizeTask(task);
+  
+  
+   taskData = response.task || response;
+  return normalizeTask(taskData);
 };
 
 // Update task status
-export const updateTaskStatus = async (taskId, status) => {
-  const backendStatus = {
-    'pending': 'PENDING',
-    'in-progress': 'IN_PROGRESS',
-    'completed': 'COMPLETED',
-    'blocked': 'BLOCKED',
-    'review': 'REVIEW'
-  }[status] || 'PENDING';
 
-  const task = await apiClient(`/tasks/${taskId}/status`, {
-    method: 'PUT',
-    body: JSON.stringify({ status: backendStatus })
-  });
-  return normalizeTask(task);
+export const updateTaskStatus = async (taskId, status, progress) => {
+  try {
+   
+    
+    const backendStatus = {
+      'pending': 'PENDING',
+      'in-progress': 'IN_PROGRESS',
+      'completed': 'COMPLETED',
+      'blocked': 'BLOCKED',
+      'review': 'REVIEW'
+    }[status] || 'PENDING';
+
+    const payload = { 
+      status: backendStatus
+    };
+    
+    if (progress !== undefined) {
+      payload.progress = progress;
+    }
+
+    console.log('Sending payload to backend:', payload);
+
+    const response = await apiClient(`/tasks/${taskId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+    
+    console.log('Backend response:', response);
+    
+ 
+    const taskData = response.task || response;
+    return normalizeTask(taskData);
+  } catch (error) {
+    console.error('Error in updateTaskStatus:', error);
+    throw error;
+  }
 };
 
 // Update task progress
@@ -174,7 +230,7 @@ export const assignTask = async (taskId, userId) => {
   return normalizeTask(task);
 };
 
-// ✅ ADD THIS: Get task comments
+
 export const getTaskComments = async (taskId) => {
   try {
     const comments = await apiClient(`/tasks/${taskId}/comments`);
@@ -185,7 +241,7 @@ export const getTaskComments = async (taskId) => {
   }
 };
 
-// ✅ ADD THIS: Add comment to task
+
 export const addTaskComment = async (taskId, commentData) => {
   const comment = await apiClient(`/tasks/${taskId}/comments`, {
     method: 'POST',
@@ -194,11 +250,8 @@ export const addTaskComment = async (taskId, commentData) => {
   return comment;
 };
 
-// Get tasks assigned to user
-export const getTasksByUser = async (userId) => {
-  const tasks = await getTasks();
-  return tasks.filter(t => t.assigneeId === userId);
-};
+
+
 
 // Get tasks by team
 export const getTasksByTeam = async (teamId) => {

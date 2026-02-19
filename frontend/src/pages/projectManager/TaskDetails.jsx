@@ -237,7 +237,7 @@ const TaskDetails = () => {
       ></div>
     </div>
     
-    <div className="flex justify-between mt-4">
+    {/* <div className="flex justify-between mt-4">
       {[0, 25, 50, 75, 100].map(percent => (
         <button
           key={percent}
@@ -252,7 +252,7 @@ const TaskDetails = () => {
           {percent}%
         </button>
       ))}
-    </div>
+    </div> */}
   </div>
 </div>
 

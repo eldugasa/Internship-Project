@@ -1,8 +1,7 @@
 // backend/src/controllers/task.controller.js
 import { prisma } from "../config/db.js";  // ✅ CRITICAL: This was missing!
 
-// Get task by ID
-// In backend/src/controllers/task.controller.js - Update getTaskById:
+
 
 // Get task by ID
 const getTaskById = async (req, res) => {
@@ -41,7 +40,7 @@ const getTaskById = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Check authorization - FIX: Use assigneeId instead of assignedTo
+   
     if (req.user.role !== "ADMIN" && 
         req.user.role !== "PROJECT_MANAGER" && 
         task.assigneeId !== req.user.id) {
@@ -62,7 +61,7 @@ const getTaskById = async (req, res) => {
       
       // Assignee info - frontend expects these fields
       assigneeId: task.assigneeId,
-      assignee: task.assignee, // Full assignee object
+      assignee: task.assignee, 
       
       // Project info
       projectId: task.projectId,
@@ -105,7 +104,7 @@ const createTask = async (req, res) => {
     
     res.status(201).json({ message: "Task created", task });
   } catch (err) {
-    console.error('Error in createTask:', err);
+   
     res.status(500).json({ message: err.message });
   }
 };
@@ -124,29 +123,108 @@ const getTasksByProject = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+// Get tasks assigned to the current user (for Team Members)
+const getMyTasks = async (req, res) => {
+  try {
+    const tasks = await prisma.task.findMany({
+      where: { 
+        assigneeId: req.user.id 
+      },
+      include: { 
+        assignee: { 
+          select: { 
+            id: true, 
+            name: true, 
+            email: true,
+            role: true 
+          } 
+        },
+        project: { 
+          select: { 
+            id: true, 
+            name: true,
+            description: true,
+            status: true 
+          } 
+        }
+      },
+      orderBy: [
+        { dueDate: 'asc' },
+        { createdAt: 'desc' }
+      ]
+    });
+    
+    // Format tasks
+    const formattedTasks = tasks.map(task => ({
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      progress: task.progress || 0,
+      priority: task.priority || 'MEDIUM',
+      dueDate: task.dueDate,
+      estimatedHours: task.estimatedHours,
+      actualHours: task.actualHours,
+      projectId: task.projectId,
+      projectName: task.project?.name || 'Unknown Project',
+      assigneeId: task.assigneeId,
+      assigneeName: task.assignee?.name || 'Unassigned',
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt
+    }));
+    
+    res.json(formattedTasks);
+  } catch (err) {
+    console.error('Error in getMyTasks:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
 
 // Update task status/progress (TEAM_MEMBER or PROJECT_MANAGER)
+
 const updateTaskStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, progress } = req.body;
 
-    const task = await prisma.task.findUnique({ where: { id: Number(id) } });
-    if (!task) return res.status(404).json({ message: "Task not found" });
+    
+
+    const task = await prisma.task.findUnique({ 
+      where: { id: Number(id) } 
+    });
+    
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
 
     // TEAM_MEMBER can only update their own tasks
-    if (req.user.role === "TEAM_MEMBER" && task.assignedTo !== req.user.id) {
-      return res.status(403).json({ message: "Forbidden" });
+    if (req.user.role === "TEAM_MEMBER" && task.assigneeId !== req.user.id) {
+      return res.status(403).json({ message: "Forbidden: You can only update your own tasks" });
     }
+
+    // Prepare update data - update BOTH status and progress
+    const updateData = {
+      updatedAt: new Date()
+    };
+    
+    if (status) updateData.status = status;
+    if (progress !== undefined) updateData.progress = progress;
+
+  
 
     const updatedTask = await prisma.task.update({
       where: { id: Number(id) },
-      data: { status, progress }
+      data: updateData
     });
 
-    res.json({ message: "Task updated", task: updatedTask });
+    console.log('✅ Task updated successfully');
+
+    res.json({ 
+      message: "Task updated", 
+      task: updatedTask 
+    });
   } catch (err) {
-    console.error('Error in updateTaskStatus:', err);
+    console.error('❌ Error in updateTaskStatus:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -162,12 +240,13 @@ const getAllTasks = async (req, res) => {
     });
     res.json(tasks);
   } catch (err) {
-    console.error('Error in getAllTasks:', err);  // This will now show in your backend console
+    console.error('Error in getAllTasks:', err);   
     res.status(500).json({ message: err.message });
   }
 };
 
 // Update task progress
+
 const updateTaskProgress = async (req, res) => {
   try {
     const { id } = req.params;
@@ -181,10 +260,10 @@ const updateTaskProgress = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Check authorization
+    
     if (req.user.role !== "ADMIN" && 
         req.user.role !== "PROJECT_MANAGER" && 
-        task.assignedTo !== req.user.id) {
+        task.assigneeId !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to update this task" });
     }
 
@@ -209,14 +288,16 @@ const updateTaskProgress = async (req, res) => {
 };
 
 // Assign task to user
+
 const assignTask = async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
 
+    
     const task = await prisma.task.update({
       where: { id: parseInt(id) },
-      data: { assignedTo: parseInt(userId) },
+      data: { assigneeId: parseInt(userId) },
       include: {
         assignee: { select: { name: true, email: true } }
       }
@@ -226,7 +307,7 @@ const assignTask = async (req, res) => {
       message: 'Task assigned successfully',
       taskId: task.id,
       assignee: task.assignee?.name || null,
-      assigneeId: task.assignedTo
+      assigneeId: task.assigneeId
     });
   } catch (err) {
     console.error('Error assigning task:', err);
@@ -348,6 +429,7 @@ const deleteTask = async (req, res) => {
 export { 
   createTask, 
   getTasksByProject, 
+  getMyTasks,
   getTaskById,
   updateTaskStatus, 
   updateTaskProgress,

@@ -12,7 +12,8 @@ import {
   updateTask,
   assignTask,
   addTaskComment,
-  deleteTask
+  deleteTask,
+   getMyTasks 
 } from "../controllers/task.controller.js";
 
 const router = express.Router();
@@ -22,13 +23,13 @@ router.use(authenticate);
 
 // ===== TASK ROUTES =====
 
-// POST /api/tasks - Create task (PROJECT_MANAGER only)
+
 router.post("/", 
   authorize("PROJECT_MANAGER", "project-manager", "project_manager"), 
   createTask
 );
 
-// GET /api/tasks - Get all tasks (ADMIN or PROJECT_MANAGER)
+
 router.get("/", 
   authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"), 
   getAllTasks
@@ -40,13 +41,19 @@ router.get("/project/:projectId",
   getTasksByProject
 );
 
-// GET /api/tasks/:id - Get single task by ID (All roles with ownership check)
+// GET /api/tasks/my-tasks - Get tasks for current user (Team Member)
+router.get("/my-tasks",
+  authorize("TEAM_MEMBER", "team-member", "team_member"),
+  getMyTasks
+);
+
+
 router.get("/:id", 
   authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"),
   getTaskById
 );
 
-// ✅ ADD THIS: PUT /api/tasks/:id - Update task (PROJECT_MANAGER or ADMIN)
+
 router.put("/:id", 
   authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
   updateTask
@@ -58,13 +65,22 @@ router.put("/:id/status",
   updateTaskStatus
 );
 
-// ✅ ADD THIS: PUT /api/tasks/:id/assign - Assign task to user
+
+
+// GET /api/tasks/my-tasks - Get tasks for current user (Team Member)
+router.get("/my-tasks", 
+  authenticate,
+  authorize("TEAM_MEMBER", "team-member", "team_member"),
+  getMyTasks
+);
+
+
 router.put("/:id/assign", 
   authorize("PROJECT_MANAGER", "project-manager", "project_manager"),
   assignTask
 );
 
-// ✅ ADD THIS: DELETE /api/tasks/:id - Delete task
+
 router.delete("/:id", 
   authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
   deleteTask

@@ -1,3 +1,4 @@
+// src/pages/teamMember/TaskDetails.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -6,11 +7,10 @@ import {
   Clock,
   User,
   Flag,
-  CheckCircle,
   MessageSquare,
   Edit,
 } from "lucide-react";
-import DataService from "../../services/dataservices";
+import { getTaskById, updateTaskStatus, addTaskComment } from "../../services/tasksService";
 
 const PRIORITY_MAP = {
   high: "bg-red-100 text-red-800",
@@ -26,7 +26,11 @@ const STATUS_MAP = {
 
 const formatDate = (date) => {
   if (!date) return "—";
-  return new Date(date).toLocaleString();
+  try {
+    return new Date(date).toLocaleString();
+  } catch {
+    return "Invalid date";
+  }
 };
 
 const clampProgress = (value) => {
@@ -43,17 +47,17 @@ const TaskDetails = () => {
   const [loading, setLoading] = useState(true);
   const [commentText, setCommentText] = useState("");
   const [customProgress, setCustomProgress] = useState("");
-  const [updateNotes, setUpdateNotes] = useState("");
+  const [updating, setUpdating] = useState(false);
 
-  // Load Task from Backend
   useEffect(() => {
     const loadTask = async () => {
       try {
         setLoading(true);
-        const data = await DataService.getTaskById(id);
+        const data = await getTaskById(id);
         setTask(data);
       } catch (err) {
         console.error("Failed to fetch task:", err);
+        alert("Failed to load task details");
       } finally {
         setLoading(false);
       }
@@ -63,28 +67,28 @@ const TaskDetails = () => {
   }, [id]);
 
   const isOverdue = useMemo(() => {
-    if (!task?.deadline || task?.status === "completed") return false;
-    return new Date(task.deadline) < new Date();
+    if (!task?.dueDate || task?.status === "completed") return false;
+    return new Date(task.dueDate) < new Date();
   }, [task]);
 
   const handleProgressUpdate = async (value) => {
     try {
+      setUpdating(true);
       const newProgress = clampProgress(value);
+      
+      const newStatus = newProgress === 100
+        ? "completed"
+        : newProgress > 0
+        ? "in-progress"
+        : "pending";
 
-      const updatedTask = await DataService.updateTask(task.id, {
-        progress: newProgress,
-        status:
-          newProgress === 100
-            ? "completed"
-            : newProgress > 0
-            ? "in-progress"
-            : "pending",
-        updatedAt: new Date().toISOString(),
-      });
-
-      setTask(updatedTask);
+      const updatedTask = await updateTaskStatus(task.id, newStatus, newProgress);
+      setTask({ ...updatedTask });
     } catch (err) {
       console.error("Progress update failed:", err);
+      alert("Failed to update progress");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -92,25 +96,24 @@ const TaskDetails = () => {
     if (customProgress === "") return;
 
     const value = clampProgress(Number(customProgress));
-
+    
     try {
-      const updatedTask = await DataService.updateTask(task.id, {
-        progress: value,
-        status:
-          value === 100
-            ? "completed"
-            : value > 0
-            ? "in-progress"
-            : "pending",
-        notes: updateNotes,
-        updatedAt: new Date().toISOString(),
-      });
+      setUpdating(true);
+      
+      const newStatus = value === 100
+        ? "completed"
+        : value > 0
+        ? "in-progress"
+        : "pending";
 
-      setTask(updatedTask);
+      const updatedTask = await updateTaskStatus(task.id, newStatus, value);
+      setTask({ ...updatedTask });
       setCustomProgress("");
-      setUpdateNotes("");
     } catch (err) {
       console.error("Custom update failed:", err);
+      alert("Failed to update task");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -118,30 +121,44 @@ const TaskDetails = () => {
     if (!commentText.trim()) return;
 
     try {
-      const newComment = {
-        text: commentText,
-        author: "You",
-        createdAt: new Date().toISOString(),
-      };
+      setUpdating(true);
+      
+      const newComment = await addTaskComment(id, {
+        content: commentText
+      });
 
-      const updatedTask = await DataService.addComment(task.id, newComment);
-      setTask(updatedTask);
+      setTask(prev => ({
+        ...prev,
+        comments: [...(prev.comments || []), newComment]
+      }));
+      
       setCommentText("");
     } catch (err) {
       console.error("Failed to add comment:", err);
+      alert("Failed to add comment");
+    } finally {
+      setUpdating(false);
     }
   };
 
   if (loading) {
     return (
-      <div className="p-6 text-gray-500 text-sm">Loading task details...</div>
+      <div className="p-6 flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4DA5AD]"></div>
+      </div>
     );
   }
 
   if (!task) {
     return (
-      <div className="p-6 text-red-500 text-sm">
-        Task not found.
+      <div className="p-6 text-center">
+        <p className="text-red-500">Task not found.</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="mt-4 px-4 py-2 bg-[#4DA5AD] text-white rounded-lg"
+        >
+          Go Back
+        </button>
       </div>
     );
   }
@@ -151,14 +168,24 @@ const TaskDetails = () => {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
+            disabled={updating}
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <h1 className="text-2xl font-bold text-gray-900">{task.title}</h1>
+        </div>
         <button
-          onClick={() => navigate(-1)}
-          className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"
+          onClick={() => navigate(`/team-member/tasks/edit/${id}`)}
+          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+          disabled={updating}
         >
-          <ArrowLeft size={18} />
+          <Edit size={16} /> Edit
         </button>
-        <h1 className="text-2xl font-bold text-gray-900">{task.title}</h1>
       </div>
 
       {/* Main Card */}
@@ -167,18 +194,18 @@ const TaskDetails = () => {
         <div className="flex gap-3 flex-wrap">
           <span
             className={`px-3 py-1 text-xs font-semibold rounded-full ${
-              PRIORITY_MAP[task.priority] || ""
+              PRIORITY_MAP[task.priority] || 'bg-gray-100 text-gray-800'
             }`}
           >
-            {task.priority}
+            {task.priority || 'medium'}
           </span>
 
           <span
             className={`px-3 py-1 text-xs font-semibold rounded-full ${
-              STATUS_MAP[task.status] || ""
+              STATUS_MAP[task.status] || 'bg-gray-100 text-gray-800'
             }`}
           >
-            {task.status}
+            {task.status || 'pending'}
           </span>
 
           {isOverdue && (
@@ -189,21 +216,24 @@ const TaskDetails = () => {
         </div>
 
         {/* Description */}
-        <p className="text-gray-700">{task.description}</p>
+        {task.description && (
+          <p className="text-gray-700">{task.description}</p>
+        )}
 
-        {/* Task Meta */}
+        {/* Task Meta - SIMPLIFIED like Project Manager version */}
         <div className="grid sm:grid-cols-2 gap-4 text-sm text-gray-600">
           <div className="flex items-center gap-2">
-            <User size={16} /> {task.assignee || "Unassigned"}
+            <User size={16} /> {task.assigneeName || task.assignee?.name || "Unassigned"}
           </div>
           <div className="flex items-center gap-2">
-            <Flag size={16} /> {task.project || "No Project"}
+            <Flag size={16} /> {task.projectName || task.project?.name || "No Project"}
           </div>
           <div className="flex items-center gap-2">
-            <Calendar size={16} /> Due: {formatDate(task.deadline)}
+            <Calendar size={16} /> 
+            Due: {task.dueDate || "No deadline"}
           </div>
           <div className="flex items-center gap-2">
-            <Clock size={16} /> Est: {task.estimatedHours || 0}h
+            <Clock size={16} /> Est: {task.estimatedHours || 0}h / Actual: {task.actualHours || 0}h
           </div>
         </div>
 
@@ -211,7 +241,7 @@ const TaskDetails = () => {
         <div className="space-y-3">
           <div className="w-full bg-gray-100 rounded-full h-3">
             <div
-              className="bg-[#4DA5AD] h-3 rounded-full transition-all"
+              className="bg-[#4DA5AD] h-3 rounded-full transition-all duration-300"
               style={{ width: `${task.progress || 0}%` }}
             />
           </div>
@@ -226,7 +256,8 @@ const TaskDetails = () => {
             <button
               key={step}
               onClick={() => handleProgressUpdate(step)}
-              className="px-3 py-1 text-xs bg-gray-100 rounded-lg hover:bg-gray-200"
+              disabled={updating}
+              className="px-3 py-1 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
             >
               {step}%
             </button>
@@ -239,26 +270,25 @@ const TaskDetails = () => {
             Custom Update
           </h3>
 
-          <input
-            type="number"
-            placeholder="Enter progress (0–100)"
-            value={customProgress}
-            onChange={(e) => setCustomProgress(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-
-          <textarea
-            placeholder="Update notes..."
-            value={updateNotes}
-            onChange={(e) => setUpdateNotes(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              type="number"
+              placeholder="Enter progress (0–100)"
+              value={customProgress}
+              onChange={(e) => setCustomProgress(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              min="0"
+              max="100"
+              disabled={updating}
+            />
+          </div>
 
           <button
             onClick={handleCustomUpdate}
-            className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg text-sm hover:opacity-90"
+            disabled={updating || !customProgress}
+            className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg text-sm hover:bg-[#3D8B93] transition disabled:opacity-50"
           >
-            Update Task
+            {updating ? 'Updating...' : 'Update Task'}
           </button>
         </div>
       </div>
@@ -266,21 +296,34 @@ const TaskDetails = () => {
       {/* Comments */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
         <h2 className="font-bold text-gray-900 flex items-center gap-2">
-          <MessageSquare size={18} /> Comments
+          <MessageSquare size={18} /> Comments ({task.comments?.length || 0})
         </h2>
 
         {task.comments?.length ? (
-          task.comments.map((c, i) => (
-            <div key={i} className="text-sm border-b pb-2">
-              <div className="font-semibold">{c.author}</div>
-              <div className="text-gray-600">{c.text}</div>
-              <div className="text-xs text-gray-400">
-                {formatDate(c.createdAt)}
-              </div>
-            </div>
-          ))
+          <div className="space-y-4 max-h-80 overflow-y-auto">
+            {/* Sort comments by date (oldest first) */}
+            {[...task.comments]
+              .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+              .map((comment) => {
+                const uniqueKey = comment.id 
+                  ? `comment-${comment.id}` 
+                  : `comment-${Date.now()}-${Math.random()}`;
+                
+                return (
+                  <div key={uniqueKey} className="text-sm border-b border-gray-100 pb-3">
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold">{comment.user?.name || 'User'}</span>
+                      <span className="text-xs text-gray-400">
+                        {comment.createdAt ? new Date(comment.createdAt).toLocaleString() : ''}
+                      </span>
+                    </div>
+                    <div className="text-gray-600 mt-1">{comment.content}</div>
+                  </div>
+                );
+              })}
+          </div>
         ) : (
-          <div className="text-gray-500 text-sm">No comments yet.</div>
+          <div className="text-gray-500 text-sm py-4 text-center">No comments yet.</div>
         )}
 
         <div className="flex gap-2">
@@ -289,11 +332,14 @@ const TaskDetails = () => {
             placeholder="Add a comment..."
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+            disabled={updating}
+            onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
           />
           <button
             onClick={handleAddComment}
-            className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg text-sm"
+            disabled={updating || !commentText.trim()}
+            className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg text-sm hover:bg-[#3D8B93] transition disabled:opacity-50"
           >
             Post
           </button>
