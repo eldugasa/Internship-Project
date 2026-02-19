@@ -1,12 +1,15 @@
 // src/pages/projectManager/EditTask.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { X, Save, AlertCircle, Users } from 'lucide-react';
-import axios from 'axios';
+import { X, Save, Users } from 'lucide-react';
+import { getTaskById, updateTask } from '../../services/tasksService';
+import { getProjects } from '../../services/projectsService';
+import { getProjectMembers } from '../../services/projectsService';
 
 const EditTask = () => {
   const navigate = useNavigate();
   const { id } = useParams();
+  
   const [task, setTask] = useState({
     title: '',
     description: '',
@@ -22,18 +25,16 @@ const EditTask = () => {
   const [availableMembers, setAvailableMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [fetchingMembers, setFetchingMembers] = useState(false);
 
   // Fetch projects
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/projects', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setProjects(res.data);
+        const data = await getProjects();
+        setProjects(data);
       } catch (error) {
-        console.error(error);
+        console.error('Error fetching projects:', error);
         alert('Failed to fetch projects');
       }
     };
@@ -41,52 +42,70 @@ const EditTask = () => {
   }, []);
 
   // Fetch task data
-  useEffect(() => {
-    const fetchTask = async () => {
-      setLoading(true);
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`http://localhost:5000/api/tasks/${id}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const t = res.data;
-        setTask({
-          title: t.title,
-          description: t.description || '',
-          projectId: t.projectId.toString(),
-          assigneeId: t.assigneeId.toString(),
-          priority: t.priority,
-          deadline: t.deadline,
-          estimatedHours: t.estimatedHours?.toString() || '',
-          tags: t.tags?.join(', ') || ''
-        });
-      } catch (error) {
-        console.error(error);
-        alert('Failed to load task');
-        navigate('/manager/tasks');
-      } finally {
-        setLoading(false);
+ // In EditTask.jsx, update the fetchTask function:
+
+useEffect(() => {
+  const fetchTask = async () => {
+    setLoading(true);
+    try {
+      const taskData = await getTaskById(id);
+      
+      // Format date safely - check if it exists and is valid
+      let formattedDate = '';
+      if (taskData.dueDate) {
+        try {
+          const date = new Date(taskData.dueDate);
+          // Check if date is valid
+          if (!isNaN(date.getTime())) {
+            formattedDate = date.toISOString().split('T')[0];
+          }
+        } catch (e) {
+          console.error('Error parsing date:', e);
+        }
       }
-    };
-    fetchTask();
-  }, [id, navigate]);
+      
+      setTask({
+        title: taskData.title || '',
+        description: taskData.description || '',
+        projectId: taskData.projectId?.toString() || '',
+        assigneeId: taskData.assigneeId?.toString() || '',
+        priority: taskData.priority?.toLowerCase() || 'medium',
+        deadline: formattedDate,  // Use safely formatted date
+        estimatedHours: taskData.estimatedHours?.toString() || '',
+        tags: taskData.tags?.join(', ') || ''
+      });
+    } catch (error) {
+      console.error('Error fetching task:', error);
+      alert(error.message || 'Failed to load task');
+      navigate('/manager/tasks');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  fetchTask();
+}, [id, navigate]);
 
   // Fetch team members when project changes
   useEffect(() => {
     const fetchMembers = async () => {
-      if (!task.projectId) return setAvailableMembers([]);
-      try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(
-          `http://localhost:5000/api/projects/${task.projectId}/members`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setAvailableMembers(res.data);
-      } catch (error) {
-        console.error(error);
+      if (!task.projectId) {
         setAvailableMembers([]);
+        return;
+      }
+      
+      setFetchingMembers(true);
+      try {
+        const members = await getProjectMembers(task.projectId);
+        setAvailableMembers(members);
+      } catch (error) {
+        console.error('Error fetching team members:', error);
+        setAvailableMembers([]);
+      } finally {
+        setFetchingMembers(false);
       }
     };
+    
     fetchMembers();
   }, [task.projectId]);
 
@@ -97,33 +116,48 @@ const EditTask = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!task.title || !task.projectId || !task.assigneeId || !task.deadline) {
-      alert('Please fill all required fields');
+    
+    // Validation
+    if (!task.title.trim()) {
+      alert('Task title is required');
+      return;
+    }
+    
+    if (!task.projectId) {
+      alert('Please select a project');
+      return;
+    }
+    
+    if (!task.assigneeId) {
+      alert('Please assign the task to a team member');
+      return;
+    }
+    
+    if (!task.deadline) {
+      alert('Please select a deadline');
       return;
     }
 
     setSaving(true);
     try {
-      const token = localStorage.getItem('token');
-      const payload = {
+      const taskData = {
         title: task.title,
         description: task.description,
-        assigneeId: parseInt(task.assigneeId),
-        priority: task.priority,
-        deadline: task.deadline,
-        estimatedHours: task.estimatedHours ? parseInt(task.estimatedHours) : 0,
+        projectId: parseInt(task.projectId),
+        assignedTo: parseInt(task.assigneeId),
+        priority: task.priority.toUpperCase(),
+        dueDate: new Date(task.deadline).toISOString(),
+        estimatedHours: task.estimatedHours ? parseFloat(task.estimatedHours) : null,
         tags: task.tags ? task.tags.split(',').map(tag => tag.trim()) : []
       };
 
-      await axios.put(`http://localhost:5000/api/tasks/${id}`, payload, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await updateTask(id, taskData);
 
       alert('Task updated successfully!');
-      navigate('/manager/tasks');
+      navigate(`/manager/tasks/${id}`);
     } catch (error) {
-      console.error(error);
-      alert(error.response?.data?.message || 'Failed to update task');
+      console.error('Error updating task:', error);
+      alert(error.message || 'Failed to update task');
     } finally {
       setSaving(false);
     }
@@ -147,7 +181,10 @@ const EditTask = () => {
           <h1 className="text-2xl font-bold text-gray-900">Edit Task</h1>
           <p className="text-gray-600">Update task details and assignment</p>
         </div>
-        <button onClick={() => navigate('/manager/tasks')} className="p-2 hover:bg-gray-100 rounded-lg">
+        <button 
+          onClick={() => navigate('/manager/tasks')} 
+          className="p-2 hover:bg-gray-100 rounded-lg"
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
@@ -159,116 +196,158 @@ const EditTask = () => {
           <div className="space-y-4">
             {/* Task Title */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Task Title *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Task Title *
+              </label>
               <input
                 type="text"
                 name="title"
                 value={task.title}
                 onChange={handleChange}
                 required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                placeholder="Enter task title"
               />
             </div>
 
             {/* Description */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
               <textarea
                 name="description"
                 value={task.description}
                 onChange={handleChange}
                 rows="3"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                placeholder="Describe the task"
               />
             </div>
 
             {/* Project & Assignee */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Project *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Project *
+                </label>
                 <select
                   name="projectId"
                   value={task.projectId}
                   onChange={handleChange}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 >
                   <option value="">Select project</option>
                   {projects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name} ({p.teamName})</option>
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.status})
+                    </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Assign To *</label>
-                <select
-                  name="assigneeId"
-                  value={task.assigneeId}
-                  onChange={handleChange}
-                  required
-                  disabled={!task.projectId}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                >
-                  <option value="">Select team member</option>
-                  {availableMembers.map(m => (
-                    <option key={m.id} value={m.id}>{m.name} ({m.role})</option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assign To *
+                </label>
+                {!task.projectId ? (
+                  <div className="p-3 bg-gray-50 rounded-lg text-center">
+                    <Users className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500">Select a project first</p>
+                  </div>
+                ) : fetchingMembers ? (
+                  <div className="p-3 bg-gray-50 rounded-lg text-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#4DA5AD] mx-auto"></div>
+                    <p className="text-sm text-gray-500 mt-2">Loading members...</p>
+                  </div>
+                ) : availableMembers.length === 0 ? (
+                  <div className="p-3 bg-gray-50 rounded-lg text-center">
+                    <p className="text-sm text-gray-500">No team members available</p>
+                  </div>
+                ) : (
+                  <select
+                    name="assigneeId"
+                    value={task.assigneeId}
+                    onChange={handleChange}
+                    required
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                  >
+                    <option value="">Select team member</option>
+                    {availableMembers.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({m.role || 'Team Member'})
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
 
             {/* Priority, Deadline, Estimated Hours */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Priority *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Priority *
+                </label>
                 <select
                   name="priority"
                   value={task.priority}
                   onChange={handleChange}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 >
                   <option value="low">Low</option>
                   <option value="medium">Medium</option>
                   <option value="high">High</option>
+                  <option value="critical">Critical</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Deadline *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Deadline *
+                </label>
                 <input
                   type="date"
                   name="deadline"
                   value={task.deadline}
                   onChange={handleChange}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  min={new Date().toISOString().split('T')[0]}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Estimated Hours
+                </label>
                 <input
                   type="number"
                   name="estimatedHours"
                   value={task.estimatedHours}
                   onChange={handleChange}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                   min="0"
+                  step="0.5"
+                  placeholder="e.g., 2.5"
                 />
               </div>
             </div>
 
             {/* Tags */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tags (comma separated)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Tags (comma separated)
+              </label>
               <input
                 type="text"
                 name="tags"
                 value={task.tags}
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                placeholder="e.g., frontend, urgent, bug"
               />
             </div>
           </div>
@@ -279,14 +358,14 @@ const EditTask = () => {
           <button
             type="button"
             onClick={() => navigate('/manager/tasks')}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={saving}
-            className="px-6 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center"
+            className="px-6 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition flex items-center disabled:opacity-50"
           >
             <Save className="w-4 h-4 mr-2" />
             {saving ? 'Updating...' : 'Update Task'}

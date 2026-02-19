@@ -2,36 +2,48 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Search, Filter, Eye, X, ChevronDown, ChevronUp } from 'lucide-react';
-import axios from 'axios';
+import { getTasks, deleteTask } from '../../services/tasksService';
+import { getProjects } from '../../services/projectsService';
 
 const Tasks = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Get search query from URL
   const queryParams = new URLSearchParams(location.search);
   const searchFromUrl = queryParams.get('q') || '';
   
   const [tasks, setTasks] = useState([]);
+  const [projects, setProjects] = useState([]);
   const [filteredTasks, setFilteredTasks] = useState([]);
   const [filter, setFilter] = useState('all');
   const [localSearch, setLocalSearch] = useState(searchFromUrl);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  // --- Fetch tasks from backend on mount ---
+  // Fetch tasks and projects
   useEffect(() => {
-    const fetchTasks = async () => {
+    const fetchData = async () => {
+      setLoading(true);
       try {
-        const res = await axios.get('http://localhost:5000/api/tasks'); // adjust URL as needed
-        setTasks(res.data);
+        const [tasksData, projectsData] = await Promise.all([
+          getTasks(),
+          getProjects()
+        ]);
+        setTasks(tasksData);
+        setProjects(projectsData);
       } catch (err) {
-        console.error('Error fetching tasks:', err);
+        console.error('Error fetching data:', err);
+        if (err.message?.includes('401')) {
+          navigate('/login');
+        }
+      } finally {
+        setLoading(false);
       }
     };
-    fetchTasks();
-  }, []);
+    fetchData();
+  }, [navigate]);
 
-  // --- Filter tasks based on search & status ---
+  // Filter tasks
   useEffect(() => {
     let result = tasks;
 
@@ -44,23 +56,22 @@ const Tasks = () => {
     if (localSearch.trim()) {
       const query = localSearch.toLowerCase();
       result = result.filter(task =>
-        task.title.toLowerCase().includes(query) ||
-        task.project.toLowerCase().includes(query) ||
-        task.assignee.toLowerCase().includes(query) ||
-        task.priority.toLowerCase().includes(query) ||
-        task.status.toLowerCase().includes(query)
+        task.title?.toLowerCase().includes(query) ||
+        task.projectName?.toLowerCase().includes(query) ||
+        task.assigneeName?.toLowerCase().includes(query) ||
+        task.priority?.toLowerCase().includes(query) ||
+        task.status?.toLowerCase().includes(query)
       );
     }
 
     setFilteredTasks(result);
   }, [tasks, filter, localSearch]);
 
-  // --- Update search when URL changes ---
+  // Update search from URL
   useEffect(() => {
     setLocalSearch(searchFromUrl);
   }, [searchFromUrl]);
 
-  // --- Handle search input ---
   const handleSearchChange = (e) => {
     const value = e.target.value;
     setLocalSearch(value);
@@ -75,23 +86,55 @@ const Tasks = () => {
     navigate({ search: '' }, { replace: true });
   };
 
-  // --- View task details ---
   const handleViewTask = (task) => {
-    navigate(`/manager/tasks/${task.id}`, { state: { task } });
+    navigate(`/manager/tasks/${task.id}`);
   };
 
-  // --- Delete task via backend ---
-  const deleteTask = async (id) => {
+  const handleDeleteTask = async (id) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
 
     try {
-      await axios.delete(`http://localhost:5000/api/tasks/${id}`);
+      await deleteTask(id);
       setTasks(prev => prev.filter(task => task.id !== id));
     } catch (err) {
       console.error('Failed to delete task:', err);
-      alert('Failed to delete task');
+      alert(err.message || 'Failed to delete task');
     }
   };
+
+  const getProjectName = (projectId) => {
+    const project = projects.find(p => p.id === projectId);
+    return project?.name || 'Unknown';
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority?.toLowerCase()) {
+      case 'high': return 'bg-red-100 text-red-800';
+      case 'medium': return 'bg-yellow-100 text-yellow-800';
+      case 'low': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'completed': return 'bg-green-100 text-green-800';
+      case 'in-progress': return 'bg-blue-100 text-blue-800';
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6 flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4DA5AD] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading tasks...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 sm:p-6">
@@ -201,7 +244,7 @@ const Tasks = () => {
         </div>
         <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
           <div className="text-lg font-bold text-[#FF6B6B]">
-            {filteredTasks.filter(t => t.status !== 'completed' && new Date(t.deadline) < new Date()).length}
+            {filteredTasks.filter(t => t.status !== 'completed' && new Date(t.dueDate) < new Date()).length}
           </div>
           <div className="text-xs text-gray-500">Overdue</div>
         </div>
@@ -237,44 +280,40 @@ const Tasks = () => {
                       <td className="px-4 py-4">
                         <div>
                           <div className="font-medium text-gray-900 text-sm">{task.title}</div>
-                          <div className="text-xs text-gray-500">{task.status}</div>
+                          <div className="text-xs text-gray-500 capitalize">{task.status}</div>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-900">{task.project}</td>
+                      <td className="px-4 py-4 text-sm text-gray-900">{getProjectName(task.projectId)}</td>
                       <td className="px-4 py-4">
                         <div className="flex items-center">
                           <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-medium mr-2">
-                            {task.assignee.charAt(0)}
+                            {task.assigneeName?.charAt(0) || 'U'}
                           </div>
-                          <span className="text-sm">{task.assignee}</span>
+                          <span className="text-sm">{task.assigneeName || 'Unassigned'}</span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
-                        <span className={`px-2 py-1 rounded-full text-xs ${
-                          task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                          task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {task.priority}
+                        <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(task.priority)}`}>
+                          {task.priority || 'medium'}
                         </span>
                       </td>
                       <td className="px-4 py-4 text-sm">
-                        {task.deadline}
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}
                         <div className={`text-xs ${
                           task.status === 'completed' ? 'text-green-600' :
-                          new Date(task.deadline) < new Date() ? 'text-red-600' :
+                          task.dueDate && new Date(task.dueDate) < new Date() ? 'text-red-600' :
                           'text-gray-500'
                         }`}>
                           {task.status === 'completed' ? 'Completed' :
-                           new Date(task.deadline) < new Date() ? 'Overdue' : 'Active'}
+                           task.dueDate && new Date(task.dueDate) < new Date() ? 'Overdue' : 'Active'}
                         </div>
                       </td>
                       <td className="px-4 py-4">
                         <div className="flex items-center">
                           <div className="w-20 sm:w-24 bg-gray-200 rounded-full h-2 mr-2">
-                            <div className="bg-[#4DA5AD] h-2 rounded-full" style={{ width: `${task.progress}%` }}></div>
+                            <div className="bg-[#4DA5AD] h-2 rounded-full" style={{ width: `${task.progress || 0}%` }}></div>
                           </div>
-                          <span className="text-xs sm:text-sm text-gray-600">{task.progress}%</span>
+                          <span className="text-xs sm:text-sm text-gray-600">{task.progress || 0}%</span>
                         </div>
                       </td>
                       <td className="px-4 py-4">
@@ -287,7 +326,7 @@ const Tasks = () => {
                             <Eye className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() => deleteTask(task.id)}
+                            onClick={() => handleDeleteTask(task.id)}
                             className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded"
                             title="Delete Task"
                           >
@@ -310,19 +349,11 @@ const Tasks = () => {
                   <div className="flex-1">
                     <h3 className="font-medium text-gray-900 text-sm mb-1">{task.title}</h3>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${
-                        task.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        task.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {task.status}
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${getStatusColor(task.status)}`}>
+                        {task.status || 'pending'}
                       </span>
-                      <span className={`px-2 py-0.5 rounded-full text-xs ${
-                        task.priority === 'high' ? 'bg-red-100 text-red-800' :
-                        task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {task.priority}
+                      <span className={`px-2 py-0.5 rounded-full text-xs ${getPriorityColor(task.priority)}`}>
+                        {task.priority || 'medium'}
                       </span>
                     </div>
                   </div>
@@ -335,7 +366,7 @@ const Tasks = () => {
                       <Eye className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => deleteTask(task.id)}
+                      onClick={() => handleDeleteTask(task.id)}
                       className="text-red-500 hover:text-red-700 p-1"
                       title="Delete Task"
                     >
@@ -349,16 +380,16 @@ const Tasks = () => {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center">
                       <div className="w-8 h-8 bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] rounded-full flex items-center justify-center text-white text-sm font-medium mr-2">
-                        {task.assignee.charAt(0)}
+                        {task.assigneeName?.charAt(0) || 'U'}
                       </div>
                       <div>
                         <div className="text-xs text-gray-500">Assignee</div>
-                        <div className="text-sm font-medium">{task.assignee}</div>
+                        <div className="text-sm font-medium">{task.assigneeName || 'Unassigned'}</div>
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-xs text-gray-500">Project</div>
-                      <div className="text-sm font-medium text-[#4DA5AD]">{task.project}</div>
+                      <div className="text-sm font-medium text-[#4DA5AD]">{getProjectName(task.projectId)}</div>
                     </div>
                   </div>
 
@@ -368,13 +399,13 @@ const Tasks = () => {
                       <div className="text-xs text-gray-500">Deadline</div>
                       <div className={`text-sm font-medium ${
                         task.status === 'completed' ? 'text-green-600' :
-                        new Date(task.deadline) < new Date() ? 'text-red-600' :
+                        task.dueDate && new Date(task.dueDate) < new Date() ? 'text-red-600' :
                         'text-gray-900'
                       }`}>
-                        {task.deadline}
+                        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}
                         <span className="ml-2 text-xs">
                           {task.status === 'completed' ? '✓' :
-                          new Date(task.deadline) < new Date() ? 'Overdue' : 'Active'}
+                          task.dueDate && new Date(task.dueDate) < new Date() ? 'Overdue' : 'Active'}
                         </span>
                       </div>
                     </div>
@@ -382,9 +413,9 @@ const Tasks = () => {
                       <div className="text-xs text-gray-500">Progress</div>
                       <div className="flex items-center">
                         <div className="w-16 bg-gray-200 rounded-full h-1.5 mr-2">
-                          <div className="bg-[#4DA5AD] h-1.5 rounded-full" style={{ width: `${task.progress}%` }}></div>
+                          <div className="bg-[#4DA5AD] h-1.5 rounded-full" style={{ width: `${task.progress || 0}%` }}></div>
                         </div>
-                        <span className="text-sm font-medium">{task.progress}%</span>
+                        <span className="text-sm font-medium">{task.progress || 0}%</span>
                       </div>
                     </div>
                   </div>

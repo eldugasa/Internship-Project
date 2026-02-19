@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Plus, Search, Filter, Trash2, X } from 'lucide-react';
-import axios from 'axios';
+import { getProjects, deleteProject } from '../../services/projectsService';
 
 const Projects = () => {
   const navigate = useNavigate();
@@ -16,39 +16,53 @@ const Projects = () => {
   const [localSearch, setLocalSearch] = useState(searchFromUrl);
   const [filteredProjects, setFilteredProjects] = useState([]);
 
+  // Fetch projects using service
   useEffect(() => {
     const fetchProjects = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get('http://localhost:5000/api/projects', {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setProjects(res.data);
+        // ✅ Using service - token handled automatically by apiClient
+        const data = await getProjects();
+        setProjects(data);
       } catch (err) {
-        console.error(err);
-        alert('Failed to load projects.');
+        console.error('Error fetching projects:', err);
+        
+        // Handle 401 specifically
+        if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+          alert('Your session has expired. Please login again.');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('current_user');
+          navigate('/login');
+        } else {
+          alert(err.message || 'Failed to load projects.');
+        }
       } finally {
         setLoading(false);
       }
     };
+    
     fetchProjects();
-  }, []);
+  }, [navigate]);
 
+  // Filter projects based on search
   useEffect(() => {
     if (!localSearch.trim()) {
       setFilteredProjects(projects);
     } else {
       const filtered = projects.filter(project => 
         project.name.toLowerCase().includes(localSearch.toLowerCase()) ||
-        project.description.toLowerCase().includes(localSearch.toLowerCase()) ||
-        project.status.toLowerCase().includes(localSearch.toLowerCase())
+        (project.description && project.description.toLowerCase().includes(localSearch.toLowerCase())) ||
+        (project.status && project.status.toLowerCase().includes(localSearch.toLowerCase()))
       );
       setFilteredProjects(filtered);
     }
   }, [localSearch, projects]);
 
-  useEffect(() => setLocalSearch(searchFromUrl), [searchFromUrl]);
+  // Update search from URL
+  useEffect(() => {
+    setLocalSearch(searchFromUrl);
+  }, [searchFromUrl]);
 
   const handleSearchChange = e => {
     const value = e.target.value;
@@ -63,27 +77,34 @@ const Projects = () => {
     navigate({ search: '' }, { replace: true });
   };
 
-  const deleteProject = async (id) => {
+  const handleDeleteProject = async (id) => {
     if (!window.confirm('Are you sure you want to delete this project?')) return;
 
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`http://localhost:5000/api/projects/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      // ✅ Using service - token handled automatically
+      await deleteProject(id);
       setProjects(projects.filter(p => p.id !== id));
+      alert('Project deleted successfully!');
     } catch (err) {
-      console.error(err);
-      alert('Failed to delete project.');
+      console.error('Error deleting project:', err);
+      
+      if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+        alert('Your session has expired. Please login again.');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('current_user');
+        navigate('/login');
+      } else {
+        alert(err.message || 'Failed to delete project.');
+      }
     }
   };
 
-  const formatDate = dateStr => dateStr ? dateStr.split('T')[0] : 'N/A';
+  const formatDate = dateStr => dateStr || 'N/A';
 
-  const calculateProgress = (tasks) => {
-    if (!tasks || tasks.length === 0) return 0;
-    const completed = tasks.filter(t => t.status === 'COMPLETED').length;
-    return Math.round((completed / tasks.length) * 100);
+  // Progress is already calculated in the service normalization
+  const getProgress = (project) => {
+    return project.progress || 0;
   };
 
   if (loading) {
@@ -105,7 +126,10 @@ const Projects = () => {
           <h1 className="text-2xl font-bold text-gray-900">Project Management</h1>
           <p className="text-gray-600">Create and manage your projects</p>
         </div>
-        <button onClick={() => navigate('/manager/projects/create')} className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center">
+        <button 
+          onClick={() => navigate('/manager/projects/create')} 
+          className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center"
+        >
           <Plus className="w-4 h-4 mr-2" /> New Project
         </button>
       </div>
@@ -122,7 +146,10 @@ const Projects = () => {
             className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
           />
           {localSearch && (
-            <button onClick={clearSearch} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+            <button 
+              onClick={clearSearch} 
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
               <X className="w-4 h-4" />
             </button>
           )}
@@ -135,15 +162,16 @@ const Projects = () => {
       {/* Projects Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProjects.length > 0 ? filteredProjects.map(project => {
-          const progress = calculateProgress(project.tasks);
-          const team = project.team;
+          const progress = getProgress(project);
 
           return (
             <div key={project.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="font-bold text-gray-900 text-lg">{project.name}</h3>
-                  <p className="text-sm text-gray-500 mt-1">{project.description}</p>
+                  {project.description && (
+                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">{project.description}</p>
+                  )}
                 </div>
               </div>
 
@@ -153,40 +181,52 @@ const Projects = () => {
                   <span>{progress}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-[#4DA5AD] h-2 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
+                  <div 
+                    className="bg-[#4DA5AD] h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${progress}%` }}
+                  ></div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3 mb-4">
                 <div className="text-center p-2 bg-gray-50 rounded">
-                  <div className="text-lg font-bold text-gray-900">{project.tasks?.length || 0}</div>
+                  <div className="text-lg font-bold text-gray-900">{project.tasks?.total || 0}</div>
                   <div className="text-xs text-gray-500">Tasks</div>
                 </div>
                 <div className="text-center p-2 bg-gray-50 rounded">
-                  <div className="text-lg font-bold text-gray-900">{team?.memberCount || 0}</div>
+                  <div className="text-lg font-bold text-gray-900">{project.teamMembers?.length || 0}</div>
                   <div className="text-xs text-gray-500">Team</div>
                 </div>
               </div>
 
               <div className="text-sm text-gray-500 mb-4">
-                <div className="font-medium text-gray-700 mb-1">{team?.name || 'No Team'}</div>
+                <div className="font-medium text-gray-700 mb-1">{project.teamName || 'No Team'}</div>
                 <div>Start: {formatDate(project.startDate)}</div>
-                <div>Deadline: {formatDate(project.endDate)}</div>
+                <div>Deadline: {formatDate(project.dueDate || project.endDate)}</div>
               </div>
 
               <div className="mb-4">
-                <span className={`px-2 py-1 rounded text-xs ${
-                  project.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                  project.status === 'COMPLETED' ? 'bg-blue-100 text-blue-800' :
+                <span className={`px-2 py-1 rounded text-xs font-medium ${
+                  project.status === 'active' ? 'bg-green-100 text-green-800' :
+                  project.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                  project.status === 'planned' ? 'bg-purple-100 text-purple-800' :
                   'bg-gray-100 text-gray-800'
-                }`}>{project.status}</span>
+                }`}>
+                  {project.status?.toUpperCase()}
+                </span>
               </div>
 
               <div className="flex space-x-2">
-                <button onClick={() => navigate(`/manager/projects/${project.id}`)} className="flex-1 py-2 border border-[#4DA5AD] text-[#4DA5AD] rounded-lg hover:bg-[#4DA5AD]/10 transition-colors">
+                <button 
+                  onClick={() => navigate(`/manager/projects/${project.id}`)} 
+                  className="flex-1 py-2 border border-[#4DA5AD] text-[#4DA5AD] rounded-lg hover:bg-[#4DA5AD]/10 transition-colors"
+                >
                   View Details
                 </button>
-                <button onClick={() => deleteProject(project.id)} className="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors">
+                <button 
+                  onClick={() => handleDeleteProject(project.id)} 
+                  className="px-3 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -199,14 +239,22 @@ const Projects = () => {
                 <div className="text-gray-400 text-4xl mb-4">🔍</div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No projects found</h3>
                 <p className="text-gray-500">No projects match "{localSearch}"</p>
-                <button onClick={clearSearch} className="mt-4 px-4 py-2 text-[#4DA5AD] hover:underline">Clear search</button>
+                <button 
+                  onClick={clearSearch} 
+                  className="mt-4 px-4 py-2 text-[#4DA5AD] hover:underline"
+                >
+                  Clear search
+                </button>
               </>
             ) : (
               <>
                 <div className="text-gray-400 text-4xl mb-4">📁</div>
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No projects yet</h3>
                 <p className="text-gray-500 mb-4">Create your first project to get started</p>
-                <button onClick={() => navigate('/manager/projects/create')} className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center mx-auto">
+                <button 
+                  onClick={() => navigate('/manager/projects/create')} 
+                  className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center mx-auto"
+                >
                   <Plus className="w-4 h-4 mr-2" /> Create First Project
                 </button>
               </>

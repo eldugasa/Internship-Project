@@ -153,36 +153,40 @@ router.get(
 
 
 // GET /api/projects/:projectId/members
-router.get('/:projectId/members', async (req, res) => {
-  const { projectId } = req.params;
+// GET /api/projects/:projectId/members
+router.get(
+  '/:projectId/members', 
+  authenticate,  // ✅ Add this
+  authorize("admin", "project_manager"), // ✅ Add role check
+  async (req, res) => {
+    const { projectId } = req.params;
 
-  try {
-    // Fetch project and include team and its users
-    const project = await prisma.project.findUnique({
-      where: { id: parseInt(projectId) },
-      include: {
-        team: {
-          include: {
-            users: {
-              select: { id: true, name: true, email: true } // only select what you need
+    try {
+      const project = await prisma.project.findUnique({
+        where: { id: parseInt(projectId) },
+        include: {
+          team: {
+            include: {
+              users: {
+                select: { id: true, name: true, email: true }
+              }
             }
           }
         }
+      });
+
+      if (!project) {
+        return res.status(404).json({ message: 'Project not found' });
       }
-    });
 
-    if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
+      const members = project.team?.users || [];
+      res.json(members);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Failed to fetch project members' });
     }
-
-    const members = project.team?.users || [];
-
-    res.json(members);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Failed to fetch project members' });
   }
-});
+);
 
 
 

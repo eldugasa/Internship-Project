@@ -2,6 +2,9 @@
 import { prisma } from "../config/db.js";  // ✅ CRITICAL: This was missing!
 
 // Get task by ID
+// In backend/src/controllers/task.controller.js - Update getTaskById:
+
+// Get task by ID
 const getTaskById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -38,13 +41,14 @@ const getTaskById = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    // Check authorization
+    // Check authorization - FIX: Use assigneeId instead of assignedTo
     if (req.user.role !== "ADMIN" && 
         req.user.role !== "PROJECT_MANAGER" && 
-        task.assignedTo !== req.user.id) {
+        task.assigneeId !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to view this task" });
     }
 
+    // Format response to match what frontend's normalizeTask expects
     res.json({
       id: task.id,
       title: task.title,
@@ -55,24 +59,19 @@ const getTaskById = async (req, res) => {
       dueDate: task.dueDate,
       estimatedHours: task.estimatedHours,
       actualHours: task.actualHours,
+      
+      // Assignee info - frontend expects these fields
       assigneeId: task.assigneeId,
-      assignee: task.assignee?.name || null,
-      assigneeEmail: task.assignee?.email || null,
-      assigneeRole: task.assignee?.role || null,
+      assignee: task.assignee, // Full assignee object
+      
+      // Project info
       projectId: task.projectId,
-      project: task.project?.name || null,
-      projectDescription: task.project?.description || null,
-      projectStatus: task.project?.status || null,
-      comments: task.comments?.map(comment => ({
-        id: comment.id,
-        content: comment.content,
-        createdAt: comment.createdAt,
-        user: {
-          id: comment.user.id,
-          name: comment.user.name,
-          email: comment.user.email
-        }
-      })) || [],
+      project: task.project, // Full project object
+      
+      // Comments
+      comments: task.comments,
+      
+      // Timestamps
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     });
@@ -99,7 +98,7 @@ const createTask = async (req, res) => {
         progress: 0,
         priority: "MEDIUM",
         projectId: Number(projectId),
-        assignedTo: Number(assignedTo),
+         assigneeId: Number(assignedTo),
         dueDate: dueDate ? new Date(dueDate) : null
       }
     });
@@ -267,6 +266,52 @@ const addTaskComment = async (req, res) => {
   }
 };
 
+const updateTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, description, assigneeId, priority, dueDate, estimatedHours, status, progress } = req.body;
+
+    // Check if task exists
+    const existingTask = await prisma.task.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingTask) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    // Build update data
+    const updateData = {};
+    if (title !== undefined) updateData.title = title;
+    if (description !== undefined) updateData.description = description;
+    if (assigneeId !== undefined) updateData.assigneeId = parseInt(assigneeId);
+    if (priority !== undefined) updateData.priority = priority;
+    if (dueDate !== undefined) updateData.dueDate = new Date(dueDate);
+    if (estimatedHours !== undefined) updateData.estimatedHours = estimatedHours ? parseFloat(estimatedHours) : null;
+    if (status !== undefined) updateData.status = status;
+    if (progress !== undefined) updateData.progress = progress;
+    
+    updateData.updatedAt = new Date();
+
+    const updatedTask = await prisma.task.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: {
+        assignee: { select: { id: true, name: true, email: true } },
+        project: { select: { id: true, name: true } }
+      }
+    });
+
+    res.json({
+      message: "Task updated successfully",
+      task: updatedTask
+    });
+  } catch (err) {
+    console.error("Error updating task:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Delete task
 const deleteTask = async (req, res) => {
   try {
@@ -309,5 +354,6 @@ export {
   assignTask,
   addTaskComment,
   deleteTask,
-  getAllTasks 
+  getAllTasks,
+  updateTask 
 };

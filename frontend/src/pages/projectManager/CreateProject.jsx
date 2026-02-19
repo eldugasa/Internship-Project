@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Save, Users } from 'lucide-react';
-import axios from 'axios';
+import { createProject } from '../../services/projectsService';
+import { getTeams } from '../../services/teamsService';
 
 const CreateProject = () => {
   const navigate = useNavigate();
@@ -17,37 +18,33 @@ const CreateProject = () => {
 
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [fetchingTeams, setFetchingTeams] = useState(true);
 
-  // ✅ Fetch teams
+  // Fetch teams
   useEffect(() => {
     const fetchTeams = async () => {
       try {
-        const token = localStorage.getItem('token');
-
-        const res = await axios.get(
-          'http://localhost:5000/api/teams',
-          {
-            headers: { Authorization: `Bearer ${token}` }
-          }
-        );
-
-        setTeams(res.data);
+        setFetchingTeams(true);
+        const data = await getTeams();
+        setTeams(data);
       } catch (err) {
         console.error("Failed to fetch teams:", err);
         alert('Failed to load teams.');
+      } finally {
+        setFetchingTeams(false);
       }
     };
 
     fetchTeams();
   }, []);
 
-  // ✅ Handle form change
+  // Handle form change
   const handleChange = (e) => {
     const { name, value } = e.target;
     setProject(prev => ({ ...prev, [name]: value }));
   };
 
-  // ✅ Submit project
+  // Submit project
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -59,39 +56,40 @@ const CreateProject = () => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('token');
-
-      const payload = {
+      const projectData = {
         name: project.name,
         description: project.description,
         startDate: new Date(project.startDate).toISOString(),
         endDate: new Date(project.endDate).toISOString(),
-        status: 'PLANNED',
+        status: 'planned',
         teamId: parseInt(project.selectedTeam, 10),
       };
 
-      console.log("Submitting project:", payload);
+      const newProject = await createProject(projectData);
 
-      const res = await axios.post(
-        'http://localhost:5000/api/projects',
-        payload,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-
-      // ✅ FIXED: backend returns project directly
-      alert(`Project "${res.data.name}" created successfully!`);
-
+      alert(`Project "${newProject.name}" created successfully!`);
       navigate('/manager/projects');
 
     } catch (err) {
       console.error("Create project error:", err);
-      alert(err.response?.data?.message || 'Failed to create project');
+      alert(err.message || 'Failed to create project');
     } finally {
       setLoading(false);
     }
   };
+
+  const selectedTeamDetails = teams.find(t => t.id === parseInt(project.selectedTeam, 10));
+
+  if (fetchingTeams) {
+    return (
+      <div className="p-6 flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4DA5AD] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading teams...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -114,7 +112,6 @@ const CreateProject = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-
         {/* Project Info */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
@@ -122,7 +119,6 @@ const CreateProject = () => {
           </h2>
 
           <div className="space-y-4">
-
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Project Name *
@@ -133,7 +129,7 @@ const CreateProject = () => {
                 value={project.name}
                 onChange={handleChange}
                 required
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 placeholder="Enter project name"
               />
             </div>
@@ -147,13 +143,12 @@ const CreateProject = () => {
                 value={project.description}
                 onChange={handleChange}
                 rows="3"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 placeholder="Describe the project"
               />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Start Date *
@@ -164,7 +159,7 @@ const CreateProject = () => {
                   value={project.startDate}
                   onChange={handleChange}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 />
               </div>
 
@@ -178,17 +173,15 @@ const CreateProject = () => {
                   value={project.endDate}
                   onChange={handleChange}
                   required
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 />
               </div>
-
             </div>
           </div>
         </div>
 
         {/* Team Assignment */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
             <Users className="w-5 h-5 mr-2" />
             Assign to Team
@@ -204,10 +197,9 @@ const CreateProject = () => {
               value={project.selectedTeam}
               onChange={handleChange}
               required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
             >
               <option value="">Choose a team</option>
-
               {teams.map(team => (
                 <option key={team.id} value={team.id}>
                   {team.name} {team.lead ? `(Lead: ${team.lead})` : ''}
@@ -216,44 +208,33 @@ const CreateProject = () => {
             </select>
           </div>
 
-          {project.selectedTeam && (
+          {selectedTeamDetails && (
             <div className="mt-4 p-4 bg-gray-50 rounded-lg">
               <h3 className="font-medium text-gray-900 mb-3">
                 Selected Team Details
               </h3>
-
-              {(() => {
-                const selectedTeam = teams.find(
-                  t => t.id === parseInt(project.selectedTeam, 10)
-                );
-
-                return selectedTeam ? (
-                  <>
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Team Lead:</span>{' '}
-                      {selectedTeam.lead || "N/A"}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      <span className="font-medium">Description:</span>{' '}
-                      {selectedTeam.description || "No description"}
-                    </p>
-                  </>
-                ) : (
-                  <p className="text-gray-500">Team not found</p>
-                );
-              })()}
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Team Lead:</span>{' '}
+                {selectedTeamDetails.lead || "N/A"}
+              </p>
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Description:</span>{' '}
+                {selectedTeamDetails.description || "No description"}
+              </p>
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Members:</span>{' '}
+                {selectedTeamDetails.memberCount || 0}
+              </p>
             </div>
           )}
-
         </div>
 
         {/* Submit */}
         <div className="flex justify-end space-x-3">
-
           <button
             type="button"
             onClick={() => navigate('/manager/projects')}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
           >
             Cancel
           </button>
@@ -261,12 +242,11 @@ const CreateProject = () => {
           <button
             type="submit"
             disabled={loading}
-            className="px-6 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center"
+            className="px-6 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition flex items-center disabled:opacity-50"
           >
             <Save className="w-4 h-4 mr-2" />
             {loading ? 'Creating...' : 'Create Project'}
           </button>
-
         </div>
       </form>
     </div>

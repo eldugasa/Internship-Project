@@ -19,32 +19,46 @@ const priorityMap = {
 };
 
 // Helper to normalize task data
-const normalizeTask = (task) => ({
-  ...task,
-  id: task.id,
-  title: task.title,
-  description: task.description || '',
-  status: statusMap[task.status] || task.status?.toLowerCase() || 'pending',
-  priority: priorityMap[task.priority] || task.priority?.toLowerCase() || 'medium',
-  progress: task.progress || 0,
-  assigneeId: task.assigneeId,
-  assignee: task.assignee || task.assignedTo || null,
-  assigneeName: task.assignee?.name || task.assignedToName || 'Unassigned',
-  projectId: task.projectId,
-  projectName: task.project?.name || task.projectName || 'Unknown Project',
-  teamId: task.teamId,
-  teamName: task.team?.name || task.teamName,
-  dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : null,
-  startDate: task.startDate ? new Date(task.startDate).toLocaleDateString() : null,
-  completedDate: task.completedDate ? new Date(task.completedDate).toLocaleDateString() : null,
-  estimatedHours: task.estimatedHours || 0,
-  actualHours: task.actualHours || 0,
-  tags: task.tags || [],
-  comments: task.comments || [],
-  attachments: task.attachments || [],
-  createdAt: task.createdAt ? new Date(task.createdAt).toLocaleDateString() : null,
-  updatedAt: task.updatedAt ? new Date(task.updatedAt).toLocaleDateString() : null
-});
+// In tasksService.js, update normalizeTask:
+
+const normalizeTask = (task) => {
+  // Log to see what we're getting
+  console.log('Normalizing task:', task);
+  
+  return {
+    ...task,
+    id: task.id,
+    title: task.title,
+    description: task.description || '',
+    status: statusMap[task.status] || task.status?.toLowerCase() || 'pending',
+    priority: priorityMap[task.priority] || task.priority?.toLowerCase() || 'medium',
+    progress: task.progress || 0,
+    
+    // Assignee fields - handle both nested and direct formats
+    assigneeId: task.assigneeId,
+    assignee: task.assignee || null,
+    assigneeName: task.assignee?.name || task.assigneeName || 'Unassigned',
+    
+    // Project fields
+    projectId: task.projectId,
+    project: task.project || null,
+    projectName: task.project?.name || task.projectName || 'Unknown Project',
+    
+    // Date fields - handle properly
+    dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : null,
+    rawDueDate: task.dueDate, // Keep original for editing
+    
+    // Other fields
+    estimatedHours: task.estimatedHours || 0,
+    actualHours: task.actualHours || 0,
+    tags: task.tags || [],
+    comments: task.comments || [],
+    
+    // Timestamps
+    createdAt: task.createdAt ? new Date(task.createdAt).toLocaleDateString() : null,
+    updatedAt: task.updatedAt ? new Date(task.updatedAt).toLocaleDateString() : null
+  };
+};
 
 // Get all tasks
 export const getTasks = async () => {
@@ -65,30 +79,27 @@ export const getTasksByProject = async (projectId) => {
 };
 
 // Create new task
-export const createTask = async (taskData) => {
-  // Convert UI status to backend status
-  const backendStatus = {
-    'pending': 'PENDING',
-    'in-progress': 'IN_PROGRESS',
-    'completed': 'COMPLETED',
-    'blocked': 'BLOCKED',
-    'review': 'REVIEW'
-  }[taskData.status] || 'PENDING';
+// In tasksService.js, update createTask:
 
-  const backendPriority = {
-    'low': 'LOW',
-    'medium': 'MEDIUM',
-    'high': 'HIGH',
-    'critical': 'CRITICAL'
-  }[taskData.priority] || 'MEDIUM';
+export const createTask = async (taskData) => {
+  console.log('createTask received:', taskData);
+  
+  // Map frontend field names to backend expectations
+  const payload = {
+    title: taskData.title,
+    description: taskData.description || '',
+    projectId: parseInt(taskData.projectId),
+    assignedTo: parseInt(taskData.assigneeId || taskData.assignedTo), // Map assigneeId to assignedTo
+    dueDate: taskData.dueDate,
+    priority: taskData.priority?.toUpperCase() || 'MEDIUM',
+    estimatedHours: taskData.estimatedHours ? parseFloat(taskData.estimatedHours) : null
+  };
+
+  console.log('Sending payload:', payload);
 
   const task = await apiClient('/tasks', {
     method: 'POST',
-    body: JSON.stringify({
-      ...taskData,
-      status: backendStatus,
-      priority: backendPriority
-    })
+    body: JSON.stringify(payload)
   });
   return normalizeTask(task);
 };
@@ -163,12 +174,24 @@ export const assignTask = async (taskId, userId) => {
   return normalizeTask(task);
 };
 
-// Add comment to task
-export const addTaskComment = async (taskId, comment) => {
-  return apiClient(`/tasks/${taskId}/comments`, {
+// ✅ ADD THIS: Get task comments
+export const getTaskComments = async (taskId) => {
+  try {
+    const comments = await apiClient(`/tasks/${taskId}/comments`);
+    return comments;
+  } catch (error) {
+    console.error('Error fetching comments:', error);
+    return [];
+  }
+};
+
+// ✅ ADD THIS: Add comment to task
+export const addTaskComment = async (taskId, commentData) => {
+  const comment = await apiClient(`/tasks/${taskId}/comments`, {
     method: 'POST',
-    body: JSON.stringify({ comment })
+    body: JSON.stringify(commentData)
   });
+  return comment;
 };
 
 // Get tasks assigned to user
