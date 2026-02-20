@@ -7,7 +7,11 @@ import bcrypt from "bcryptjs";
 // GET all users
 export const getAllUsers = async (req, res) => {
   try {
-    const users = await prisma.user.findMany();
+    const users = await prisma.user.findMany({
+      include: {
+        team: { select: { id: true, name: true } }
+      }
+    });
     res.json(users);
   } catch (error) {
     console.error(error);
@@ -24,6 +28,9 @@ export const updateUserRole = async (req, res) => {
     const user = await prisma.user.update({
       where: { id: parseInt(id) },
       data: { role },
+      include: {
+        team: { select: { id: true, name: true } }
+      }
     });
 
     res.json(user);
@@ -36,12 +43,22 @@ export const updateUserRole = async (req, res) => {
 // CREATE user (example for POST)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, phone, location } = req.body; // ✅ Added phone/location
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
-      data: { name, email, password: hashedPassword, role },
+      data: { 
+        name, 
+        email, 
+        password: hashedPassword, 
+        role,
+        phone: phone || null,        // ✅ NEW
+        location: location || null    // ✅ NEW
+      },
+      include: {
+        team: { select: { id: true, name: true } }
+      }
     });
 
     res.json(user);
@@ -60,12 +77,24 @@ export const getMe = async (req, res) => {
 
     const user = await prisma.user.findUnique({
       where: { id: parseInt(userId) },
-      select: { id: true, name: true, email: true, role: true },
+      include: {
+        team: { select: { id: true, name: true } }
+      }
     });
 
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    res.json(user);
+    res.json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone || null,        // ✅ NEW
+      location: user.location || null,   // ✅ NEW
+      team: user.team,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
@@ -75,7 +104,7 @@ export const getMe = async (req, res) => {
 // Update current user's profile
 export const updateCurrentUser = async (req, res) => {
   try {
-    const { name, email } = req.body;
+    const { name, email, phone, location } = req.body; // ✅ Added phone/location
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
@@ -89,7 +118,12 @@ export const updateCurrentUser = async (req, res) => {
       where: { id: req.user.id },
       data: {
         name: name || user.name,
-        email: email || user.email
+        email: email || user.email,
+        phone: phone !== undefined ? phone : user.phone,        // ✅ NEW
+        location: location !== undefined ? location : user.location // ✅ NEW
+      },
+      include: {
+        team: { select: { id: true, name: true } }
       }
     });
 
@@ -97,13 +131,18 @@ export const updateCurrentUser = async (req, res) => {
       id: updatedUser.id,
       name: updatedUser.name,
       email: updatedUser.email,
-      role: updatedUser.role
+      role: updatedUser.role,
+      phone: updatedUser.phone || null,        // ✅ NEW
+      location: updatedUser.location || null,   // ✅ NEW
+      team: updatedUser.team,
+      createdAt: updatedUser.createdAt,
+      updatedAt: updatedUser.updatedAt
     });
   } catch (error) {
+    console.error('Error updating user:', error);
     res.status(500).json({ message: error.message });
   }
 };
-
 
 // Change password
 export const changePassword = async (req, res) => {
@@ -135,8 +174,7 @@ export const changePassword = async (req, res) => {
   }
 };
 
-
-// delete user 
+// Delete user
 export const deleteUser = async (req, res) => {
   const { id } = req.params;
 

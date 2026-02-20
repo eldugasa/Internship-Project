@@ -238,13 +238,13 @@ const TeamMemberProgress = () => {
             <option value="year">This Year</option>
             <option value="all">All Time</option>
           </select>
-          <button 
+          {/* <button 
             onClick={exportData}
             className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
           >
             <Download className="w-4 h-4 mr-2" />
             Export Report
-          </button>
+          </button> */}
         </div>
       </header>
 
