@@ -127,7 +127,7 @@ const TeamMemberDashboard = () => {
       setTasks(updatedTasks);
       calculateStats(updatedTasks, stats.efficiency);
 
-      // ✅ Use updateTaskStatus service
+      
       await updateTaskStatus(taskId, status, progress);
     } catch (err) {
       console.error('Error updating task:', err);
@@ -230,7 +230,7 @@ const TeamMemberDashboard = () => {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between">
           <div className="mb-6 lg:mb-0">
             <h1 className="text-2xl lg:text-3xl font-bold mb-2">Welcome back, {employee.name}!</h1>
-            <p className="opacity-90 mb-4">Here's your overview for today</p>
+         
             <div className="flex items-center space-x-4">
               <div className="flex items-center">
                 <Users className="w-4 h-4 mr-2 opacity-80" />

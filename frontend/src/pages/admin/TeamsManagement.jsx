@@ -193,7 +193,7 @@ const TeamsManagement = () => {
 
       {/* Create Team Popup */}
       {showCreateTeamPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 bg-opacity-50">
           <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-3xl flex flex-col" style={{ maxHeight: '80vh' }}>
             <div className="p-6 border-b border-gray-200 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900">Create New Team</h2>

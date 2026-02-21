@@ -34,6 +34,7 @@ import EditTask from './pages/projectManager/EditTask';
 import TaskDetails from './pages/projectManager/TaskDetails';
 import Progress from './pages/projectManager/Progress';
 import Settings from './pages/projectManager/Settings';
+import EditProject from "./pages/projectManager/EditProject";
 
 // Team Member imports
 import TeamMemberLayout from './Component/projectmanager/TeamMemberLayout';
@@ -83,6 +84,7 @@ export default function App() {
           <Route path="projects" element={<Projects />} />
           <Route path="projects/create" element={<CreateProject />} />
           <Route path="projects/:id" element={<ProjectDetails />} />
+          <Route path="projects/edit/:id" element={<EditProject />} />
           <Route path="tasks" element={<Tasks />} />
           <Route path="tasks/create" element={<CreateTask />} />
           <Route path="tasks/edit/:id" element={<EditTask />} />

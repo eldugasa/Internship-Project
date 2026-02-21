@@ -1,13 +1,10 @@
 // src/controllers/project.controller.js
-console.log("boobaajdkfjdk jkjkjBOBOBOBOBOB")
-
-
-import { prisma } from "../config/db.js"; // make sure prisma is exported from db.js
+import { prisma } from "../config/db.js";
 
 // Helper to normalize role
 const normalizeRole = (role) => (role || "").toUpperCase().replace("-", "_");
 
-// Create a project (PROJECT_MANAGER only)
+// Create a project
 export const createProject = async (req, res) => {
   console.log("REQ.USER:", req.user);
   try {
@@ -33,11 +30,81 @@ export const createProject = async (req, res) => {
 
     res.status(201).json({ message: "Project created", project });
   } catch (err) {
+    console.error("Error creating project:", err);
     res.status(500).json({ message: err.message });
   }
 };
 
-// Get all projects (ADMIN sees all, PROJECT_MANAGER sees own)
+// Update project
+// Update project
+export const updateProject = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, description, startDate, endDate, status, teamId } = req.body;
+
+    console.log('=== UPDATE PROJECT CONTROLLER ===');
+    console.log('Project ID:', id);
+    console.log('Request body:', req.body);
+
+    // Check if project exists
+    const existingProject = await prisma.project.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!existingProject) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Build update data - ❌ REMOVE updatedAt
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (startDate !== undefined) updateData.startDate = new Date(startDate);
+    if (endDate !== undefined) updateData.endDate = new Date(endDate);
+    if (status !== undefined) updateData.status = status;
+    if (teamId !== undefined) updateData.teamId = parseInt(teamId);
+    
+    // ❌ REMOVE THIS LINE - updatedAt is managed by Prisma
+    // updateData.updatedAt = new Date();
+
+    console.log('Update data:', updateData);
+
+    const updatedProject = await prisma.project.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+      include: {
+        team: {
+          select: { id: true, name: true, lead: true }
+        }
+      }
+    });
+
+    console.log('Project updated successfully');
+
+    res.json({
+      id: updatedProject.id,
+      name: updatedProject.name,
+      description: updatedProject.description,
+      status: updatedProject.status,
+      startDate: updatedProject.startDate,
+      endDate: updatedProject.endDate,
+      dueDate: updatedProject.endDate,
+      teamId: updatedProject.teamId,
+      teamName: updatedProject.team?.name || null,
+      teamLead: updatedProject.team?.lead || null,
+      updatedAt: updatedProject.updatedAt // This will be automatically set by Prisma
+    });
+
+  } catch (err) {
+    console.error("Error updating project:", err);
+    res.status(500).json({ 
+      message: "Failed to update project",
+      error: err.message 
+    });
+  }
+};
+
+// Get all projects
 export const getAllProjects = async (req, res) => {
   try {
     const role = normalizeRole(req.user.role);
@@ -62,7 +129,6 @@ export const getAllProjects = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    // Format tasks & team for frontend
     projects = projects.map((project) => ({
       ...project,
       tasks: {
@@ -74,6 +140,7 @@ export const getAllProjects = async (req, res) => {
 
     res.json(projects);
   } catch (err) {
+    console.error("Error fetching projects:", err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -97,6 +164,37 @@ export const getProjectById = async (req, res) => {
 
     res.json(project);
   } catch (err) {
+    console.error("Error fetching project:", err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Get project members
+export const getProjectMembers = async (req, res) => {
+  try {
+    const { projectId } = req.params;
+
+    const project = await prisma.project.findUnique({
+      where: { id: parseInt(projectId) },
+      include: {
+        team: {
+          include: {
+            users: {
+              select: { id: true, name: true, email: true, role: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found' });
+    }
+
+    const members = project.team?.users || [];
+    res.json(members);
+  } catch (err) {
+    console.error("Error fetching project members:", err);
     res.status(500).json({ message: err.message });
   }
 };
