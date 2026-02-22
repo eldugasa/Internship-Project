@@ -1,7 +1,7 @@
 // src/pages/admin/SettingsPage.jsx
 import React, { useState, useEffect } from "react";
 import { apiClient } from "../../services/apiClient";
-import { User, Lock, X, Save, LogOut } from 'lucide-react';
+import { User, Lock, X, Save, LogOut, Bell, BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const SettingsPage = () => {
@@ -22,6 +22,15 @@ const SettingsPage = () => {
   const [profileUpdating, setProfileUpdating] = useState(false);
   const [passwordUpdating, setPasswordUpdating] = useState(false);
 
+  // ✅ Add notification preferences state
+  const [notifications, setNotifications] = useState({
+    userRegistered: true,
+    projectCreated: true,
+    projectCompleted: true,
+    systemAlerts: true,
+    roleChanged: true
+  });
+
   // Fetch user
   useEffect(() => {
     const fetchUser = async () => {
@@ -31,6 +40,12 @@ const SettingsPage = () => {
         setUser(data);
         setName(data.name);
         setEmail(data.email);
+        
+        // ✅ Load notification preferences from localStorage
+        const savedPrefs = localStorage.getItem('adminNotificationPrefs');
+        if (savedPrefs) {
+          setNotifications(JSON.parse(savedPrefs));
+        }
       } catch (error) {
         console.error('Error fetching user:', error);
         alert('Failed to load user profile');
@@ -69,10 +84,9 @@ const SettingsPage = () => {
         body: JSON.stringify({ name, email }),
       });
 
-      // Check if email changed
       if (email !== user.email) {
         alert('Email updated! Please login again with your new email.');
-        logout(); // Force re-login
+        logout();
       } else {
         setUser(updatedUser);
         setShowEditProfile(false);
@@ -114,13 +128,22 @@ const SettingsPage = () => {
       });
 
       alert('Password changed successfully! Please login again.');
-      logout(); // Force re-login for security
+      logout();
     } catch (error) {
       console.error('Error changing password:', error);
       alert(error.message || 'Failed to change password');
     } finally {
       setPasswordUpdating(false);
     }
+  };
+
+  // ✅ Add toggle notification function
+  const toggleNotification = (key) => {
+    setNotifications(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('adminNotificationPrefs', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   if (loading) {
@@ -186,6 +209,41 @@ const SettingsPage = () => {
         <p className="text-sm text-yellow-800">
           <strong>Security Note:</strong> If you change your email or password, you'll need to login again.
         </p>
+      </div>
+
+      {/* ✅ Notification Preferences Section */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mt-6">
+        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+          <Bell className="w-5 h-5" style={{ color: '#0f5841' }} />
+          Notification Preferences
+        </h2>
+        <div className="space-y-4">
+          {Object.entries(notifications).map(([key, value]) => (
+            <div key={key} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-700 capitalize">
+                  {key.replace(/([A-Z])/g, ' $1').trim()}
+                </span>
+                {value ? (
+                  <Bell className="w-4 h-4" style={{ color: '#0f5841' }} />
+                ) : (
+                  <BellOff className="w-4 h-4 text-gray-400" />
+                )}
+              </div>
+              <button
+                onClick={() => toggleNotification(key)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#194f87] focus:ring-offset-2`}
+                style={{ backgroundColor: value ? '#0f5841' : '#d1d5db' }}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    value ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Edit Profile Modal */}

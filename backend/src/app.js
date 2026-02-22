@@ -6,6 +6,7 @@ import userRoutes from "./routes/user.routes.js";
 import teamRoutes from "./routes/team.routes.js"; 
 import taskRoutes from "./routes/task.routes.js";
 import projectRoutes from "./routes/project.routes.js";
+import notificationRoutes from './routes/notification.routes.js';
 const app = express();
 
 app.use(cors()); // 👈 IMPORTANT
@@ -17,6 +18,7 @@ app.use("/api/teams", teamRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/admin", adminRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "Task Management API running 🚀" });

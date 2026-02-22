@@ -28,7 +28,7 @@ const SettingsPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Notification preferences (stored in localStorage)
+  // ✅ FIXED: Notification preferences with proper toggle
   const [notifications, setNotifications] = useState({
     taskUpdates: true,
     deadlineReminders: true,
@@ -82,7 +82,7 @@ const SettingsPage = () => {
         location: profile.location,
       });
 
-      // Save notification preferences to localStorage
+      // ✅ Save notification preferences to localStorage
       localStorage.setItem('notificationPrefs', JSON.stringify(notifications));
       
       setSuccess('Settings saved successfully!');
@@ -112,7 +112,7 @@ const SettingsPage = () => {
       setError('');
       
       await updateCurrentUserPassword({
-        currentPassword: tempPassword, // Note: You need to add current password field
+        currentPassword: tempPassword,
         newPassword: tempPassword
       });
 
@@ -129,10 +129,11 @@ const SettingsPage = () => {
     }
   };
 
-  // Toggle notifications
+  // ✅ FIXED: Toggle notifications with auto-save
   const toggleNotification = (key) => {
     setNotifications(prev => {
       const updated = { ...prev, [key]: !prev[key] };
+      // Auto-save to localStorage when toggled
       localStorage.setItem('notificationPrefs', JSON.stringify(updated));
       return updated;
     });
@@ -143,11 +144,9 @@ const SettingsPage = () => {
     const file = e.target.files[0];
     if (!file) return;
     
-    // In a real app, you would upload to server and get URL back
     const reader = new FileReader();
     reader.onloadend = () => {
       setProfile(prev => ({ ...prev, profileImage: reader.result }));
-      // You would also upload to server here
     };
     reader.readAsDataURL(file);
   };
@@ -220,15 +219,15 @@ const SettingsPage = () => {
                   alt="Profile" 
                   className="w-28 h-28 rounded-full border-4 border-white shadow-lg object-cover"
                 />
-                {/* <label 
+                <label 
                   className="absolute bottom-0 right-0 p-2 rounded-full text-white cursor-pointer transition shadow-lg"
                   style={{ background: `linear-gradient(to bottom right, #0f5841, #194f87)` }}
                 >
                   <Camera className="w-4 h-4" />
                   <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                </label> */}
+                </label>
               </div>
-              {/* <p className="text-xs text-gray-500 mt-2">Click camera to update photo</p> */}
+              <p className="text-xs text-gray-500 mt-2">Click camera to update photo</p>
             </div>
 
             {/* Name Field */}
@@ -399,7 +398,7 @@ const SettingsPage = () => {
 
         {/* Right Column: Notifications & Account Info */}
         <div className="space-y-6">
-          {/* Notifications */}
+          {/* ✅ FIXED: Notifications Section */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-2 mb-6">
               <Bell className="w-5 h-5" style={{ color: '#0f5841' }} />

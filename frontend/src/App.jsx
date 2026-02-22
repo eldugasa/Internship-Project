@@ -21,6 +21,8 @@ import Reports from './pages/admin/Reports';
 import SettingsPage from './pages/admin/SettingsPage';
 import TeamDetailsPage from './pages/admin/TeamDetailsPage';
 
+import AdminNotificationsPage from './Component/admin/AdminNotificationsPage';
+
 // Project Manager imports
 import ManagerLayout from './Component/projectmanager/PromanagerLayout';
 import ProjectManagerDashboard from './pages/projectManager/ProjectManagerDashboard';
@@ -36,14 +38,18 @@ import Progress from './pages/projectManager/Progress';
 import Settings from './pages/projectManager/Settings';
 import EditProject from "./pages/projectManager/EditProject";
 
+import ManagerNotificationsPage from './Component/projectmanager/ManagerNotificationsPage';
+
 // Team Member imports
-import TeamMemberLayout from './Component/projectmanager/TeamMemberLayout';
+import TeamMemberLayout from './Component/teamMember/TeamMemberLayout';
 import TeamMemberDashboard from './pages/teamMember/Dashboard';
 import TeamMemberTasks from './pages/teamMember/Tasks';
 import TeamMemberTaskDetails from './pages/teamMember/TaskDetails';
 import TeamMemberProgress from './pages/teamMember/Progress';
 import TeamMemberReports from './pages/teamMember/Reports';
 import TeamMemberProfile from './pages/teamMember/Profile';
+
+import TeamMemberNotificationsPage from './Component/teamMember/TeamMemberNotificationsPage';
 
 export default function App() {
   return (
@@ -61,8 +67,6 @@ export default function App() {
             <AdminLayout />
           </ProtectedRoute>
         }>
-       
-
           <Route index element={<Navigate to="dashboard" replace />} />
           <Route path="dashboard" element={<DashboardOverview />} />
           <Route path="users" element={<UsersManagement />} />
@@ -71,6 +75,8 @@ export default function App() {
           <Route path="projects" element={<ProjectsManagement />} />
           <Route path="reports" element={<Reports />} />
           <Route path="settings" element={<SettingsPage />} />
+          {/* ADD THIS ROUTE */}
+          <Route path="notifications" element={<AdminNotificationsPage />} />
         </Route>
 
         {/* Project Manager routes - Protected */}
@@ -92,6 +98,8 @@ export default function App() {
           <Route path="progress" element={<Progress />} />
           <Route path="reports" element={<Reportpm />} />
           <Route path="settings" element={<Settings />} />
+          {/* ADD THIS ROUTE */}
+          <Route path="notifications" element={<ManagerNotificationsPage />} />
         </Route>
 
         {/* Team Member routes - Protected */}
@@ -107,6 +115,8 @@ export default function App() {
           <Route path="progress" element={<TeamMemberProgress />} />
           <Route path="reports" element={<TeamMemberReports />} />
           <Route path="profile" element={<TeamMemberProfile />} />
+          {/* ADD THIS ROUTE */}
+          <Route path="notifications" element={<TeamMemberNotificationsPage />} />
           <Route path="*" element={<Navigate to="dashboard" replace />} />
         </Route>
 

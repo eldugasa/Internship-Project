@@ -18,9 +18,6 @@ const priorityMap = {
   'CRITICAL': 'critical'
 };
 
-// Helper to normalize task data
-// In tasksService.js, update normalizeTask:
-
 const normalizeTask = (task) => {
   // Log to see what we're getting
   console.log('Normalizing task:', task);
@@ -66,8 +63,6 @@ export const getTasks = async () => {
   return tasks.map(normalizeTask);
 };
 
-// Get task by ID
-// Get task by ID
 export const getTaskById = async (id) => {
   const response = await apiClient(`/tasks/${id}`);
   console.log('getTaskById response:', response);
@@ -81,11 +76,6 @@ export const getTasksByProject = async (projectId) => {
   const tasks = await apiClient(`/tasks/project/${projectId}`);
   return tasks.map(normalizeTask);
 };
-
-
-// Create new task
-
-
 export const createTask = async (taskData) => {
   console.log('createTask received:', taskData);
   
@@ -106,7 +96,7 @@ export const createTask = async (taskData) => {
     body: JSON.stringify(payload)
   });
   
-  console.log('createTask response:', response);
+  
    taskData = response.task || response;
   return normalizeTask(taskData);
 };
@@ -133,8 +123,6 @@ export const getTasksByUser = async (userId) => {
   return tasks.filter(t => t.assigneeId === userId);
 };
 
-// Update task
-// Update task
 export const updateTask = async (id, taskData) => {
   const backendStatus = {
     'pending': 'PENDING',
@@ -193,8 +181,6 @@ export const updateTaskStatus = async (taskId, status, progress) => {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
-    
-    console.log('Backend response:', response);
     
  
     const taskData = response.task || response;

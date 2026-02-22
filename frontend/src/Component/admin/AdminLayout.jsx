@@ -1,14 +1,28 @@
 // src/components/admin/AdminLayout.jsx
 import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
-import AdminHeader from './AdminHeader';
-import AdminSidebar from './AdminSidebar';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { Menu } from 'lucide-react';
+import AdminSidebar from './AdminSidebar';
+import NotificationBell from './NotificationBell';
 
 const AdminLayout = () => {
+  const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Get user from localStorage
+  const userStr = localStorage.getItem('user');
+  const user = userStr ? JSON.parse(userStr) : null;
+  const userName = user?.name || 'Admin User';
+  const userRole = user?.role || 'admin';
+  
+  const userInitials = userName
+    .split(' ')
+    .map(n => n[0])
+    .join('')
+    .toUpperCase()
+    .substring(0, 2);
 
   // Check if mobile on mount and resize
   useEffect(() => {
@@ -53,11 +67,20 @@ const AdminLayout = () => {
               <span className="font-bold text-gray-900">Admin Panel</span>
             </div>
           </div>
+          
+          {/* Desktop Profile on Mobile */}
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <div 
+              className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer"
+              style={{ background: `linear-gradient(to bottom right, #0f5841, #194f87)` }}
+              onClick={() => navigate('/admin/settings')}
+            >
+              {userInitials}
+            </div>
+          </div>
         </div>
       )}
-
-      {/* Desktop Header */}
-      {!isMobile && <AdminHeader />}
       
       {/* Main content area with sidebar and content */}
       <div className="flex flex-1 overflow-hidden relative">
@@ -92,6 +115,30 @@ const AdminLayout = () => {
           ${isMobile ? 'p-4' : 'p-6'}
         `}>
           <div className="max-w-7xl mx-auto">
+            {/* Desktop Header */}
+            {!isMobile && (
+              <div className="mb-6 flex justify-between items-center">
+                <div></div>
+                <div className="flex items-center gap-4">
+                  <NotificationBell />
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900">{userName}</p>
+                      <p className="text-xs text-gray-500 capitalize">
+                        {userRole.replace(/_/g, ' ')}
+                      </p>
+                    </div>
+                    <div 
+                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition"
+                      style={{ background: `linear-gradient(to bottom right, #0f5841, #194f87)` }}
+                      onClick={() => navigate('/admin/settings')}
+                    >
+                      {userInitials}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             <Outlet />
           </div>
         </main>

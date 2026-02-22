@@ -1,7 +1,6 @@
 // backend/src/controllers/task.controller.js
-import { prisma } from "../config/db.js";  // ✅ CRITICAL: This was missing!
-
-
+import { prisma } from "../config/db.js";
+import { createNotification, NOTIFICATION_TYPES } from '../utils/notificationHelper.js';
 
 // Get task by ID
 const getTaskById = async (req, res) => {
@@ -24,7 +23,8 @@ const getTaskById = async (req, res) => {
             id: true, 
             name: true,
             description: true,
-            status: true 
+            status: true,
+            managerId: true 
           } 
         },
         comments: {
@@ -40,14 +40,12 @@ const getTaskById = async (req, res) => {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-   
     if (req.user.role !== "ADMIN" && 
         req.user.role !== "PROJECT_MANAGER" && 
         task.assigneeId !== req.user.id) {
       return res.status(403).json({ message: "Not authorized to view this task" });
     }
 
-    // Format response to match what frontend's normalizeTask expects
     res.json({
       id: task.id,
       title: task.title,
@@ -58,19 +56,11 @@ const getTaskById = async (req, res) => {
       dueDate: task.dueDate,
       estimatedHours: task.estimatedHours,
       actualHours: task.actualHours,
-      
-      // Assignee info - frontend expects these fields
       assigneeId: task.assigneeId,
-      assignee: task.assignee, 
-      
-      // Project info
+      assignee: task.assignee,
       projectId: task.projectId,
-      project: task.project, // Full project object
-      
-      // Comments
+      project: task.project,
       comments: task.comments,
-      
-      // Timestamps
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     });
@@ -83,28 +73,78 @@ const getTaskById = async (req, res) => {
 // Create a task (PROJECT_MANAGER only)
 const createTask = async (req, res) => {
   try {
-    const { title, description, projectId, assignedTo, dueDate } = req.body;
+    const { title, description, projectId, assignedTo, dueDate, priority, estimatedHours } = req.body;
 
     // Check if assigned user exists
-    const user = await prisma.user.findUnique({ where: { id: Number(assignedTo) } });
-    if (!user) return res.status(404).json({ message: "Assigned user not found" });
+    const user = await prisma.user.findUnique({ 
+      where: { id: Number(assignedTo) } 
+    });
+    
+    if (!user) {
+      return res.status(404).json({ message: "Assigned user not found" });
+    }
 
+    // Get project details to find the manager
+    const project = await prisma.project.findUnique({
+      where: { id: Number(projectId) },
+      select: { managerId: true, name: true }
+    });
+
+    if (!project) {
+      return res.status(404).json({ message: "Project not found" });
+    }
+
+    // Create the task
     const task = await prisma.task.create({
       data: {
         title,
-        description,
+        description: description || "",
         status: "PENDING",
         progress: 0,
-        priority: "MEDIUM",
+        priority: priority || "MEDIUM",
         projectId: Number(projectId),
-         assigneeId: Number(assignedTo),
-        dueDate: dueDate ? new Date(dueDate) : null
+        assigneeId: Number(assignedTo),
+        dueDate: dueDate ? new Date(dueDate) : null,
+        estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null
+      },
+      include: {
+        assignee: {
+          select: { id: true, name: true, email: true }
+        }
       }
     });
+
+    // Create notifications
+    try {
+      // Notify project manager
+      if (project.managerId) {
+        await createNotification({
+          userId: project.managerId,
+          type: NOTIFICATION_TYPES.TASK_ASSIGNED,
+          title: 'Task Assigned',
+          message: `Task "${task.title}" has been assigned to ${user.name || 'team member'}`,
+          data: { taskId: task.id, projectId: task.projectId },
+          link: `/manager/tasks/${task.id}`
+        });
+      }
+
+      // Notify the assignee (team member)
+      await createNotification({
+        userId: task.assigneeId,
+        type: NOTIFICATION_TYPES.TASK_ASSIGNED_TO_ME,
+        title: 'New Task Assigned',
+        message: `You have been assigned to "${task.title}" in project "${project.name}"`,
+        data: { taskId: task.id, projectId: task.projectId },
+        link: `/team-member/tasks/${task.id}`
+      });
+    } catch (notifErr) {
+      console.error('Error creating notifications:', notifErr);
+      // Don't fail the task creation if notifications fail
+    }
     
     res.status(201).json({ message: "Task created", task });
   } catch (err) {
-   
+    console.error('Error in createTask:', err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -115,7 +155,14 @@ const getTasksByProject = async (req, res) => {
     const { projectId } = req.params;
     const tasks = await prisma.task.findMany({
       where: { projectId: Number(projectId) },
-      include: { assignee: true, project: true }
+      include: { 
+        assignee: { 
+          select: { id: true, name: true, email: true, role: true } 
+        }, 
+        project: { 
+          select: { id: true, name: true } 
+        }
+      }
     });
     res.json(tasks);
   } catch (err) {
@@ -123,6 +170,7 @@ const getTasksByProject = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 // Get tasks assigned to the current user (for Team Members)
 const getMyTasks = async (req, res) => {
   try {
@@ -181,16 +229,21 @@ const getMyTasks = async (req, res) => {
 };
 
 // Update task status/progress (TEAM_MEMBER or PROJECT_MANAGER)
-
 const updateTaskStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, progress } = req.body;
 
-    
-
     const task = await prisma.task.findUnique({ 
-      where: { id: Number(id) } 
+      where: { id: Number(id) },
+      include: {
+        project: { 
+          select: { managerId: true, name: true } 
+        },
+        assignee: { 
+          select: { name: true } 
+        }
+      }
     });
     
     if (!task) {
@@ -202,7 +255,7 @@ const updateTaskStatus = async (req, res) => {
       return res.status(403).json({ message: "Forbidden: You can only update your own tasks" });
     }
 
-    // Prepare update data - update BOTH status and progress
+    // Prepare update data
     const updateData = {
       updatedAt: new Date()
     };
@@ -210,14 +263,29 @@ const updateTaskStatus = async (req, res) => {
     if (status) updateData.status = status;
     if (progress !== undefined) updateData.progress = progress;
 
-  
-
     const updatedTask = await prisma.task.update({
       where: { id: Number(id) },
       data: updateData
     });
 
-    console.log('✅ Task updated successfully');
+    // Create notification for task completion
+    if (status === 'COMPLETED' || status === 'DONE' || progress === 100) {
+      try {
+        // Notify project manager
+        if (task.project && task.project.managerId) {
+          await createNotification({
+            userId: task.project.managerId,
+            type: NOTIFICATION_TYPES.TASK_COMPLETED,
+            title: 'Task Completed',
+            message: `Task "${task.title}" was completed by ${task.assignee?.name || 'team member'}`,
+            data: { taskId: task.id, projectId: task.projectId },
+            link: `/manager/tasks/${task.id}`
+          });
+        }
+      } catch (notifErr) {
+        console.error('Error creating completion notification:', notifErr);
+      }
+    }
 
     res.json({ 
       message: "Task updated", 
@@ -234,8 +302,12 @@ const getAllTasks = async (req, res) => {
   try {
     const tasks = await prisma.task.findMany({
       include: { 
-        assignee: true, 
-        project: true 
+        assignee: { 
+          select: { id: true, name: true, email: true, role: true } 
+        }, 
+        project: { 
+          select: { id: true, name: true } 
+        }
       }
     });
     res.json(tasks);
@@ -246,21 +318,27 @@ const getAllTasks = async (req, res) => {
 };
 
 // Update task progress
-
 const updateTaskProgress = async (req, res) => {
   try {
     const { id } = req.params;
     const { progress } = req.body;
 
     const task = await prisma.task.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: parseInt(id) },
+      include: {
+        project: { 
+          select: { managerId: true, name: true } 
+        },
+        assignee: { 
+          select: { name: true } 
+        }
+      }
     });
 
     if (!task) {
       return res.status(404).json({ message: 'Task not found' });
     }
 
-    
     if (req.user.role !== "ADMIN" && 
         req.user.role !== "PROJECT_MANAGER" && 
         task.assigneeId !== req.user.id) {
@@ -271,10 +349,26 @@ const updateTaskProgress = async (req, res) => {
       where: { id: parseInt(id) },
       data: { 
         progress,
-        status: progress === 100 ? 'DONE' : 
+        status: progress === 100 ? 'COMPLETED' : 
                 progress > 0 ? 'IN_PROGRESS' : 'PENDING'
       }
     });
+
+    // Notify project manager when task is completed
+    if (progress === 100 && task.project && task.project.managerId) {
+      try {
+        await createNotification({
+          userId: task.project.managerId,
+          type: NOTIFICATION_TYPES.TASK_COMPLETED,
+          title: 'Task Completed',
+          message: `Task "${task.title}" has been completed by ${task.assignee?.name || 'team member'}`,
+          data: { taskId: task.id, projectId: task.projectId },
+          link: `/manager/tasks/${task.id}`
+        });
+      } catch (notifErr) {
+        console.error('Error creating completion notification:', notifErr);
+      }
+    }
 
     res.json({
       message: 'Task progress updated',
@@ -288,14 +382,32 @@ const updateTaskProgress = async (req, res) => {
 };
 
 // Assign task to user
-
 const assignTask = async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
 
-    
-    const task = await prisma.task.update({
+    // Get current task details
+    const existingTask = await prisma.task.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        project: { 
+          select: { managerId: true, name: true } 
+        }
+      }
+    });
+
+    if (!existingTask) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
+    // Get user info for notification
+    const user = await prisma.user.findUnique({
+      where: { id: parseInt(userId) },
+      select: { name: true }
+    });
+
+    const updatedTask = await prisma.task.update({
       where: { id: parseInt(id) },
       data: { assigneeId: parseInt(userId) },
       include: {
@@ -303,11 +415,25 @@ const assignTask = async (req, res) => {
       }
     });
 
+    // Notify the newly assigned user
+    try {
+      await createNotification({
+        userId: parseInt(userId),
+        type: NOTIFICATION_TYPES.TASK_ASSIGNED_TO_ME,
+        title: 'Task Assigned to You',
+        message: `You have been assigned to task "${existingTask.title}" in project "${existingTask.project?.name}"`,
+        data: { taskId: existingTask.id, projectId: existingTask.projectId },
+        link: `/team-member/tasks/${existingTask.id}`
+      });
+    } catch (notifErr) {
+      console.error('Error creating assignment notification:', notifErr);
+    }
+
     res.json({
       message: 'Task assigned successfully',
-      taskId: task.id,
-      assignee: task.assignee?.name || null,
-      assigneeId: task.assigneeId
+      taskId: updatedTask.id,
+      assignee: updatedTask.assignee?.name || null,
+      assigneeId: updatedTask.assigneeId
     });
   } catch (err) {
     console.error('Error assigning task:', err);
@@ -321,6 +447,18 @@ const addTaskComment = async (req, res) => {
     const { id } = req.params;
     const { content } = req.body;
 
+    const task = await prisma.task.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        project: { select: { managerId: true } },
+        assignee: { select: { id: true } }
+      }
+    });
+
+    if (!task) {
+      return res.status(404).json({ message: 'Task not found' });
+    }
+
     const comment = await prisma.comment.create({
       data: {
         content,
@@ -331,6 +469,31 @@ const addTaskComment = async (req, res) => {
         user: { select: { id: true, name: true, email: true } }
       }
     });
+
+    // Notify relevant people (project manager and assignee if they're not the commenter)
+    const notifyUsers = [];
+    if (task.project?.managerId && task.project.managerId !== req.user.id) {
+      notifyUsers.push(task.project.managerId);
+    }
+    if (task.assigneeId && task.assigneeId !== req.user.id) {
+      notifyUsers.push(task.assigneeId);
+    }
+
+    // Send notifications
+    try {
+      for (const userId of notifyUsers) {
+        await createNotification({
+          userId,
+          type: NOTIFICATION_TYPES.COMMENT_ADDED,
+          title: 'New Comment',
+          message: `${req.user.name} commented on task "${task.title}"`,
+          data: { taskId: task.id, commentId: comment.id },
+          link: `/tasks/${task.id}`
+        });
+      }
+    } catch (notifErr) {
+      console.error('Error creating comment notification:', notifErr);
+    }
 
     res.status(201).json({
       message: 'Comment added',
@@ -347,6 +510,7 @@ const addTaskComment = async (req, res) => {
   }
 };
 
+// Update task
 const updateTask = async (req, res) => {
   try {
     const { id } = req.params;
@@ -354,7 +518,10 @@ const updateTask = async (req, res) => {
 
     // Check if task exists
     const existingTask = await prisma.task.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: parseInt(id) },
+      include: {
+        project: { select: { managerId: true } }
+      }
     });
 
     if (!existingTask) {
@@ -362,7 +529,9 @@ const updateTask = async (req, res) => {
     }
 
     // Build update data
-    const updateData = {};
+    const updateData = {
+      updatedAt: new Date()
+    };
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (assigneeId !== undefined) updateData.assigneeId = parseInt(assigneeId);
@@ -371,8 +540,6 @@ const updateTask = async (req, res) => {
     if (estimatedHours !== undefined) updateData.estimatedHours = estimatedHours ? parseFloat(estimatedHours) : null;
     if (status !== undefined) updateData.status = status;
     if (progress !== undefined) updateData.progress = progress;
-    
-    updateData.updatedAt = new Date();
 
     const updatedTask = await prisma.task.update({
       where: { id: parseInt(id) },
@@ -410,10 +577,12 @@ const deleteTask = async (req, res) => {
       return res.status(403).json({ message: "Not authorized to delete tasks" });
     }
 
+    // Delete comments first (due to foreign key constraint)
     await prisma.comment.deleteMany({
       where: { taskId: parseInt(id) }
     });
 
+    // Delete the task
     await prisma.task.delete({
       where: { id: parseInt(id) }
     });

@@ -2,6 +2,7 @@ import { prisma } from "../config/db.js";
 
 import { hashPassword, comparePassword } from "../utils/hash.js";
 import { generateToken } from "../utils/jwt.js";
+import { createNotification, NOTIFICATION_TYPES } from '../utils/notificationHelper.js';
 
 const register = async (req, res) => {
   try {
@@ -25,6 +26,17 @@ const register = async (req, res) => {
         role
       }
     });
+    const admins = await prisma.user.findMany({ where: { role: 'admin' } });
+await createBulkNotifications(
+  admins.map(admin => ({
+    userId: admin.id,
+    type: NOTIFICATION_TYPES.USER_REGISTERED,
+    title: 'New User Registered',
+    message: `${newUser.name} (${newUser.email}) joined the platform`,
+    data: { userId: newUser.id },
+    link: `/admin/users/${newUser.id}`
+  }))
+);
 
     // Generate token for the newly registered user
     const token = generateToken(user);

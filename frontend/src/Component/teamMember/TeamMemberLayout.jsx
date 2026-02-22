@@ -1,13 +1,12 @@
-// src/components/projectmanager/ProjectManagerLayout.jsx
+// src/components/teamMember/TeamMemberLayout.jsx
 import React, { useState, useMemo, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
-  FolderKanban,
   CheckSquare,
   TrendingUp,
   FileText,
-  Settings,
+  User,
   LogOut,
   Search,
   X,
@@ -16,7 +15,7 @@ import {
 import NotificationBell from "./NotificationBell";
 import Sidebar from "./Sidebar";
 
-const ProjectManagerLayout = () => {
+const TeamMemberLayout = () => {
   const navigate = useNavigate();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -33,11 +32,11 @@ const ProjectManagerLayout = () => {
     }
   }, []);
 
-  const userName = userData?.name || "Project Manager";
-  const userRole = userData?.role || "project-manager";
+  const userName = userData?.name || "Team Member";
+  const userRole = userData?.role || "team-member";
 
   const userInitials = useMemo(() => {
-    if (!userName) return "PM";
+    if (!userName) return "TM";
     const parts = userName.split(" ");
     return parts.length === 1
       ? parts[0][0].toUpperCase()
@@ -45,12 +44,11 @@ const ProjectManagerLayout = () => {
   }, [userName]);
 
   const navItems = [
-    { path: "/manager/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/manager/projects", icon: FolderKanban, label: "Projects" },
-    { path: "/manager/tasks", icon: CheckSquare, label: "Tasks" },
-    { path: "/manager/progress", icon: TrendingUp, label: "Progress" },
-    { path: "/manager/reports", icon: FileText, label: "Reports" },
-    { path: "/manager/settings", icon: Settings, label: "Settings" },
+    { path: "/team-member/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    { path: "/team-member/tasks", icon: CheckSquare, label: "My Tasks" },
+    { path: "/team-member/progress", icon: TrendingUp, label: "My Progress" },
+    { path: "/team-member/reports", icon: FileText, label: "Reports" },
+    { path: "/team-member/profile", icon: User, label: "Profile" },
   ];
 
   // Close mobile menu when screen size changes to large
@@ -68,7 +66,7 @@ const ProjectManagerLayout = () => {
   const handleSearch = (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    navigate(`/manager/projects?search=${encodeURIComponent(searchQuery.trim())}`);
+    navigate(`/team-member/tasks?search=${encodeURIComponent(searchQuery.trim())}`);
     setSearchQuery("");
   };
 
@@ -126,7 +124,7 @@ const ProjectManagerLayout = () => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search projects, tasks..."
+                  placeholder="Search tasks..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-[#194f87] focus:border-transparent text-sm"
@@ -160,7 +158,7 @@ const ProjectManagerLayout = () => {
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition"
                   style={{ background: `linear-gradient(to bottom right, #0f5841, #194f87)` }}
-                  onClick={() => navigate("/manager/settings")}
+                  onClick={() => navigate("/team-member/profile")}
                 >
                   {userInitials}
                 </div>
@@ -207,4 +205,4 @@ const ProjectManagerLayout = () => {
   );
 };
 
-export default ProjectManagerLayout;
+export default TeamMemberLayout;
