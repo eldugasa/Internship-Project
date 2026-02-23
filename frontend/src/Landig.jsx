@@ -2,6 +2,13 @@ import React, { useState } from 'react';
 import logo from './assets/logo.png';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import { 
+  Facebook, 
+  Linkedin, 
+  Send, 
+  Youtube 
+} from 'lucide-react';
+
 
 const LandingPage = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -11,9 +18,9 @@ const LandingPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-800 overflow-x-hidden">
+    <div className="min-h-screen bg-white font-sans text-slate-800 overflow-x-hidden w-full max-w-full">
       {/* --- NAVIGATION --- */}
-      <nav className="flex justify-between items-center px-4 sm:px-6 md:px-16 py-4 bg-gradient-to-r from-white/95 via-blue-50/95 to-white/95 backdrop-blur-lg sticky top-0 z-50 border-b border-blue-100/50 shadow-sm">
+      <nav className="flex justify-between items-center px-4 sm:px-6 md:px-16 py-4 bg-gradient-to-r from-white/95 via-blue-50/95 to-white/95 backdrop-blur-lg sticky top-0 z-50 border-b border-blue-100/50 shadow-sm w-full">
         {/* Logo/Brand */}
         <div className="flex items-center gap-2 sm:gap-3">
           <img src={logo} alt="Company Logo" className="w-8 h-8 sm:w-10 sm:h-10" />
@@ -102,8 +109,8 @@ const LandingPage = () => {
       </nav>
 
       {/* --- HERO SECTION --- */}
-      <header id="home" className="px-4 sm:px-6 md:px-16 py-12 sm:py-16 md:py-20 bg-white overflow-hidden">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+      <header id="home" className="px-4 sm:px-6 md:px-16 py-12 sm:py-16 md:py-20 bg-white overflow-hidden w-full">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-12 w-full">
           
           {/* Hero Content */}
           <div className="flex-1 text-center lg:text-left order-2 lg:order-1">
@@ -139,7 +146,7 @@ const LandingPage = () => {
             {/* Stats - Responsive Grid */}
             <div className="grid grid-cols-3 gap-4 sm:gap-8 mt-8 sm:mt-12">
               <div className="text-center">
-                <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#2D4A6B]">500+</div>
+                <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#2D4A6B]">50+</div>
                 <div className="text-xs sm:text-sm text-slate-500">Teams</div>
               </div>
               <div className="text-center">
@@ -223,16 +230,16 @@ const LandingPage = () => {
                 </div>
               </div>
               
-              {/* Floating Card - Hidden on mobile */}
-              <div className="hidden md:block absolute -bottom-6 -right-6 bg-white p-4 rounded-xl shadow-xl border border-slate-100/50 animate-float backdrop-blur-sm">
+              {/* Floating Card - Fixed positioning */}
+              <div className="hidden lg:block absolute -bottom-6 -right-4 lg:-right-6 bg-white p-4 rounded-xl shadow-xl border border-slate-100/50 animate-float backdrop-blur-sm max-w-[200px]">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] flex items-center justify-center text-white">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] flex items-center justify-center text-white flex-shrink-0">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
                     </svg>
                   </div>
-                  <div>
-                    <p className="text-xs text-slate-400">Sprint Velocity</p>
+                  <div className="min-w-0">
+                    <p className="text-xs text-slate-400 truncate">Sprint Velocity</p>
                     <p className="text-sm font-bold text-[#2D4A6B]">+24% This Sprint</p>
                   </div>
                 </div>
@@ -243,8 +250,8 @@ const LandingPage = () => {
       </header>
 
       {/* --- FEATURES SECTION --- */}
-      <section id="features" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-white scroll-mt-20">
-        <div className="max-w-7xl mx-auto text-center mb-12 sm:mb-16">
+      <section id="features" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-white scroll-mt-20 w-full">
+        <div className="max-w-7xl mx-auto text-center mb-12 sm:mb-16 w-full">
           <div className="inline-flex items-center gap-2 mb-4">
             <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
             <span className="text-xs sm:text-sm font-bold uppercase tracking-widest text-[#4DA5AD]">Features</span>
@@ -258,7 +265,7 @@ const LandingPage = () => {
           </p>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto px-4 sm:px-0">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto px-4 sm:px-0 w-full">
           <FeatureCard 
             icon={
               <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/10 to-[#2D4A6B]/10 flex items-center justify-center">
@@ -299,8 +306,8 @@ const LandingPage = () => {
       </section>
 
       {/* --- SOLUTIONS SECTION --- */}
-      <section id="solutions" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-gradient-to-b from-white to-slate-50 scroll-mt-20">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-16">
+      <section id="solutions" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-gradient-to-b from-white to-slate-50 scroll-mt-20 w-full relative">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-16 w-full relative">
           <div className="flex-1 px-4 sm:px-0">
             <div className="inline-flex items-center gap-2 mb-4">
               <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
@@ -332,7 +339,7 @@ const LandingPage = () => {
           </div>
           
           {/* Metrics Card - Responsive */}
-          <div className="flex-1 w-full px-4 sm:px-0">
+          <div className="flex-1 w-full px-4 sm:px-0 relative">
             <div className="relative bg-gradient-to-br from-[#2D4A6B] via-[#2D4A6B]/90 to-[#4DA5AD] rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-2xl overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent"></div>
               
@@ -379,46 +386,109 @@ const LandingPage = () => {
               </div>
             </div>
             
-            {/* Floating Element - Hidden on mobile */}
-            <div className="hidden md:block absolute -top-4 -right-4 w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-[#4DA5AD] to-teal-300 rounded-xl -rotate-12 shadow-lg"></div>
+            {/* Floating Element - Fixed positioning */}
+            <div className="hidden lg:block absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-[#4DA5AD] to-teal-300 rounded-xl -rotate-12 shadow-lg"></div>
           </div>
         </div>
       </section>
 
       {/* --- FOOTER --- */}
-      <footer className="bg-[#1a2a3a] text-white py-8 sm:py-10 md:py-12 px-4 sm:px-6 md:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center mb-6 md:mb-8">
-            <div className="flex flex-wrap justify-center gap-6 sm:gap-8">
-              <FooterSection 
-                title="Product"
-                links={[
-                  { href: "#features", label: "Features" },
-                  { href: "#solutions", label: "Solutions" },
-                  { href: "#pricing", label: "Pricing" }
-                ]}
-              />
-              <FooterSection 
-                title="Company"
-                links={[
-                  { href: "#about", label: "About" },
-                  { href: "#careers", label: "Careers" },
-                  { href: "#blog", label: "Blog" }
-                ]}
-              />
-              <FooterSection 
-                title="Support"
-                links={[
-                  { href: "#help", label: "Help Center" },
-                  { href: "#contact", label: "Contact" },
-                  { href: "#privacy", label: "Privacy" }
-                ]}
-              />
+      <footer className="bg-[#1a2a3a] text-white py-4  py-8 sm:py-3 px-4 sm:px-6 md:px-8 w-full overflow-hidden">
+        <div className="max-w-7xl mx-auto w-full">
+          {/* Footer Content - Responsive Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-8 md:mb-10 w-full">
+            
+            {/* Product Section */}
+            <div className="text-center sm:text-left">
+              <h4 className="font-bold mb-4 text-slate-300 text-sm sm:text-base">Product</h4>
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-400">
+                <li><a href="#features" className="hover:text-white transition-colors block py-1">Features</a></li>
+                <li><a href="#solutions" className="hover:text-white transition-colors block py-1">Solutions</a></li>
+                <li><a href="#pricing" className="hover:text-white transition-colors block py-1">Pricing</a></li>
+              </ul>
+            </div>
+            
+            {/* Company Section */}
+            <div className="text-center sm:text-left">
+              <h4 className="font-bold mb-4 text-slate-300 text-sm sm:text-base">Company</h4>
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-400">
+                <li><a href="#about" className="hover:text-white transition-colors block py-1">About</a></li>
+                <li><a href="#careers" className="hover:text-white transition-colors block py-1">Careers</a></li>
+                <li><a href="#blog" className="hover:text-white transition-colors block py-1">Blog</a></li>
+              </ul>
+            </div>
+            
+            {/* Support Section */}
+            <div className="text-center sm:text-left">
+              <h4 className="font-bold mb-4 text-slate-300 text-sm sm:text-base">Support</h4>
+              <ul className="space-y-2 text-xs sm:text-sm text-slate-400">
+                <li><a href="#help" className="hover:text-white transition-colors block py-1">Help Center</a></li>
+                <li><a href="#contact" className="hover:text-white transition-colors block py-1">Contact</a></li>
+                <li><a href="#privacy" className="hover:text-white transition-colors block py-1">Privacy</a></li>
+              </ul>
+            </div>
+            
+            {/* Contact & Social Section */}
+            <div className="text-center sm:text-left">
+              <h4 className="font-bold mb-4 text-slate-300 text-sm sm:text-base">Contact Info</h4>
+              <div className="space-y-2 mb-6 text-xs sm:text-sm text-slate-400">
+                <p className="py-1">Jimma, Ethiopia</p>
+                <p className="py-1">contact@deboengineering.com</p>
+                <p className="py-1">+251 94 954 0860</p>
+              </div>
+              
+              {/* Social Media Icons */}
+              <div className="flex items-center justify-center sm:justify-start gap-3 flex-wrap">
+                {/* Facebook */}
+                <a 
+                  href="https://facebook.com/deboengineering" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors group"
+                  aria-label="Facebook"
+                >
+                  <Facebook className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                </a>
+                
+                {/* LinkedIn */}
+                <a 
+                  href="https://www.linkedin.com/company/debo-engineering" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors group"
+                  aria-label="LinkedIn"
+                >
+                  <Linkedin className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                </a>
+                
+                {/* Telegram */}
+                <a 
+                  href="#" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors group"
+                  aria-label="Telegram"
+                >
+                  <Send className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                </a>
+                
+                {/* YouTube */}
+                <a 
+                  href="https://www.youtube.com/channel/UCSFW4-JLb7X5Y8-ThBX5NFg" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors group"
+                  aria-label="YouTube"
+                >
+                  <Youtube className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                </a>
+              </div>
             </div>
           </div>
           
-          <div className="border-t border-slate-700 pt-6 sm:pt-8 text-center text-slate-400 text-xs sm:text-sm">
-            <p>© 2024. The digital core for modern engineering teams.</p>
+          {/* Bottom Copyright */}
+          <div className="border-t border-slate-700 pt-4 text-center text-slate-400 text-xs sm:text-sm w-full">
+            <p>© 2026 TaskFlow. The digital core for modern engineering teams.</p>
           </div>
         </div>
       </footer>
@@ -427,7 +497,7 @@ const LandingPage = () => {
 };
 
 const FeatureCard = ({ icon, title, desc }) => (
-  <div className="p-4 sm:p-6 md:p-8 border border-slate-100 bg-gradient-to-br from-[#4DA5AD]/20 via-[#4DA5AD]/10 to-[#2D4A6B]/20 rounded-xl sm:rounded-2xl hover:shadow-xl hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 bg-white group">
+  <div className="p-4 sm:p-6 md:p-6 border border-slate-100 bg-gradient-to-br from-[#4DA5AD]/20 via-[#4DA5AD]/10 to-[#2D4A6B]/20 rounded-xl sm:rounded-2xl hover:shadow-xl hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 bg-white group">
     <div className="mb-3 sm:mb-4 md:mb-6 group-hover:scale-110 transition-transform duration-300">
       {icon}
     </div>
@@ -438,19 +508,6 @@ const FeatureCard = ({ icon, title, desc }) => (
   </div>
 );
 
-const FooterSection = ({ title, links }) => (
-  <div className="text-center md:text-left">
-    <h4 className="font-bold mb-2 sm:mb-3 text-slate-300 text-sm sm:text-base">{title}</h4>
-    <ul className="space-y-1 sm:space-y-2 text-xs sm:text-sm text-slate-400">
-      {links.map((link, index) => (
-        <li key={index}>
-          <a href={link.href} className="hover:text-white transition-colors">
-            {link.label}
-          </a>
-        </li>
-      ))}
-    </ul>
-  </div>
-);
+
 
 export default LandingPage;
