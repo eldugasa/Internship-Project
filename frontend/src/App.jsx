@@ -6,7 +6,7 @@ import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './auth/ProtectedRoute';
 
 // Public imports
-import LandingPage from "./Landig";
+import LandingPage from "./LandingPage";
 import Signup from './auth/Signup';
 import Login from './auth/Login';
 import ForgetPassword from './auth/ForgetPassword';

@@ -1,114 +1,10 @@
-import React, { useState } from 'react';
-import logo from './assets/logo.png';
+import React from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
-import { 
-  Facebook, 
-  Linkedin, 
-  Send, 
-  Youtube 
-} from 'lucide-react';
 
-
-const LandingPage = () => {
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen);
-  };
-
+const HeroSection = () => {
   return (
-    <div className="min-h-screen bg-white font-sans text-slate-800 overflow-x-hidden w-full max-w-full">
-      {/* --- NAVIGATION --- */}
-      <nav className="flex justify-between items-center px-4 sm:px-6 md:px-16 py-4 bg-gradient-to-r from-white/95 via-blue-50/95 to-white/95 backdrop-blur-lg sticky top-0 z-50 border-b border-blue-100/50 shadow-sm w-full">
-        {/* Logo/Brand */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <img src={logo} alt="Company Logo" className="w-8 h-8 sm:w-10 sm:h-10" />
-          <a href="#home" className="hidden sm:block text-sm sm:text-base hover:text-[#4DA5AD] transition-colors duration-300 relative group">
-            Home
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] group-hover:w-full transition-all duration-300"></span>
-          </a>
-        </div>
-        
-        {/* Desktop Navigation Links */}
-        <div className="hidden md:flex space-x-8 lg:space-x-10 font-semibold text-sm text-gray-600">
-          <a href="#features" className="hover:text-[#4DA5AD] transition-colors duration-300 relative group">
-            Features
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] group-hover:w-full transition-all duration-300"></span>
-          </a>
-          <a href="#solutions" className="hover:text-[#4DA5AD] transition-colors duration-300 relative group">
-            Solutions
-            <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] group-hover:w-full transition-all duration-300"></span>
-          </a>
-        </div>
-
-        {/* Desktop Auth Buttons */}
-        <div className="hidden md:flex items-center gap-3 lg:gap-4">
-          <Link 
-            to="/login"
-            className="px-4 lg:px-5 py-2 text-sm font-semibold text-[#2D4A6B] hover:text-[#4DA5AD] transition-colors hover:bg-gray-50/80 rounded-lg">
-            Login
-          </Link>
-          <Link 
-            to="/signup"
-            className="px-4 lg:px-6 py-2 text-sm font-semibold text-white bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 shadow-lg hover:shadow-[#4DA5AD]/30"
-          >
-            Get Started
-          </Link>
-        </div>
-
-        {/* Mobile Menu Button */}
-        <button 
-          onClick={toggleMobileMenu}
-          className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition"
-        >
-          {mobileMenuOpen ? (
-            <X className="w-6 h-6 text-[#2D4A6B]" />
-          ) : (
-            <Menu className="w-6 h-6 text-[#2D4A6B]" />
-          )}
-        </button>
-
-        {/* Mobile Menu Dropdown */}
-        {mobileMenuOpen && (
-          <div className="absolute top-16 left-0 right-0 bg-white border-b border-gray-200 shadow-lg p-4 md:hidden z-50">
-            <div className="flex flex-col space-y-4">
-              <a 
-                href="#features" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition"
-              >
-                Features
-              </a>
-              <a 
-                href="#solutions" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition"
-              >
-                Solutions
-              </a>
-              <div className="border-t border-gray-200 pt-4 flex flex-col gap-3">
-                <Link 
-                  to="/login"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-4 py-3 text-center text-[#2D4A6B] border border-gray-300 rounded-lg hover:bg-gray-50 transition"
-                >
-                  Login
-                </Link>
-                <Link 
-                  to="/signup"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="px-4 py-3 text-center text-white bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-lg hover:shadow-lg transition"
-                >
-                  Get Started
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-      </nav>
-
-      {/* --- HERO SECTION --- */}
+    <>
+      {/* HERO SECTION */}
       <header id="home" className="px-4 sm:px-6 md:px-16 py-12 sm:py-16 md:py-20 bg-white overflow-hidden w-full">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-12 w-full">
           
@@ -143,7 +39,7 @@ const LandingPage = () => {
               </Link>
             </div>
 
-            {/* Stats - Responsive Grid */}
+            {/* Stats */}
             <div className="grid grid-cols-3 gap-4 sm:gap-8 mt-8 sm:mt-12">
               <div className="text-center">
                 <div className="text-xl sm:text-2xl lg:text-3xl font-bold text-[#2D4A6B]">50+</div>
@@ -160,7 +56,7 @@ const LandingPage = () => {
             </div>
           </div>
 
-          {/* Hero Image - Responsive */}
+          {/* Hero Image */}
           <div className="flex-1 relative w-full max-w-2xl lg:max-w-none order-1 lg:order-2 mb-8 lg:mb-0">
             <div className="absolute -top-10 -right-10 w-48 sm:w-64 h-48 sm:h-64 bg-[#4DA5AD]/20 rounded-full blur-3xl opacity-60"></div>
             <div className="absolute -bottom-10 -left-10 w-32 sm:w-48 h-32 sm:h-48 bg-[#2D4A6B]/20 rounded-full blur-3xl opacity-40"></div>
@@ -195,7 +91,7 @@ const LandingPage = () => {
                   </div>
                 </div>
                 
-                {/* Task List - Responsive */}
+                {/* Task List */}
                 <div className="bg-white p-3 sm:p-4 md:p-6">
                   <div className="space-y-2 sm:space-y-3">
                     {[
@@ -230,7 +126,7 @@ const LandingPage = () => {
                 </div>
               </div>
               
-              {/* Floating Card - Fixed positioning */}
+              {/* Floating Card */}
               <div className="hidden lg:block absolute -bottom-6 -right-4 lg:-right-6 bg-white p-4 rounded-xl shadow-xl border border-slate-100/50 animate-float backdrop-blur-sm max-w-[200px]">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] flex items-center justify-center text-white flex-shrink-0">
@@ -249,7 +145,7 @@ const LandingPage = () => {
         </div>
       </header>
 
-      {/* --- FEATURES SECTION --- */}
+      {/* FEATURES SECTION */}
       <section id="features" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-white scroll-mt-20 w-full">
         <div className="max-w-7xl mx-auto text-center mb-12 sm:mb-16 w-full">
           <div className="inline-flex items-center gap-2 mb-4">
@@ -305,7 +201,7 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* --- SOLUTIONS SECTION --- */}
+      {/* SOLUTIONS SECTION */}
       <section id="solutions" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-gradient-to-b from-white to-slate-50 scroll-mt-20 w-full relative">
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-16 w-full relative">
           <div className="flex-1 px-4 sm:px-0">
@@ -338,7 +234,7 @@ const LandingPage = () => {
             </ul>
           </div>
           
-          {/* Metrics Card - Responsive */}
+          {/* Metrics Card */}
           <div className="flex-1 w-full px-4 sm:px-0 relative">
             <div className="relative bg-gradient-to-br from-[#2D4A6B] via-[#2D4A6B]/90 to-[#4DA5AD] rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-2xl overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent"></div>
@@ -386,116 +282,16 @@ const LandingPage = () => {
               </div>
             </div>
             
-            {/* Floating Element - Fixed positioning */}
+            {/* Floating Element */}
             <div className="hidden lg:block absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-[#4DA5AD] to-teal-300 rounded-xl -rotate-12 shadow-lg"></div>
           </div>
         </div>
       </section>
-
-      {/* --- FOOTER --- */}
-      <footer className="bg-[#1a2a3a] text-white py-4  py-8 sm:py-3 px-4 sm:px-6 md:px-8 w-full overflow-hidden">
-        <div className="max-w-7xl mx-auto w-full">
-          {/* Footer Content - Responsive Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-8 md:mb-10 w-full">
-            
-            {/* Product Section */}
-            <div className="text-center sm:text-left">
-              <h4 className="font-bold mb-4 text-slate-300 text-sm sm:text-base">Product</h4>
-              <ul className="space-y-2 text-xs sm:text-sm text-slate-400">
-                <li><a href="#features" className="hover:text-white transition-colors block py-1">Features</a></li>
-                <li><a href="#solutions" className="hover:text-white transition-colors block py-1">Solutions</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors block py-1">Pricing</a></li>
-              </ul>
-            </div>
-            
-            {/* Company Section */}
-            <div className="text-center sm:text-left">
-              <h4 className="font-bold mb-4 text-slate-300 text-sm sm:text-base">Company</h4>
-              <ul className="space-y-2 text-xs sm:text-sm text-slate-400">
-                <li><a href="#about" className="hover:text-white transition-colors block py-1">About</a></li>
-                <li><a href="#careers" className="hover:text-white transition-colors block py-1">Careers</a></li>
-                <li><a href="#blog" className="hover:text-white transition-colors block py-1">Blog</a></li>
-              </ul>
-            </div>
-            
-            {/* Support Section */}
-            <div className="text-center sm:text-left">
-              <h4 className="font-bold mb-4 text-slate-300 text-sm sm:text-base">Support</h4>
-              <ul className="space-y-2 text-xs sm:text-sm text-slate-400">
-                <li><a href="#help" className="hover:text-white transition-colors block py-1">Help Center</a></li>
-                <li><a href="#contact" className="hover:text-white transition-colors block py-1">Contact</a></li>
-                <li><a href="#privacy" className="hover:text-white transition-colors block py-1">Privacy</a></li>
-              </ul>
-            </div>
-            
-            {/* Contact & Social Section */}
-            <div className="text-center sm:text-left">
-              <h4 className="font-bold mb-4 text-slate-300 text-sm sm:text-base">Contact Info</h4>
-              <div className="space-y-2 mb-6 text-xs sm:text-sm text-slate-400">
-                <p className="py-1">Jimma, Ethiopia</p>
-                <p className="py-1">contact@deboengineering.com</p>
-                <p className="py-1">+251 94 954 0860</p>
-              </div>
-              
-              {/* Social Media Icons */}
-              <div className="flex items-center justify-center sm:justify-start gap-3 flex-wrap">
-                {/* Facebook */}
-                <a 
-                  href="https://facebook.com/deboengineering" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors group"
-                  aria-label="Facebook"
-                >
-                  <Facebook className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                </a>
-                
-                {/* LinkedIn */}
-                <a 
-                  href="https://www.linkedin.com/company/debo-engineering" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors group"
-                  aria-label="LinkedIn"
-                >
-                  <Linkedin className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                </a>
-                
-                {/* Telegram */}
-                <a 
-                  href="#" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors group"
-                  aria-label="Telegram"
-                >
-                  <Send className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                </a>
-                
-                {/* YouTube */}
-                <a 
-                  href="https://www.youtube.com/channel/UCSFW4-JLb7X5Y8-ThBX5NFg" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-lg bg-slate-800 hover:bg-slate-700 flex items-center justify-center text-slate-400 hover:text-white transition-colors group"
-                  aria-label="YouTube"
-                >
-                  <Youtube className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                </a>
-              </div>
-            </div>
-          </div>
-          
-          {/* Bottom Copyright */}
-          <div className="border-t border-slate-700 pt-4 text-center text-slate-400 text-xs sm:text-sm w-full">
-            <p>© 2026 TaskFlow. The digital core for modern engineering teams.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
+    </>
   );
 };
 
+// Feature Card Component (kept inside since it's only used here)
 const FeatureCard = ({ icon, title, desc }) => (
   <div className="p-4 sm:p-6 md:p-6 border border-slate-100 bg-gradient-to-br from-[#4DA5AD]/20 via-[#4DA5AD]/10 to-[#2D4A6B]/20 rounded-xl sm:rounded-2xl hover:shadow-xl hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 bg-white group">
     <div className="mb-3 sm:mb-4 md:mb-6 group-hover:scale-110 transition-transform duration-300">
@@ -508,6 +304,4 @@ const FeatureCard = ({ icon, title, desc }) => (
   </div>
 );
 
-
-
-export default LandingPage;
+export default HeroSection;
