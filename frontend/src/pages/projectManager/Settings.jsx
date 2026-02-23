@@ -1,15 +1,16 @@
-// src/pages/projectmanager/SettingsPage.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Save, Edit, User, Mail, Lock, Camera, X, Check, 
-  Bell, BellOff, Shield, Key, Eye, EyeOff 
+  Bell, BellOff, Shield, Key, Eye, EyeOff, RotateCcw 
 } from 'lucide-react';
+import { apiClient } from '../../services/apiClient';
 import { getCurrentUserProfile, updateCurrentUserProfile, updateCurrentUserPassword } from '../../services/usersService';
 
 const SettingsPage = () => {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [prefsSaving, setPrefsSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
@@ -28,19 +29,16 @@ const SettingsPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // ✅ FIXED: Notification preferences with proper toggle
-  const [notifications, setNotifications] = useState({
-    taskUpdates: true,
-    deadlineReminders: true,
-    projectUpdates: true,
-    teamMentions: false
-  });
+  // Notification preferences from backend
+  const [notifications, setNotifications] = useState({});
 
-  // Fetch profile from backend
+  // Fetch profile and notification preferences from backend
   useEffect(() => {
-    const fetchProfile = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
+        
+        // Fetch user profile
         const userData = await getCurrentUserProfile();
         setProfile({
           id: userData.id,
@@ -54,10 +52,21 @@ const SettingsPage = () => {
           profileImage: userData.profileImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.name || 'User')}&background=0f5841&color=fff&size=128`
         });
         
-        // Load notification preferences from localStorage
-        const savedNotifications = localStorage.getItem('notificationPrefs');
-        if (savedNotifications) {
-          setNotifications(JSON.parse(savedNotifications));
+        // Fetch notification preferences from backend
+        try {
+          const prefs = await apiClient('/notification-prefs');
+          setNotifications(prefs);
+        } catch (prefErr) {
+          console.error('Error fetching notification prefs:', prefErr);
+          // Set defaults if API fails
+          setNotifications({
+            taskUpdates: true,
+            deadlineReminders: true,
+            projectUpdates: true,
+            teamMentions: false,
+            emailNotifications: true,
+            inAppNotifications: true
+          });
         }
       } catch (err) {
         console.error('Error fetching profile:', err);
@@ -67,7 +76,7 @@ const SettingsPage = () => {
       }
     };
 
-    fetchProfile();
+    fetchData();
   }, []);
 
   // Save all changes
@@ -81,11 +90,8 @@ const SettingsPage = () => {
         phone: profile.phone,
         location: profile.location,
       });
-
-      // ✅ Save notification preferences to localStorage
-      localStorage.setItem('notificationPrefs', JSON.stringify(notifications));
       
-      setSuccess('Settings saved successfully!');
+      setSuccess('Profile saved successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error('Error saving settings:', err);
@@ -129,14 +135,44 @@ const SettingsPage = () => {
     }
   };
 
-  // ✅ FIXED: Toggle notifications with auto-save
-  const toggleNotification = (key) => {
-    setNotifications(prev => {
-      const updated = { ...prev, [key]: !prev[key] };
-      // Auto-save to localStorage when toggled
-      localStorage.setItem('notificationPrefs', JSON.stringify(updated));
-      return updated;
-    });
+  // Toggle notifications with backend save
+  const toggleNotification = async (key) => {
+    try {
+      setPrefsSaving(true);
+      const updated = { ...notifications, [key]: !notifications[key] };
+      setNotifications(updated);
+      
+      // Save to backend
+      await apiClient('/notification-prefs', {
+        method: 'PUT',
+        body: JSON.stringify(updated)
+      });
+    } catch (err) {
+      console.error('Error saving notification preferences:', err);
+      setError('Failed to save notification preferences');
+      // Revert on error
+      setNotifications(notifications);
+    } finally {
+      setPrefsSaving(false);
+    }
+  };
+
+  // Reset to default preferences
+  const resetToDefault = async () => {
+    try {
+      setPrefsSaving(true);
+      const response = await apiClient('/notification-prefs/reset', {
+        method: 'POST'
+      });
+      setNotifications(response.prefs);
+      setSuccess('Notification preferences reset to default');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error resetting preferences:', err);
+      setError('Failed to reset preferences');
+    } finally {
+      setPrefsSaving(false);
+    }
   };
 
   // Image upload handler
@@ -398,41 +434,110 @@ const SettingsPage = () => {
 
         {/* Right Column: Notifications & Account Info */}
         <div className="space-y-6">
-          {/* ✅ FIXED: Notifications Section */}
+          {/* Notifications Section - Now using API */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-2 mb-6">
-              <Bell className="w-5 h-5" style={{ color: '#0f5841' }} />
-              <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <Bell className="w-5 h-5" style={{ color: '#0f5841' }} />
+                <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
+              </div>
+              <button
+                onClick={resetToDefault}
+                disabled={prefsSaving}
+                className="flex items-center gap-1 px-2 py-1 text-xs border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                <RotateCcw className="w-3 h-3" />
+                Reset
+              </button>
             </div>
 
+            {prefsSaving && (
+              <div className="text-center py-2 text-xs text-gray-500">
+                Saving preferences...
+              </div>
+            )}
+
             <div className="space-y-4">
-              {Object.entries(notifications).map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition">
-                  <div className="flex-1 mr-4">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900 capitalize">
-                        {key.replace(/([A-Z])/g, ' $1').trim()}
-                      </span>
-                      {value ? (
-                        <Bell className="w-4 h-4" style={{ color: '#0f5841' }} />
-                      ) : (
-                        <BellOff className="w-4 h-4 text-gray-400" />
-                      )}
+              {Object.entries(notifications).map(([key, value]) => {
+                // Skip internal preferences if you want
+                if (key === 'emailNotifications' || key === 'inAppNotifications') return null;
+                
+                return (
+                  <div key={key} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition">
+                    <div className="flex-1 mr-4">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900 capitalize">
+                          {key.replace(/([A-Z])/g, ' $1').trim()}
+                        </span>
+                        {value ? (
+                          <Bell className="w-4 h-4" style={{ color: '#0f5841' }} />
+                        ) : (
+                          <BellOff className="w-4 h-4 text-gray-400" />
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <button
-                    onClick={() => toggleNotification(key)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#194f87] focus:ring-offset-2`}
-                    style={{ backgroundColor: value ? '#0f5841' : '#d1d5db' }}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        value ? 'translate-x-6' : 'translate-x-1'
+                    <button
+                      onClick={() => toggleNotification(key)}
+                      disabled={prefsSaving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#194f87] focus:ring-offset-2 ${
+                        prefsSaving ? 'opacity-50 cursor-not-allowed' : ''
                       }`}
-                    />
-                  </button>
-                </div>
-              ))}
+                      style={{ backgroundColor: value ? '#0f5841' : '#d1d5db' }}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          value ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Global notification settings */}
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <h3 className="text-sm font-medium text-gray-900 mb-3">Global Settings</h3>
+              <div className="space-y-3">
+                {notifications.emailNotifications !== undefined && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-gray-700">Email Notifications</span>
+                    <button
+                      onClick={() => toggleNotification('emailNotifications')}
+                      disabled={prefsSaving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        prefsSaving ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      style={{ backgroundColor: notifications.emailNotifications ? '#0f5841' : '#d1d5db' }}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          notifications.emailNotifications ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )}
+                {notifications.inAppNotifications !== undefined && (
+                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <span className="text-gray-700">In-App Notifications</span>
+                    <button
+                      onClick={() => toggleNotification('inAppNotifications')}
+                      disabled={prefsSaving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        prefsSaving ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                      style={{ backgroundColor: notifications.inAppNotifications ? '#0f5841' : '#d1d5db' }}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          notifications.inAppNotifications ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
