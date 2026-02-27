@@ -179,13 +179,7 @@ const TaskDetails = () => {
           </button>
           <h1 className="text-2xl font-bold text-gray-900">{task.title}</h1>
         </div>
-        <button
-          onClick={() => navigate(`/team-member/tasks/edit/${id}`)}
-          className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-          disabled={updating}
-        >
-          <Edit size={16} /> Edit
-        </button>
+        {/*  */}
       </div>
 
       {/* Main Card */}

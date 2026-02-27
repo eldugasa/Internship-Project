@@ -88,7 +88,7 @@ router.delete("/:id",
 
 // ===== COMMENT ROUTES =====
 
-// ✅ ADD THIS: GET /api/tasks/:id/comments - Get all comments
+//  GET /api/tasks/:id/comments - Get all comments
 router.get("/:id/comments", 
   authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"),
   async (req, res) => {
