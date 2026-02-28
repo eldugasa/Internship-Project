@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { forgotPasswordApi } from '../services/authService';
 
 const SignIn = () => {
   const [form, setForm] = useState({ 
@@ -79,23 +80,37 @@ const SignIn = () => {
     if (error) setError('');
   };
 
-  const handleForgotPassword = (e) => {
+  const handleForgotPassword = async (e) => {
     e.preventDefault();
-    
+
     if (!forgotEmail.includes('@')) {
       setForgotMessage('Please enter a valid email address');
       return;
     }
-    
-    // Simulate sending reset email
-    setTimeout(() => {
-      setForgotMessage(`Password reset link sent to ${forgotEmail}. Please check your email.`);
+
+    try {
+      setIsLoading(true);
+      // call backend endpoint to send reset link
+      const res = await forgotPasswordApi(forgotEmail);
+      // backend returns generic message; in development it includes token
+      setForgotMessage(
+        res.message || `Password reset link sent to ${forgotEmail}. Check your email.`
+      );
+
+      // close form after a short delay
       setTimeout(() => {
         setShowForgotPassword(false);
         setForgotEmail('');
         setForgotMessage('');
       }, 3000);
-    }, 1000);
+    } catch (err) {
+      console.error('Forgot password API error:', err);
+      setForgotMessage(
+        err.message || 'Failed to send reset link. Please try again later.'
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDemoLogin = (email) => {

@@ -13,16 +13,14 @@ import {
   assignTask,
   addTaskComment,
   deleteTask,
-   getMyTasks 
+   getMyTasks ,
+    deleteComment
 } from "../controllers/task.controller.js";
 
 const router = express.Router();
 
 // All routes require authentication
 router.use(authenticate);
-
-// ===== TASK ROUTES =====
-
 
 router.post("/", 
   authorize("PROJECT_MANAGER", "project-manager", "project_manager"), 
@@ -111,10 +109,15 @@ router.get("/:id/comments",
   }
 );
 
-// ✅ ADD THIS: POST /api/tasks/:id/comments - Add a comment
+//  Add a comment
 router.post("/:id/comments", 
   authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"),
   addTaskComment
+);
+
+router.delete("/:id/comments/:commentId", 
+  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"),
+  deleteComment // Use the controller function created above
 );
 
 export default router;

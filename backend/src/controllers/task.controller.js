@@ -510,6 +510,40 @@ const addTaskComment = async (req, res) => {
   }
 };
 
+const deleteComment = async (req, res) => {
+  try {
+    const { id, commentId } = req.params; // id is taskId, commentId is the comment's ID
+
+    const comment = await prisma.comment.findUnique({
+      where: { id: parseInt(commentId) }
+    });
+
+    if (!comment) {
+      return res.status(404).json({ message: "Comment not found" });
+    }
+
+    // Security: Only the author, an ADMIN, or a PROJECT_MANAGER can delete
+    const isAuthor = comment.userId === req.user.id;
+    const isPrivileged = req.user.role === "ADMIN" || req.user.role === "PROJECT_MANAGER";
+
+    if (!isAuthor && !isPrivileged) {
+      return res.status(403).json({ message: "Not authorized to delete this comment" });
+    }
+
+    await prisma.comment.delete({
+      where: { id: parseInt(commentId) }
+    });
+
+    res.json({ message: "Comment deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting comment:", err);
+    res.status(500).json({ message: "Failed to delete comment" });
+  }
+};
+
+// Remember to add deleteComment to your export { ... } list at the bottom!
+
+
 // Update task
 const updateTask = async (req, res) => {
   try {
@@ -606,5 +640,6 @@ export {
   addTaskComment,
   deleteTask,
   getAllTasks,
-  updateTask 
+  updateTask,
+  deleteComment
 };

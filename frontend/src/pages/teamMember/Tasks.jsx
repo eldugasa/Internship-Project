@@ -41,7 +41,7 @@ const TeamMemberTasks = () => {
         setTasks(userTasks);
         setFilteredTasks(userTasks);
 
-        // ✅ Extract unique projects from tasks (no API call needed)
+        
         const uniqueProjects = [];
         const projectIds = new Set();
         
@@ -199,14 +199,10 @@ const TeamMemberTasks = () => {
     return dueDate && new Date(dueDate) < new Date() && task.status !== 'completed';
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'No deadline';
-    try {
-      return new Date(dateStr).toLocaleDateString();
-    } catch {
-      return 'Invalid date';
-    }
-  };
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'No deadline';
+  return dateStr; // Returns "24/02/2026" as is
+};
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -346,7 +342,8 @@ const TeamMemberTasks = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredTasks.map(task => {
             const isTaskUpdating = updatingTaskId === task.id;
-            
+            // Inside your filteredTasks.map, add this temporarily:
+console.log('Task due date:', task.dueDate || task.deadline);
             return (
               <div 
                 key={task.id} 
@@ -443,16 +440,16 @@ const TeamMemberTasks = () => {
                         Start
                       </button>
                     )}
-                    {task.status === 'in-progress' && (
+                    {task.progress === 100 && (
                       <button 
                         onClick={() => handleUpdateProgress(task.id, 100)} 
                         disabled={isTaskUpdating}
                         className="px-3 py-1.5 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       >
-                        {isTaskUpdating ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-700 border-t-transparent mr-1"></div>
-                        ) : (
+                        {task.progress === 100 ? (
                           <CheckCircle className="w-4 h-4 mr-1" />
+                        ) : (
+                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-700 border-t-transparent mr-1"></div>
                         )}
                         Complete
                       </button>

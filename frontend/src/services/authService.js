@@ -63,6 +63,34 @@ export const registerApi = async ({ name, email, password }) => {
   return user;
 };
 
+// ✅ ADD THIS FUNCTION - Forgot Password
+export const forgotPasswordApi = async (email) => {
+  try {
+    const data = await apiClient("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+    return data;
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    throw error;
+  }
+};
+
+// ✅ ADD THIS FUNCTION - Reset Password (with token)
+export const resetPasswordApi = async (token, newPassword) => {
+  try {
+    const data = await apiClient("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, newPassword }),
+    });
+    return data;
+  } catch (error) {
+    console.error('Reset password error:', error);
+    throw error;
+  }
+};
+
 export const logoutApi = () => {
   localStorage.removeItem("user");
   try { localStorage.removeItem("userData"); } catch (e) {}

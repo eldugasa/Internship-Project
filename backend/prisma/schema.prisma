@@ -6,7 +6,7 @@ datasource db {
 
 generator client {
   provider = "prisma-client-js"
-   binaryTargets = ["native", "linux-musl", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"]
+  binaryTargets = ["native", "linux-musl", "debian-openssl-3.0.x", "rhel-openssl-3.0.x"]
 }
 
 model User {
@@ -30,6 +30,10 @@ model User {
   notificationPrefs Json? @default("{}")
   
   notifications Notification[]
+  
+  // ✅ ADD THESE TWO FIELDS FOR PASSWORD RESET
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
 }
 
 model Project {

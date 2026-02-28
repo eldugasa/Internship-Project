@@ -1,5 +1,6 @@
 // src/pages/teamMember/Profile.jsx
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom'; // Add this import
 import { useAuth } from '../../context/AuthContext';
 import { 
   Mail, Phone, MapPin, Briefcase, Calendar,
@@ -8,6 +9,7 @@ import {
 import { getCurrentUserProfile, updateCurrentUserProfile } from '../../services/usersService';
 
 const TeamMemberProfile = () => {
+  const navigate = useNavigate(); // Add this
   const { user, logout } = useAuth();
   const [profile, setProfile] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -29,7 +31,7 @@ const TeamMemberProfile = () => {
           email: userData.email || '',
           phone: userData.phone || '',
           location: userData.location || '',
-          team: userData.team?.name || userData.team || 'Not assigned', // ✅ Extract name from team object
+          team: userData.team?.name || userData.team || 'Not assigned',
           role: userData.role || '',
           joinDate: userData.createdAt || new Date().toISOString(),
         });
@@ -67,6 +69,10 @@ const TeamMemberProfile = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleChangePassword = () => {
+    navigate('/change-password'); // ✅ Correct way to navigate in React
   };
 
   if (isLoading) {
@@ -203,11 +209,11 @@ const TeamMemberProfile = () => {
                 placeholder="Add location"
               />
               
-              {/* Team - Extract name from object */}
+              {/* Team */}
               <InfoRow 
                 icon={Briefcase} 
                 label="Team" 
-                value={profile.team} // Now it's a string, not an object
+                value={profile.team}
               />
               
               {/* Join Date */}
@@ -222,10 +228,10 @@ const TeamMemberProfile = () => {
               />
             </div>
 
-            {/* Password Change Link */}
+            {/* Password Change Link - FIXED */}
             <div className="mt-4 pt-4 border-t border-gray-100">
               <button 
-                onClick={() => window.location.href = '/change-password'}
+                onClick={handleChangePassword}
                 className="text-sm text-[#4DA5AD] hover:underline flex items-center gap-1"
               >
                 <Key className="w-4 h-4" /> Change Password

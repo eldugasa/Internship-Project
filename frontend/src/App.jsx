@@ -10,6 +10,7 @@ import LandingPage from "./LandingPage";
 import Signup from './auth/Signup';
 import Login from './auth/Login';
 import ForgetPassword from './auth/ForgetPassword';
+import ResetPassword from './auth/ResetPassword';
 
 // Admin imports
 import AdminLayout from './Component/admin/AdminLayout';
@@ -60,6 +61,7 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgetPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Admin routes - Protected */}
         <Route path="/admin" element={

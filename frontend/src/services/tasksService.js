@@ -20,7 +20,7 @@ const priorityMap = {
 
 const normalizeTask = (task) => {
   // Log to see what we're getting
-  console.log('Normalizing task:', task);
+
   
   return {
     ...task,
@@ -114,7 +114,6 @@ export const getMyTasks = async () => {
 
 // Update the existing getTasksByUser to use the new endpoint
 export const getTasksByUser = async (userId) => {
-  // For Team Members, they should use getMyTasks instead
   
   if (userId === JSON.parse(localStorage.getItem('user'))?.id) {
     return getMyTasks();
@@ -228,14 +227,19 @@ export const getTaskComments = async (taskId) => {
 };
 
 
+
 export const addTaskComment = async (taskId, commentData) => {
-  const comment = await apiClient(`/tasks/${taskId}/comments`, {
+  const response = await apiClient(`/tasks/${taskId}/comments`, {
     method: 'POST',
     body: JSON.stringify(commentData)
   });
-  return comment;
+  return response.comment; // Return only the comment object
 };
-
+export const deleteTaskComment = async (taskId, commentId) => {
+  return await apiClient(`/tasks/${taskId}/comments/${commentId}`, {
+    method: 'DELETE'
+  });
+};
 
 
 

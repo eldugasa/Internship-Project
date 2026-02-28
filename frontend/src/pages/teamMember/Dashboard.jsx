@@ -25,6 +25,103 @@ const TeamMemberDashboard = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
 
+  // ============= DATE HELPER FUNCTIONS =============
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    
+    try {
+      // Handle DD/MM/YYYY format (European)
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const [day, month, year] = dateStr.split('/');
+        return new Date(`${year}-${month}-${day}`);
+      }
+      return new Date(dateStr);
+    } catch {
+      return null;
+    }
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'No deadline';
+    
+    try {
+      // Handle DD/MM/YYYY format
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const [day, month, year] = dateStr.split('/');
+        const date = new Date(`${year}-${month}-${day}`);
+        
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+          });
+        }
+      }
+      
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+      
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
+  const isOverdue = (dateStr, status) => {
+    if (status === 'completed' || !dateStr) return false;
+    
+    const dueDate = parseDate(dateStr);
+    if (!dueDate) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    dueDate.setHours(0, 0, 0, 0);
+    
+    return dueDate < today;
+  };
+
+  const isInNextWeek = (dateStr, status) => {
+    if (status === 'completed' || !dateStr) return false;
+    
+    const dueDate = parseDate(dateStr);
+    if (!dueDate) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const nextWeek = new Date();
+    nextWeek.setDate(nextWeek.getDate() + 7);
+    nextWeek.setHours(23, 59, 59, 999);
+    
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate >= today && dueDate <= nextWeek;
+  };
+
+  const isUrgent = (dateStr, priority, status) => {
+    if (status === 'completed' || priority !== 'high' || !dateStr) return false;
+    
+    const dueDate = parseDate(dateStr);
+    if (!dueDate) return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const threeDays = new Date();
+    threeDays.setDate(threeDays.getDate() + 3);
+    threeDays.setHours(23, 59, 59, 999);
+    
+    dueDate.setHours(0, 0, 0, 0);
+    return dueDate >= today && dueDate <= threeDays;
+  };
+  // =================================================
+
   // Load user and tasks
   useEffect(() => {
     if (!user) {
@@ -43,11 +140,11 @@ const TeamMemberDashboard = () => {
       joinDate: user.joinDate,
       efficiency: 95
     };
+    
     setEmployee(currentEmployee);
 
     const fetchTasks = async () => {
       try {
-        // ✅ Use getMyTasks instead of axios.get
         const employeeTasks = await getMyTasks();
         setTasks(employeeTasks);
         setFilteredTasks(employeeTasks);
@@ -82,34 +179,44 @@ const TeamMemberDashboard = () => {
   }, [searchQuery, statusFilter, tasks]);
 
   // Stats Calculator
-  const calculateStats = (employeeTasks, efficiency) => {
-    const completedTasks = employeeTasks.filter(t => t.status === 'completed').length;
-    const inProgressTasks = employeeTasks.filter(t => t.status === 'in-progress').length;
-    const pendingTasks = employeeTasks.filter(t => t.status === 'pending').length;
-    const overdueTasks = employeeTasks.filter(t => 
-      t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'
-    ).length;
-    
-    const totalHours = employeeTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
-    const estimatedHours = employeeTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+// Stats Calculator
+const calculateStats = (employeeTasks, efficiency) => {
+  const completedTasks = employeeTasks.filter(t => t.status === 'completed').length;
+  const inProgressTasks = employeeTasks.filter(t => t.status === 'in-progress').length;
+  const pendingTasks = employeeTasks.filter(t => t.status === 'pending').length;
+  
+  // ✅ Use the isOverdue helper function
+  const overdueTasks = employeeTasks.filter(t => isOverdue(t.dueDate, t.status)).length;
+  
+  const totalHours = employeeTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
+  const estimatedHours = employeeTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
 
-    setStats({
-      totalTasks: employeeTasks.length,
-      completedTasks,
-      inProgressTasks,
-      pendingTasks,
-      overdueTasks,
-      efficiency,
-      completionRate: employeeTasks.length > 0 
-        ? Math.round((completedTasks / employeeTasks.length) * 100) 
-        : 0,
-      totalHours,
-      estimatedHours,
-      utilization: estimatedHours > 0 
-        ? Math.round((totalHours / estimatedHours) * 100) 
-        : 0
-    });
-  };
+  // Add debug logging
+  console.log('Overdue tasks count:', overdueTasks);
+  console.log('Tasks with overdue status:', employeeTasks.map(t => ({
+    title: t.title,
+    dueDate: t.dueDate,
+    status: t.status,
+    isOverdue: isOverdue(t.dueDate, t.status)
+  })));
+
+  setStats({
+    totalTasks: employeeTasks.length,
+    completedTasks,
+    inProgressTasks,
+    pendingTasks,
+    overdueTasks,
+    efficiency,
+    completionRate: employeeTasks.length > 0 
+      ? Math.round((completedTasks / employeeTasks.length) * 100) 
+      : 0,
+    totalHours,
+    estimatedHours,
+    utilization: estimatedHours > 0 
+      ? Math.round((totalHours / estimatedHours) * 100) 
+      : 0
+  });
+};
 
   // Handle Task Progress Update
   const handleUpdateProgress = async (taskId, progress) => {
@@ -127,7 +234,6 @@ const TeamMemberDashboard = () => {
       setTasks(updatedTasks);
       calculateStats(updatedTasks, stats.efficiency);
 
-      
       await updateTaskStatus(taskId, status, progress);
     } catch (err) {
       console.error('Error updating task:', err);
@@ -146,37 +252,29 @@ const TeamMemberDashboard = () => {
     handleUpdateProgress(taskId, 0);
   };
 
-  // Helper Functions
+  // Helper Functions using our date helpers
   const getUrgentTasks = () => {
     return filteredTasks
-      .filter(task => 
-        task.priority === 'high' && 
-        task.status !== 'completed' &&
-        task.dueDate && 
-        new Date(task.dueDate) <= new Date(new Date().setDate(new Date().getDate() + 3))
-      )
+      .filter(task => isUrgent(task.dueDate, task.priority, task.status))
       .slice(0, 3);
   };
 
   const getTodayTasks = () => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
     return filteredTasks.filter(task => {
-      if (!task.dueDate) return false;
-      const taskDate = new Date(task.dueDate).toISOString().split('T')[0];
-      return taskDate === today;
+      const dueDate = parseDate(task.dueDate);
+      if (!dueDate) return false;
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate.getTime() === today.getTime();
     });
   };
 
   const getUpcomingDeadlines = () => {
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    
-    return filteredTasks.filter(task => {
-      if (!task.dueDate || task.status === 'completed') return false;
-      const deadline = new Date(task.dueDate);
-      const today = new Date();
-      return deadline >= today && deadline <= nextWeek;
-    }).slice(0, 3);
+    return filteredTasks
+      .filter(task => isInNextWeek(task.dueDate, task.status))
+      .slice(0, 3);
   };
 
   const getStatusColor = (status) => {
@@ -197,19 +295,6 @@ const TeamMemberDashboard = () => {
     }
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'No deadline';
-    try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    } catch {
-      return 'Invalid date';
-    }
-  };
-
   // Safe Loading
   if (isLoading || !employee) {
     return (
@@ -222,15 +307,14 @@ const TeamMemberDashboard = () => {
     );
   }
 
-  // Dashboard JSX
+  // Dashboard JSX (keep all your existing JSX exactly as before)
   return (
     <div className="space-y-6 p-6">
-      {/* Welcome Banner */}
+      {/* Welcome Banner - same as before */}
       <div className="bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-2xl p-6 lg:p-8 text-white shadow-lg">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between">
           <div className="mb-6 lg:mb-0">
             <h1 className="text-2xl lg:text-3xl font-bold mb-2">Welcome back, {employee.name}!</h1>
-         
             <div className="flex items-center space-x-4">
               <div className="flex items-center">
                 <Users className="w-4 h-4 mr-2 opacity-80" />
@@ -255,7 +339,7 @@ const TeamMemberDashboard = () => {
         </div>
       </div>
 
-      {/* Filters and Search */}
+      {/* Filters and Search - same as before */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2">
           {['all', 'pending', 'in-progress', 'completed'].map(status => (
@@ -285,7 +369,7 @@ const TeamMemberDashboard = () => {
         </div>
       </div>
 
-      {/* Quick Stats */}
+      {/* Quick Stats - same as before */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
@@ -382,12 +466,12 @@ const TeamMemberDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Action Buttons */}
+                      {/* Action Buttons - FIXED overdue check */}
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
                           Due: {formatDate(task.dueDate)}
-                          {task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed' && (
-                            <span className="ml-2 text-red-600">(Overdue)</span>
+                          {isOverdue(task.dueDate, task.status) && (
+                            <span className="ml-2 text-red-600 font-medium">(Overdue!)</span>
                           )}
                         </div>
                         
@@ -436,7 +520,7 @@ const TeamMemberDashboard = () => {
 
         {/* Right Column - Stats & Info */}
         <div className="space-y-6">
-          {/* Upcoming Deadlines */}
+          {/* Upcoming Deadlines - FIXED */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Upcoming Deadlines</h2>
             <div className="space-y-3">

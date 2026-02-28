@@ -26,6 +26,21 @@ app.get("/", (req, res) => {
   res.json({ message: "Task Management API running 🚀" });
 });
 
+// Quick test endpoint to verify email sending
+import { sendPasswordResetEmail } from './utils/email.js';
+
+app.get('/_test-email', async (req, res) => {
+  try {
+    const to = req.query.to || process.env.SMTP_USER;
+    const token = 'test-token';
+    await sendPasswordResetEmail(to, token, 'Test User');
+    res.json({ success: true, message: 'Test email sent (check server logs and Ethereal preview if in dev)'});
+  } catch (err) {
+    console.error('Test email error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 export default app;
 
 
