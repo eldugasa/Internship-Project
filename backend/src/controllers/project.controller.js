@@ -184,6 +184,7 @@ export const updateProject = async (req, res) => {
 };
 
 // Get all projects
+// Get all projects
 export const getAllProjects = async (req, res) => {
   try {
     const role = normalizeRole(req.user.role);
@@ -208,16 +209,31 @@ export const getAllProjects = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
-    projects = projects.map((project) => ({
-      ...project,
+    // Format projects for frontend
+    const formattedProjects = projects.map((project) => ({
+      id: project.id,
+      name: project.name,
+      description: project.description,
+      status: project.status,
+      progress: project.progress || 0,
+      startDate: project.startDate,
+      endDate: project.endDate,
+      dueDate: project.endDate, // For UI compatibility
+      teamId: project.team?.id || null,
+      teamName: project.team?.name || 'Unassigned', // ✅ Add teamName field
+      team: project.team, // ✅ Keep the original team object
+      managerId: project.managerId,
+      createdAt: project.createdAt,
+      updatedAt: project.updatedAt,
       tasks: {
         total: project.tasks.length,
         completed: project.tasks.filter((t) => t.status === "COMPLETED").length,
-      },
-      team: project.team?.name || "No team",
+        pending: project.tasks.filter((t) => t.status === "PENDING").length,
+        inProgress: project.tasks.filter((t) => t.status === "IN_PROGRESS").length,
+      }
     }));
 
-    res.json(projects);
+    res.json(formattedProjects);
   } catch (err) {
     console.error("Error fetching projects:", err);
     res.status(500).json({ message: err.message });

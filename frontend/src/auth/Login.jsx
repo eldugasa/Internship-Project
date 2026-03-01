@@ -297,34 +297,7 @@ const SignIn = () => {
               </form>
 
               {/* Demo Accounts Section - Updated with correct emails */}
-              <div className="mt-8 pt-8 border-t border-gray-200">
-                <h3 className="text-sm font-semibold text-[#2D4A6B] mb-4 text-center">
-                  Try Demo Accounts
-                </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {[
-                    { email: 'admin@taskflow.com', role: 'Admin', icon: '👑', color: 'from-purple-100 to-purple-50' },
-                    { email: 'pm@task.com', role: 'Manager', icon: '📋', color: 'from-blue-100 to-blue-50' },
-                    { email: 'member@task.com', role: 'Member', icon: '👨‍💻', color: 'from-green-100 to-green-50' }
-                  ].map((demo) => (
-                    <button
-                      key={demo.email}
-                      onClick={() => handleDemoLogin(demo.email)}
-                      className={`p-4 bg-gradient-to-br ${demo.color} border border-gray-200 rounded-xl hover:border-[#4DA5AD] hover:shadow-md transition-all duration-300 group`}
-                    >
-                      <div className="flex flex-col items-center">
-                        <span className="text-2xl mb-2 group-hover:scale-110 transition-transform">
-                          {demo.icon}
-                        </span>
-                        <div className="font-medium text-gray-900">{demo.role}</div>
-                        <div className="text-xs text-gray-500 truncate w-full text-center">
-                          {demo.email.split('@')[0]}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+             
 
               {/* Divider */}
               <div className="mt-8 flex items-center">

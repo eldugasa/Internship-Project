@@ -8,6 +8,8 @@ import {
 import { getProjects } from '../../services/projectsService';
 import { getTasks } from '../../services/tasksService';
 import { getTeams } from '../../services/teamsService';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 const Reports = () => {
   const [selectedReport, setSelectedReport] = useState('progress');
@@ -27,7 +29,6 @@ const Reports = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Fetch only the data PM has access to
         const [projectsData, tasksData, teamsData] = await Promise.all([
           getProjects(),
           getTasks(),
@@ -38,7 +39,6 @@ const Reports = () => {
         setTasks(tasksData);
         setTeams(teamsData);
 
-        // Calculate stats
         calculateStats(projectsData, tasksData, teamsData);
         calculateTeamPerformance(teamsData, projectsData, tasksData);
       } catch (err) {
@@ -52,7 +52,6 @@ const Reports = () => {
     fetchData();
   }, []);
 
-  // Filter data based on date range
   useEffect(() => {
     if (projects.length && tasks.length) {
       filterDataByDate();
@@ -82,16 +81,13 @@ const Reports = () => {
       t.status === 'pending'
     ).length;
     
-    // Calculate overdue tasks
     const overdueTasks = tasksData.filter(t => 
       t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'
     ).length;
 
-    // Calculate overall progress
     const totalProgress = projectsData.reduce((sum, p) => sum + (p.progress || 0), 0);
     const overallProgress = projectsData.length ? Math.round(totalProgress / projectsData.length) : 0;
 
-    // Upcoming deadlines (next 7 days)
     const now = new Date();
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     const upcomingDeadlines = tasksData.filter(t => {
@@ -100,10 +96,8 @@ const Reports = () => {
       return dueDate >= now && dueDate <= nextWeek;
     }).length;
 
-    // Calculate team stats (from teams data only)
     const totalTeams = teamsData.length;
     
-    // Estimate team members from projects data
     const uniqueTeamMembers = new Set();
     projectsData.forEach(project => {
       if (project.teamMembers) {
@@ -130,14 +124,11 @@ const Reports = () => {
 
   const calculateTeamPerformance = (teamsData, projectsData, tasksData) => {
     const performance = teamsData.map(team => {
-      // Get team projects
       const teamProjects = projectsData.filter(p => p.teamId === team.id || p.teamName === team.name);
       const teamProjectIds = teamProjects.map(p => p.id);
       
-      // Get team tasks
       const teamTasks = tasksData.filter(t => teamProjectIds.includes(t.projectId));
       
-      // Calculate metrics
       const totalTasks = teamTasks.length;
       const completedTasks = teamTasks.filter(t => t.status === 'completed').length;
       const inProgressTasks = teamTasks.filter(t => t.status === 'in-progress').length;
@@ -158,7 +149,7 @@ const Reports = () => {
         pendingTasks,
         completionRate,
         totalHours,
-        performance: completionRate // For backward compatibility
+        performance: completionRate
       };
     });
 
@@ -312,23 +303,198 @@ const Reports = () => {
   const metrics = currentReport?.getMetrics() || [];
   const details = currentReport?.getDetails?.() || [];
 
+  // Generate PDF Report
+  const generatePDF = (data) => {
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(20);
+    doc.setTextColor(77, 165, 173);
+    doc.text(data.reportName, 14, 22);
+    
+    // Metadata
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${data.generatedAt}`, 14, 32);
+    doc.text(`Period: ${data.dateRange.start} to ${data.dateRange.end}`, 14, 38);
+    
+    // Metrics Table
+    doc.setFontSize(14);
+    doc.setTextColor(0);
+    doc.text('Key Metrics', 14, 48);
+    
+    const metricsData = data.metrics.map(m => [m.label, m.value.toString()]);
+    
+    // ✅ Use autoTable as a function, not doc.autoTable
+    autoTable(doc, {
+      startY: 52,
+      head: [['Metric', 'Value']],
+      body: metricsData,
+      theme: 'grid',
+      headStyles: { fillColor: [77, 165, 173] },
+      styles: { fontSize: 10 },
+      margin: { left: 14, right: 14 }
+    });
+    
+    // Details Section
+    if (data.details && data.details.length > 0) {
+      doc.setFontSize(14);
+      doc.setTextColor(0);
+      doc.text('Detailed Breakdown', 14, doc.lastAutoTable.finalY + 10);
+      
+      // Prepare data based on report type
+      let headers = [];
+      let bodyData = [];
+      
+      if (data.reportType === 'progress') {
+        headers = ['Project', 'Team', 'Status', 'Progress'];
+        bodyData = data.details.map(item => [
+          item.name || '-',
+          item.team || '-',
+          item.status || '-',
+          `${item.progress || 0}%`
+        ]);
+      } else if (data.reportType === 'workload') {
+        headers = ['Team', 'Lead', 'Members', 'Projects', 'Completion'];
+        bodyData = data.details.map(item => [
+          item.name || '-',
+          item.lead || '-',
+          (item.members || 0).toString(),
+          (item.projects || 0).toString(),
+          `${item.completionRate || 0}%`
+        ]);
+      } else if (data.reportType === 'deadlines') {
+        headers = ['Task', 'Project', 'Due Date', 'Status', 'Priority'];
+        bodyData = data.details.map(item => [
+          item.name || '-',
+          item.project || '-',
+          item.dueDate || '-',
+          item.status || '-',
+          item.priority || '-'
+        ]);
+      } else {
+        headers = ['Item', 'Value'];
+        bodyData = data.details.map(item => [
+          item.name || item.label || '-',
+          `${item.value || item.progress || item.completionRate || 0}%`
+        ]);
+      }
+      
+      if (headers.length > 0 && bodyData.length > 0) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 14,
+          head: [headers],
+          body: bodyData,
+          theme: 'grid',
+          headStyles: { fillColor: [77, 165, 173] },
+          styles: { fontSize: 9 },
+          margin: { left: 14, right: 14 }
+        });
+      }
+    }
+    
+    // Footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(150);
+      doc.text(
+        `Generated by TaskFlow • Page ${i} of ${pageCount}`,
+        14,
+        doc.internal.pageSize.height - 10
+      );
+    }
+    
+    // Save PDF
+    doc.save(`${data.reportType}-report-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  // Generate CSV Report
+  const generateCSV = (data) => {
+    let csv = '';
+    
+    csv += `Report: ${data.reportName}\n`;
+    csv += `Generated: ${data.generatedAt}\n`;
+    csv += `Period: ${data.dateRange.start} to ${data.dateRange.end}\n\n`;
+    
+    csv += 'METRICS\n';
+    csv += 'Metric,Value\n';
+    data.metrics.forEach(m => {
+      csv += `${m.label},${m.value}\n`;
+    });
+    
+    if (data.details.length > 0) {
+      csv += '\nDETAILED BREAKDOWN\n';
+      
+      // Determine headers based on data structure
+      if (data.details[0]?.name && data.details[0]?.team && data.details[0]?.progress !== undefined) {
+        csv += 'Item,Team,Status,Progress\n';
+        data.details.forEach(item => {
+          csv += `${item.name || '-'},${item.team || '-'},${item.status || '-'},${item.progress || 0}%\n`;
+        });
+      } else if (data.details[0]?.name && data.details[0]?.projects !== undefined) {
+        csv += 'Team,Lead,Members,Projects,Completion Rate,Total Tasks,Completed\n';
+        data.details.forEach(item => {
+          csv += `${item.name || '-'},${item.lead || '-'},${item.members || 0},${item.projects || 0},${item.completionRate || 0}%,${item.totalTasks || 0},${item.completedTasks || 0}\n`;
+        });
+      } else if (data.details[0]?.name && data.details[0]?.dueDate) {
+        csv += 'Task,Project,Due Date,Status,Priority\n';
+        data.details.forEach(item => {
+          csv += `${item.name || '-'},${item.project || '-'},${item.dueDate || '-'},${item.status || '-'},${item.priority || '-'}\n`;
+        });
+      }
+    }
+    
+    return csv;
+  };
+
   const handleDownload = (format) => {
-    const data = {
+    const reportData = {
       reportType: selectedReport,
+      reportName: currentReport?.name,
       dateRange,
-      generatedAt: new Date().toISOString(),
-      stats,
-      data: currentReport?.getDetails?.() || []
+      generatedAt: new Date().toLocaleString(),
+      metrics: currentReport?.getMetrics() || [],
+      details: currentReport?.getDetails?.() || [],
+      teamPerformance: teamPerformance,
+      stats: stats
     };
     
-    const jsonStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${selectedReport}-report-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    switch(format.toLowerCase()) {
+      case 'pdf':
+        generatePDF(reportData);
+        break;
+        
+      case 'excel':
+      case 'csv':
+        const csv = generateCSV(reportData);
+        const csvBlob = new Blob([csv], { type: 'text/csv' });
+        const csvUrl = URL.createObjectURL(csvBlob);
+        const csvLink = document.createElement('a');
+        csvLink.href = csvUrl;
+        csvLink.download = `${selectedReport}-report-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(csvLink);
+        csvLink.click();
+        document.body.removeChild(csvLink);
+        URL.revokeObjectURL(csvUrl);
+        break;
+        
+      default:
+        // JSON fallback
+        const json = JSON.stringify(reportData, null, 2);
+        const jsonBlob = new Blob([json], { type: 'application/json' });
+        const jsonUrl = URL.createObjectURL(jsonBlob);
+        const jsonLink = document.createElement('a');
+        jsonLink.href = jsonUrl;
+        jsonLink.download = `${selectedReport}-report-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(jsonLink);
+        jsonLink.click();
+        document.body.removeChild(jsonLink);
+        URL.revokeObjectURL(jsonUrl);
+    }
+    
+    alert(`✅ ${format} report downloaded successfully!`);
   };
 
   const generateReport = () => {
@@ -494,17 +660,7 @@ const Reports = () => {
 
             {/* Export Options */}
             <div className="mt-6 pt-6 border-t border-gray-200">
-              <div className="flex gap-3">
-                <button className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                  <Printer className="w-4 h-4 mr-2" /> Print
-                </button>
-                <button className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                  <Share2 className="w-4 h-4 mr-2" /> Share
-                </button>
-                <button className="flex items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors">
-                  <DownloadCloud className="w-4 h-4 mr-2" /> Export All
-                </button>
-              </div>
+              
             </div>
           </div>
         </div>

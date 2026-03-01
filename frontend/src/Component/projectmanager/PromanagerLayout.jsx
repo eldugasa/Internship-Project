@@ -122,7 +122,7 @@ const ProjectManagerLayout = () => {
               onSubmit={handleSearch}
               className={`flex-1 max-w-md ${isMobileMenuOpen ? 'ml-14' : 'ml-14 lg:ml-0'}`}
             >
-              <div className="relative">
+              {/* <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
@@ -140,7 +140,7 @@ const ProjectManagerLayout = () => {
                     <X className="w-4 h-4" />
                   </button>
                 )}
-              </div>
+              </div> */}
             </form>
 
             {/* Right Side */}
