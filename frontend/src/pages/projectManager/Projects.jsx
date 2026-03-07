@@ -8,12 +8,12 @@ import {
   Download, RefreshCw
 } from 'lucide-react';
 import { getProjects, deleteProject } from '../../services/projectsService';
-import { getTeams } from '../../services/teamsService'; // Add this import
+import { getTeams } from '../../services/teamsService';
 
 const Projects = () => {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
-  const [teams, setTeams] = useState([]); // Add teams state
+  const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -27,100 +27,115 @@ const Projects = () => {
     overdue: 0
   });
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
+  // Date parsing helper for DD/MM/YYYY format
+  const parseDate = (dateStr) => {
+    if (!dateStr) return null;
+    
+    try {
+      if (typeof dateStr === 'string' && dateStr.includes('/')) {
+        const [day, month, year] = dateStr.split('/');
+        return new Date(`${year}-${month}-${day}`);
+      }
+      return new Date(dateStr);
+    } catch {
+      return null;
+    }
+  };
 
- const fetchProjects = async () => {
-  setLoading(true);
-  try {
-    // Fetch both projects and teams
-    const [projectsData, teamsData] = await Promise.all([
-      getProjects(),
-      getTeams()
-    ]);
+  // Check if project is overdue
+  const isOverdue = (project) => {
+    if (project.status === 'completed') return false;
     
+    const deadlineStr = project.dueDate || project.endDate;
+    if (!deadlineStr) return false;
     
+    const deadlineDate = parseDate(deadlineStr);
+    if (!deadlineDate) return false;
     
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
     
-    const teamMap = {};
-    teamsData.forEach(team => {
-      // Check both possible ID fields
-      const teamId = team.id || team._id;
-      if (teamId) {
-        teamMap[teamId] = team.name;
-      } else {
-        console.log('⚠️ Team without ID:', team);
-      }
-    });
-    
-    // Add team names to projects
-    const projectsWithTeams = projectsData.map(project => {
-      // Try all possible places where team info might be
-      let teamName = 'Unassigned';
-      
-      // Check if project already has teamName
-      if (project.teamName) {
-        teamName = project.teamName;
-      }
-      // Check if project has nested team object with name
-      else if (project.team && project.team.name) {
-        teamName = project.team.name;
-        console.log(`Project ${project.id}: Using nested team.name: ${teamName}`);
-      }
-      else {
-        // Try to find team by ID - check all possible ID fields
-        const possibleTeamIds = [
-          project.teamId,
-          project.team_id,
-          project.team?._id,
-          project.team?.id
-        ].filter(id => id != null);
-        
-        for (const tid of possibleTeamIds) {
-          if (teamMap[tid]) {
-            teamName = teamMap[tid];
-            console.log(`Project ${project.id}: Found team via ID ${tid} -> ${teamName}`);
-            break;
-          }
-        }
-        
-        if (teamName === 'Unassigned' && possibleTeamIds.length > 0) {
-          console.log(`Project ${project.id}: No match for team IDs:`, possibleTeamIds);
-        }
-      }
-      
-      return {
-        ...project,
-        teamName: teamName
-      };
-    });
-    
-    setTeams(teamsData);
-    setProjects(projectsWithTeams);
-    calculateStats(projectsWithTeams);
-    
-  } catch (err) {
-    console.error('Error fetching projects:', err);
-  } finally {
-    setLoading(false);
-  }
-};
+    return deadlineDate < today;
+  };
 
+  // Calculate statistics
   const calculateStats = (projectsData) => {
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    
+    const overdue = projectsData.filter(p => isOverdue(p)).length;
+
     setStats({
       total: projectsData.length,
       active: projectsData.filter(p => p.status === 'active').length,
       completed: projectsData.filter(p => p.status === 'completed').length,
       planned: projectsData.filter(p => p.status === 'planned').length,
-      overdue: projectsData.filter(p => 
-        p.status !== 'completed' && 
-        new Date(p.dueDate || p.endDate) < now
-      ).length
+      overdue: overdue
     });
   };
 
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
+  const fetchProjects = async () => {
+    setLoading(true);
+    try {
+      const [projectsData, teamsData] = await Promise.all([
+        getProjects(),
+        getTeams()
+      ]);
+      
+      const teamMap = {};
+      teamsData.forEach(team => {
+        const teamId = team.id || team._id;
+        if (teamId) {
+          teamMap[teamId] = team.name;
+        }
+      });
+      
+      const projectsWithTeams = projectsData.map(project => {
+        let teamName = 'Unassigned';
+        
+        if (project.teamName) {
+          teamName = project.teamName;
+        } else if (project.team && project.team.name) {
+          teamName = project.team.name;
+        } else {
+          const possibleTeamIds = [
+            project.teamId,
+            project.team_id,
+            project.team?._id,
+            project.team?.id
+          ].filter(id => id != null);
+          
+          for (const tid of possibleTeamIds) {
+            if (teamMap[tid]) {
+              teamName = teamMap[tid];
+              break;
+            }
+          }
+        }
+        
+        return {
+          ...project,
+          teamName: teamName
+        };
+      });
+      
+      setTeams(teamsData);
+      setProjects(projectsWithTeams);
+      calculateStats(projectsWithTeams);
+      
+    } catch (err) {
+      console.error('Error fetching projects:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Filter projects
   const filteredProjects = projects.filter(project => {
     const matchesSearch = searchQuery === '' || 
       project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -131,14 +146,21 @@ const Projects = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Sort projects
   const sortedProjects = [...filteredProjects].sort((a, b) => {
     switch(sortBy) {
-      case 'deadline':
-        return new Date(a.dueDate || a.endDate) - new Date(b.dueDate || b.endDate);
+      case 'deadline': {
+        const dateA = parseDate(a.dueDate || a.endDate);
+        const dateB = parseDate(b.dueDate || b.endDate);
+        if (!dateA && !dateB) return 0;
+        if (!dateA) return 1;
+        if (!dateB) return -1;
+        return dateA - dateB;
+      }
       case 'progress':
-        return b.progress - a.progress;
+        return (b.progress || 0) - (a.progress || 0);
       case 'name':
-        return a.name.localeCompare(b.name);
+        return (a.name || '').localeCompare(b.name || '');
       default:
         return 0;
     }
@@ -192,7 +214,7 @@ const Projects = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       <div className="p-6 max-w-7xl mx-auto">
-        {/* Header Section - keep as is */}
+        {/* Header Section */}
         <div className="mb-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
@@ -217,7 +239,7 @@ const Projects = () => {
             </div>
           </div>
 
-          {/* Stats Cards - keep as is */}
+          {/* Stats Cards */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
             <StatCard 
               title="Total Projects" 
@@ -257,7 +279,7 @@ const Projects = () => {
           </div>
         </div>
 
-        {/* Filters & Search Bar - keep as is */}
+        {/* Filters & Search Bar */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
           <div className="flex flex-col lg:flex-row lg:items-center gap-4">
             <div className="flex-1 relative">
@@ -323,6 +345,7 @@ const Projects = () => {
                   onDelete={handleDeleteProject}
                   onView={() => navigate(`/manager/projects/${project.id}`)}
                   getStatusBadge={getStatusBadge}
+                  isOverdue={isOverdue}
                 />
               ))}
             </div>
@@ -370,8 +393,9 @@ const Projects = () => {
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className="text-sm text-gray-600">
+                          <span className={`text-sm ${isOverdue(project) ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
                             {project.dueDate || project.endDate || 'N/A'}
+                            {isOverdue(project) && ' (Overdue)'}
                           </span>
                         </div>
                       </td>
@@ -425,10 +449,9 @@ const StatCard = ({ title, value, icon: Icon, color, bgColor }) => (
 );
 
 // Project Card Component
-const ProjectCard = ({ project, onDelete, onView, getStatusBadge }) => {
+const ProjectCard = ({ project, onDelete, onView, getStatusBadge, isOverdue }) => {
   const [showMenu, setShowMenu] = useState(false);
-  const isOverdue = project.status !== 'completed' && 
-    new Date(project.dueDate || project.endDate) < new Date();
+  const overdue = isOverdue(project);
 
   return (
     <div className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
@@ -479,7 +502,7 @@ const ProjectCard = ({ project, onDelete, onView, getStatusBadge }) => {
         {/* Status Badge */}
         <div className="mb-4 flex items-center justify-between">
           {getStatusBadge(project.status)}
-          {isOverdue && (
+          {overdue && (
             <span className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
               <AlertCircle className="w-3 h-3" />
               Overdue
