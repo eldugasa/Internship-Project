@@ -208,16 +208,7 @@ const SignIn = () => {
             </div>
           )}
 
-          {error && !showForgotPassword && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200">
-              <div className="flex items-center gap-3">
-                <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-red-600">!</span>
-                </div>
-                <p className="text-red-700 font-medium">{error}</p>
-              </div>
-            </div>
-          )}
+        
 
           {/* Login Form */}
           {!showForgotPassword && (
@@ -263,6 +254,16 @@ const SignIn = () => {
                     className="w-full px-5 py-3.5 bg-gray-50/50 border-2 border-gray-200 rounded-xl focus:border-[#4DA5AD] focus:ring-4 focus:ring-[#4DA5AD]/20 outline-none transition-all duration-300 text-gray-900 placeholder-gray-400"
                   />
                 </div>
+                  {error && !showForgotPassword && (
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200">
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-red-600">!</span>
+                </div>
+                <p className="text-red-700 font-medium">{error}</p>
+              </div>
+            </div>
+          )}
 
                 {/* Remember Me */}
                 <div className="flex items-center">
