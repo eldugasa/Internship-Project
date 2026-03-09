@@ -247,24 +247,7 @@ const SettingsPage = () => {
               </button>
             </div>
 
-            {/* Profile Image */}
-            <div className="flex flex-col items-center mb-8">
-              <div className="relative">
-                <img 
-                  src={profile.profileImage} 
-                  alt="Profile" 
-                  className="w-28 h-28 rounded-full border-4 border-white shadow-lg object-cover"
-                />
-                <label 
-                  className="absolute bottom-0 right-0 p-2 rounded-full text-white cursor-pointer transition shadow-lg"
-                  style={{ background: `linear-gradient(to bottom right, #0f5841, #194f87)` }}
-                >
-                  <Camera className="w-4 h-4" />
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
-                </label>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Click camera to update photo</p>
-            </div>
+           
 
             {/* Name Field */}
             <div className="mb-6">
@@ -518,25 +501,7 @@ const SettingsPage = () => {
                     </button>
                   </div>
                 )}
-                {notifications.inAppNotifications !== undefined && (
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-gray-700">In-App Notifications</span>
-                    <button
-                      onClick={() => toggleNotification('inAppNotifications')}
-                      disabled={prefsSaving}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        prefsSaving ? 'opacity-50 cursor-not-allowed' : ''
-                      }`}
-                      style={{ backgroundColor: notifications.inAppNotifications ? '#0f5841' : '#d1d5db' }}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          notifications.inAppNotifications ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                )}
+               
               </div>
             </div>
           </div>

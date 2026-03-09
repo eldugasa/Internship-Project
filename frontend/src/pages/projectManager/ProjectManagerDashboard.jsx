@@ -601,7 +601,7 @@ const ManagerDashboard = () => {
         )}
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
           <QuickActionCard
             title="Create Project"
             desc="Start a new project"

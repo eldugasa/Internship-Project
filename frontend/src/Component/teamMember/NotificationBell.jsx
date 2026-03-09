@@ -7,13 +7,16 @@ import {
   Clock,
   MessageSquare,
   UserPlus,
-  Loader2
+  Loader2,
+  Trash2,
+  X
 } from 'lucide-react';
 import { 
   getNotifications, 
   getUnreadCount, 
   markAsRead, 
-  markAllAsRead 
+  markAllAsRead,
+  deleteNotification
 } from '../../services/notificationService';
 
 const NotificationBell = () => {
@@ -23,19 +26,7 @@ const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
-
-  useEffect(() => {
-    try {
-      const userStr = localStorage.getItem('user');
-      if (userStr) {
-        const user = JSON.parse(userStr);
-       
-      }
-    } catch (err) {
-      console.error('Error parsing user from localStorage:', err);
-    }
-  }, []);
+  const [deletingId, setDeletingId] = useState(null);
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -43,7 +34,15 @@ const NotificationBell = () => {
       setLoading(true);
       setError(null);
       const response = await getNotifications(1, 5);
-      setNotifications(response.notifications || []);
+      
+      // Remove duplicates by ID
+      const notificationsData = response.notifications || [];
+      const uniqueNotifications = notificationsData.filter(
+        (notification, index, self) => 
+          index === self.findIndex(n => n.id === notification.id)
+      );
+      
+      setNotifications(uniqueNotifications);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setError(err.message || 'Failed to load notifications');
@@ -104,35 +103,107 @@ const NotificationBell = () => {
       setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
       setUnreadCount(0);
     } catch (err) {
-      
+      console.error('Error marking all as read:', err);
     }
   };
 
-  // Handle notification click
-  const handleNotificationClick = (notification) => {
-    handleMarkAsRead(notification.id);
-    if (notification.link) navigate(notification.link);
-    setShowNotifications(false);
-  };
-
-  // Navigate to full notifications page - WITH DEBUGGING
-  const handleViewAllClick = (e) => {
-    // Close the dropdown
-    setShowNotifications(false);
+  // Delete single notification
+  const handleDeleteNotification = async (e, notificationId) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this notification?')) return;
     
-    
-  
-    
+    setDeletingId(notificationId);
     try {
-     
-      navigate('/team-member/notifications');
-      navigate('/team-member/notifications', { replace: true });
+      await deleteNotification(notificationId);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
       
+      const deletedNotif = notifications.find(n => n.id === notificationId);
+      if (deletedNotif && !deletedNotif.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
     } catch (err) {
-      console.error('❌ Navigation error:', err);
+      console.error('Error deleting notification:', err);
+      alert('Failed to delete notification');
+    } finally {
+      setDeletingId(null);
     }
+  };
+
+  // Handle notification click - FIXED VERSION
+  const handleNotificationClick = (notification) => {
+    // Mark as read
+    handleMarkAsRead(notification.id);
     
+    // Close dropdown
+    setShowNotifications(false);
     
+    // Log for debugging
+    console.log('Notification clicked:', notification);
+    
+    // Navigate based on notification type and data
+    if (notification.link) {
+      // If link is provided directly, use it
+      console.log('Using provided link:', notification.link);
+      navigate(notification.link);
+    } else {
+      // Generate link based on notification type
+      let path = '/team-member/dashboard';
+      
+      // Check for taskId in different possible locations
+      const taskId = notification.taskId || notification.task?.id || notification.data?.taskId;
+      const teamId = notification.teamId || notification.team?.id || notification.data?.teamId;
+      const projectId = notification.projectId || notification.project?.id || notification.data?.projectId;
+      
+      switch(notification.type) {
+        case 'task_assigned':
+        case 'task_assigned_to_me':
+        case 'task_completed':
+        case 'task_completed_by_me':
+        case 'task_overdue':
+        case 'task_overdue_for_me':
+        case 'deadline_approaching':
+        case 'comment_added':
+          // Task related - go to task details if taskId exists
+          if (taskId) {
+            path = `/team-member/tasks/${taskId}`;
+          } else {
+            path = '/team-member/tasks';
+          }
+          break;
+          
+        case 'added_to_team':
+          // Team related - go to team page if teamId exists
+          if (teamId) {
+            path = `/team-member/teams/${teamId}`;
+          } else {
+            path = '/team-member/teams';
+          }
+          break;
+          
+        case 'project_created':
+        case 'project_updated':
+          // Project related
+          if (projectId) {
+            path = `/team-member/projects/${projectId}`;
+          } else {
+            path = '/team-member/projects';
+          }
+          break;
+          
+        default:
+          // Default fallback
+          path = '/team-member/dashboard';
+      }
+      
+      console.log('Navigating to generated path:', path);
+      navigate(path);
+    }
+  };
+
+  // Navigate to full notifications page
+  const handleViewAllClick = () => {
+    setShowNotifications(false);
+    navigate('/team-member/notifications', { replace: true });
   };
 
   // Get icon based on notification type
@@ -161,10 +232,7 @@ const NotificationBell = () => {
   return (
     <div className="relative notifications-container">
       <button
-        onClick={() => {
-          console.log('Bell icon clicked, toggling dropdown');
-          setShowNotifications(!showNotifications);
-        }}
+        onClick={() => setShowNotifications(!showNotifications)}
         className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
       >
         <Bell className="w-5 h-5" />
@@ -177,6 +245,7 @@ const NotificationBell = () => {
 
       {showNotifications && (
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+          {/* Header */}
           <div className="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="font-semibold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (
@@ -186,6 +255,7 @@ const NotificationBell = () => {
             )}
           </div>
 
+          {/* Notifications List */}
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
               <div className="p-8 flex justify-center">
@@ -204,8 +274,7 @@ const NotificationBell = () => {
                 return (
                   <div
                     key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer ${
+                    className={`group relative p-4 border-b border-gray-100 hover:bg-gray-50 transition ${
                       !notification.read ? 'bg-blue-50/30' : ''
                     }`}
                   >
@@ -213,8 +282,11 @@ const NotificationBell = () => {
                       <div className={`flex-shrink-0 w-8 h-8 rounded-lg ${bg} flex items-center justify-center`}>
                         <Icon className={`w-4 h-4 ${color}`} />
                       </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <div className="flex justify-between items-start pr-6">
                           <p className="text-sm font-medium text-gray-900">{notification.title}</p>
                           {!notification.read && <span className="w-2 h-2 bg-[#0f5841] rounded-full"></span>}
                         </div>
@@ -235,15 +307,34 @@ const NotificationBell = () => {
                           </span>
                         </div>
                       </div>
+                      
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => handleDeleteNotification(e, notification.id)}
+                        disabled={deletingId === notification.id}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                        title="Delete notification"
+                      >
+                        {deletingId === notification.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <X className="w-3.5 h-3.5" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="p-8 text-center text-gray-500">No notifications</div>
+              <div className="p-12 text-center">
+                <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No notifications</p>
+                <p className="text-xs text-gray-400 mt-1">You're all caught up!</p>
+              </div>
             )}
           </div>
 
+          {/* Footer */}
           <div className="p-3 border-t border-gray-200 text-center">
             <button 
               onClick={handleViewAllClick}

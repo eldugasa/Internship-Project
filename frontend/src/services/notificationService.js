@@ -23,7 +23,12 @@ export const markAllAsRead = async () => {
   return apiClient('/notifications/read-all', { method: 'PUT' });
 };
 
-// Delete notification
+// Delete single notification
 export const deleteNotification = async (id) => {
   return apiClient(`/notifications/${id}`, { method: 'DELETE' });
+};
+
+// Delete all notifications
+export const clearAllNotifications = async () => {
+  return apiClient('/notifications', { method: 'DELETE' });
 };

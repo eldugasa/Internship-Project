@@ -1,31 +1,36 @@
 // src/pages/projectManager/EditTask.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { X, Save, Users } from 'lucide-react';
+import { useActionState } from 'react';
+import { X, Save, Users, AlertCircle } from 'lucide-react';
 import { getTaskById, updateTask } from '../../services/tasksService';
 import { getProjects } from '../../services/projectsService';
 import { getProjectMembers } from '../../services/projectsService';
+
+// Validation functions
+const isNotEmpty = (value) => value?.trim() !== '';
+const isFutureDate = (dateString) => {
+  if (!dateString) return false;
+  const selectedDate = new Date(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  selectedDate.setHours(0, 0, 0, 0);
+  return selectedDate >= today;
+};
+const isValidPriority = (priority) => ['low', 'medium', 'high', 'critical'].includes(priority?.toLowerCase());
 
 const EditTask = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   
-  const [task, setTask] = useState({
-    title: '',
-    description: '',
-    projectId: '',
-    assigneeId: '',
-    priority: 'medium',
-    deadline: '',
-    estimatedHours: '',
-    tags: ''
-  });
-
   const [projects, setProjects] = useState([]);
   const [availableMembers, setAvailableMembers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
   const [fetchingMembers, setFetchingMembers] = useState(false);
+  const [initialTaskData, setInitialTaskData] = useState(null);
+
+  // Get today's date in YYYY-MM-DD format for min attribute
+  const today = new Date().toISOString().split('T')[0];
 
   // Fetch projects
   useEffect(() => {
@@ -42,61 +47,73 @@ const EditTask = () => {
   }, []);
 
   // Fetch task data
- // In EditTask.jsx, update the fetchTask function:
-
-useEffect(() => {
-  const fetchTask = async () => {
-    setLoading(true);
-    try {
-      const taskData = await getTaskById(id);
-      
-      // Format date safely - check if it exists and is valid
-      let formattedDate = '';
-      if (taskData.dueDate) {
-        try {
-          const date = new Date(taskData.dueDate);
-          // Check if date is valid
-          if (!isNaN(date.getTime())) {
-            formattedDate = date.toISOString().split('T')[0];
-          }
-        } catch (e) {
-          console.error('Error parsing date:', e);
-        }
-      }
-      
-      setTask({
-        title: taskData.title || '',
-        description: taskData.description || '',
-        projectId: taskData.projectId?.toString() || '',
-        assigneeId: taskData.assigneeId?.toString() || '',
-        priority: taskData.priority?.toLowerCase() || 'medium',
-        deadline: formattedDate,  // Use safely formatted date
-        estimatedHours: taskData.estimatedHours?.toString() || '',
-        tags: taskData.tags?.join(', ') || ''
-      });
-    } catch (error) {
-      console.error('Error fetching task:', error);
-      alert(error.message || 'Failed to load task');
-      navigate('/manager/tasks');
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  fetchTask();
-}, [id, navigate]);
-
-  // Fetch team members when project changes
   useEffect(() => {
-    const fetchMembers = async () => {
-      if (!task.projectId) {
+    const fetchTask = async () => {
+      setLoading(true);
+      try {
+        const taskData = await getTaskById(id);
+        
+        // Format date safely
+        let formattedDate = '';
+        if (taskData.dueDate) {
+          try {
+            const date = new Date(taskData.dueDate);
+            if (!isNaN(date.getTime())) {
+              formattedDate = date.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            console.error('Error parsing date:', e);
+          }
+        }
+        
+        const initialData = {
+          title: taskData.title || '',
+          description: taskData.description || '',
+          projectId: taskData.projectId?.toString() || '',
+          assigneeId: taskData.assigneeId?.toString() || '',
+          priority: taskData.priority?.toLowerCase() || 'medium',
+          deadline: formattedDate,
+          estimatedHours: taskData.estimatedHours?.toString() || '',
+          tags: Array.isArray(taskData.tags) ? taskData.tags.join(', ') : (taskData.tags || '')
+        };
+        
+        setInitialTaskData(initialData);
+        
+        // Fetch team members for the project
+        if (taskData.projectId) {
+          setFetchingMembers(true);
+          try {
+            const members = await getProjectMembers(taskData.projectId);
+            setAvailableMembers(members);
+          } catch (error) {
+            console.error('Error fetching team members:', error);
+          } finally {
+            setFetchingMembers(false);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching task:', error);
+        alert(error.message || 'Failed to load task');
+        navigate('/manager/tasks');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchTask();
+  }, [id, navigate]);
+
+  // Fetch team members when project changes (for form updates)
+  useEffect(() => {
+    const fetchMembers = async (projectId) => {
+      if (!projectId) {
         setAvailableMembers([]);
         return;
       }
       
       setFetchingMembers(true);
       try {
-        const members = await getProjectMembers(task.projectId);
+        const members = await getProjectMembers(projectId);
         setAvailableMembers(members);
       } catch (error) {
         console.error('Error fetching team members:', error);
@@ -106,62 +123,133 @@ useEffect(() => {
       }
     };
     
-    fetchMembers();
-  }, [task.projectId]);
+    // Only fetch if we have a projectId and it's not the initial load
+    if (initialTaskData?.projectId && !loading) {
+      fetchMembers(initialTaskData.projectId);
+    }
+  }, [initialTaskData?.projectId, loading]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setTask(prev => ({ ...prev, [name]: value }));
-  };
+  const editTaskAction = async (prevFormState, formData) => {
+    const title = formData.get("title");
+    const description = formData.get("description");
+    const projectId = formData.get("projectId");
+    const assigneeId = formData.get("assigneeId");
+    const priority = formData.get("priority") || 'medium';
+    const deadline = formData.get("deadline");
+    const estimatedHours = formData.get("estimatedHours");
+    const tags = formData.get("tags");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    // Validation
-    if (!task.title.trim()) {
-      alert('Task title is required');
-      return;
-    }
-    
-    if (!task.projectId) {
-      alert('Please select a project');
-      return;
-    }
-    
-    if (!task.assigneeId) {
-      alert('Please assign the task to a team member');
-      return;
-    }
-    
-    if (!task.deadline) {
-      alert('Please select a deadline');
-      return;
+    let errors = [];
+
+    // Validate required fields
+    if (!isNotEmpty(title)) {
+      errors.push("Task title is required.");
     }
 
-    setSaving(true);
+    if (!isNotEmpty(projectId)) {
+      errors.push("Please select a project.");
+    }
+
+    if (!isNotEmpty(assigneeId)) {
+      errors.push("Please assign this task to a team member.");
+    }
+
+    if (!isNotEmpty(deadline)) {
+      errors.push("Deadline is required.");
+    } else if (!isFutureDate(deadline)) {
+      errors.push("Deadline cannot be in the past.");
+    }
+
+    if (!isValidPriority(priority)) {
+      errors.push("Please select a valid priority.");
+    }
+
+    // If validation fails, return errors and entered values
+    if (errors.length > 0) {
+      return {
+        errors,
+        enteredValues: {
+          title,
+          description,
+          projectId,
+          assigneeId,
+          priority,
+          deadline,
+          estimatedHours,
+          tags
+        },
+        success: false
+      };
+    }
+
+    // Validation passed - call API
     try {
       const taskData = {
-        title: task.title,
-        description: task.description,
-        projectId: parseInt(task.projectId),
-        assignedTo: parseInt(task.assigneeId),
-        priority: task.priority.toUpperCase(),
-        dueDate: new Date(task.deadline).toISOString(),
-        estimatedHours: task.estimatedHours ? parseFloat(task.estimatedHours) : null,
-        tags: task.tags ? task.tags.split(',').map(tag => tag.trim()) : []
+        title,
+        description,
+        projectId: parseInt(projectId),
+        assignedTo: parseInt(assigneeId),
+        priority: priority.toUpperCase(),
+        dueDate: new Date(deadline).toISOString(),
+        estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
+        tags: tags ? tags.split(',').map(tag => tag.trim()) : []
       };
 
       await updateTask(id, taskData);
 
-      alert('Task updated successfully!');
-      navigate(`/manager/tasks/${id}`);
-    } catch (error) {
-      console.error('Error updating task:', error);
-      alert(error.message || 'Failed to update task');
-    } finally {
-      setSaving(false);
+      return {
+        errors: null,
+        success: true,
+        message: 'Task updated successfully!',
+        taskId: id
+      };
+    } catch (err) {
+      return {
+        errors: [err.message || 'Failed to update task'],
+        enteredValues: {
+          title,
+          description,
+          projectId,
+          assigneeId,
+          priority,
+          deadline,
+          estimatedHours,
+          tags
+        },
+        success: false
+      };
     }
   };
+
+  const [formState, formAction, isPending] = useActionState(editTaskAction, {
+    errors: null,
+    enteredValues: initialTaskData || {
+      title: '',
+      description: '',
+      projectId: '',
+      assigneeId: '',
+      priority: 'medium',
+      deadline: '',
+      estimatedHours: '',
+      tags: ''
+    },
+    success: false
+  });
+
+  // Update form state when initial data loads
+  useEffect(() => {
+    if (initialTaskData && !formState.success) {
+      // This is a workaround since we can't directly update formState
+      // The form will use defaultValue from initialTaskData
+    }
+  }, [initialTaskData, formState.success]);
+
+  // Redirect on success
+  if (formState.success) {
+    setTimeout(() => {
+      navigate(`/manager/tasks/${formState.taskId}`);
+    }, 1500);
+  }
 
   if (loading) {
     return (
@@ -189,7 +277,17 @@ useEffect(() => {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form action={formAction} className="space-y-6">
+        {/* Success Message */}
+        {formState.success && (
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-700">{formState.message}</p>
+            <p className="text-sm text-green-600 mt-1">Redirecting to task details...</p>
+          </div>
+        )}
+
+      
+
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4">Task Information</h2>
 
@@ -202,9 +300,7 @@ useEffect(() => {
               <input
                 type="text"
                 name="title"
-                value={task.title}
-                onChange={handleChange}
-                required
+                defaultValue={formState.enteredValues?.title || initialTaskData?.title}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 placeholder="Enter task title"
               />
@@ -217,9 +313,8 @@ useEffect(() => {
               </label>
               <textarea
                 name="description"
-                value={task.description}
-                onChange={handleChange}
                 rows="3"
+                defaultValue={formState.enteredValues?.description || initialTaskData?.description}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 placeholder="Describe the task"
               />
@@ -233,9 +328,7 @@ useEffect(() => {
                 </label>
                 <select
                   name="projectId"
-                  value={task.projectId}
-                  onChange={handleChange}
-                  required
+                  defaultValue={formState.enteredValues?.projectId || initialTaskData?.projectId}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 >
                   <option value="">Select project</option>
@@ -251,7 +344,7 @@ useEffect(() => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Assign To *
                 </label>
-                {!task.projectId ? (
+                {!formState.enteredValues?.projectId && !initialTaskData?.projectId ? (
                   <div className="p-3 bg-gray-50 rounded-lg text-center">
                     <Users className="w-6 h-6 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">Select a project first</p>
@@ -268,9 +361,7 @@ useEffect(() => {
                 ) : (
                   <select
                     name="assigneeId"
-                    value={task.assigneeId}
-                    onChange={handleChange}
-                    required
+                    defaultValue={formState.enteredValues?.assigneeId || initialTaskData?.assigneeId}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                   >
                     <option value="">Select team member</option>
@@ -292,9 +383,7 @@ useEffect(() => {
                 </label>
                 <select
                   name="priority"
-                  value={task.priority}
-                  onChange={handleChange}
-                  required
+                  defaultValue={formState.enteredValues?.priority || initialTaskData?.priority}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 >
                   <option value="low">Low</option>
@@ -311,12 +400,11 @@ useEffect(() => {
                 <input
                   type="date"
                   name="deadline"
-                  value={task.deadline}
-                  onChange={handleChange}
-                  required
-                  min={new Date().toISOString().split('T')[0]}
+                  defaultValue={formState.enteredValues?.deadline || initialTaskData?.deadline}
+                  min={today}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 />
+                <p className="text-xs text-gray-500 mt-1">Must be today or a future date</p>
               </div>
 
               <div>
@@ -326,8 +414,7 @@ useEffect(() => {
                 <input
                   type="number"
                   name="estimatedHours"
-                  value={task.estimatedHours}
-                  onChange={handleChange}
+                  defaultValue={formState.enteredValues?.estimatedHours || initialTaskData?.estimatedHours}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                   min="0"
                   step="0.5"
@@ -336,22 +423,23 @@ useEffect(() => {
               </div>
             </div>
 
-            {/* Tags */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Tags (comma separated)
-              </label>
-              <input
-                type="text"
-                name="tags"
-                value={task.tags}
-                onChange={handleChange}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
-                placeholder="e.g., frontend, urgent, bug"
-              />
-            </div>
+            
           </div>
         </div>
+          {/* Error Display */}
+        {formState.errors && formState.errors.length > 0 && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-medium text-red-800 mb-1">Please fix the following errors:</h3>
+              <ul className="list-disc list-inside text-sm text-red-700">
+                {formState.errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* Submit */}
         <div className="flex justify-end space-x-3">
@@ -364,11 +452,11 @@ useEffect(() => {
           </button>
           <button
             type="submit"
-            disabled={saving}
+            disabled={isPending || formState.success}
             className="px-6 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition flex items-center disabled:opacity-50"
           >
             <Save className="w-4 h-4 mr-2" />
-            {saving ? 'Updating...' : 'Update Task'}
+            {isPending ? 'Updating...' : 'Update Task'}
           </button>
         </div>
       </form>

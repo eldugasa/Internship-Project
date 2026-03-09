@@ -1,24 +1,35 @@
 // src/components/projectManager/CreateProject.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { X, Save, Users } from 'lucide-react';
+import { useActionState } from 'react';
+import { X, Save, Users, AlertCircle } from 'lucide-react';
 import { createProject } from '../../services/projectsService';
 import { getTeams } from '../../services/teamsService';
 
+// Validation functions
+const isNotEmpty = (value) => value?.trim() !== '';
+const isFutureDate = (dateString) => {
+  if (!dateString) return false;
+  const selectedDate = new Date(dateString);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  selectedDate.setHours(0, 0, 0, 0);
+  return selectedDate >= today;
+};
+const isEndDateAfterStart = (startDate, endDate) => {
+  if (!startDate || !endDate) return false;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  return end >= start;
+};
+
 const CreateProject = () => {
   const navigate = useNavigate();
-
-  const [project, setProject] = useState({
-    name: '',
-    description: '',
-    startDate: '',
-    endDate: '',
-    selectedTeam: '',
-  });
-
   const [teams, setTeams] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [fetchingTeams, setFetchingTeams] = useState(true);
+
+  // Get today's date in YYYY-MM-DD format for min attribute
+  const today = new Date().toISOString().split('T')[0];
 
   // Fetch teams
   useEffect(() => {
@@ -38,47 +49,107 @@ const CreateProject = () => {
     fetchTeams();
   }, []);
 
-  // Handle form change
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setProject(prev => ({ ...prev, [name]: value }));
-  };
+  const createProjectAction = async (prevFormState, formData) => {
+    const name = formData.get("name");
+    const description = formData.get("description");
+    const startDate = formData.get("startDate");
+    const endDate = formData.get("endDate");
+    const selectedTeam = formData.get("selectedTeam");
 
-  // Submit project
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+    let errors = [];
 
-    if (!project.name || !project.startDate || !project.endDate || !project.selectedTeam) {
-      alert('Please fill in all required fields.');
-      return;
+    // Validate required fields
+    if (!isNotEmpty(name)) {
+      errors.push("Project name is required.");
     }
 
-    setLoading(true);
+    if (!isNotEmpty(startDate)) {
+      errors.push("Start date is required.");
+    } else if (!isFutureDate(startDate)) {
+      errors.push("Start date cannot be in the past.");
+    }
 
+    if (!isNotEmpty(endDate)) {
+      errors.push("End date is required.");
+    }
+
+    if (startDate && endDate && !isEndDateAfterStart(startDate, endDate)) {
+      errors.push("End date must be after start date.");
+    }
+
+    if (!isNotEmpty(selectedTeam)) {
+      errors.push("Please select a team for this project.");
+    }
+
+    // If validation fails, return errors and entered values
+    if (errors.length > 0) {
+      return {
+        errors,
+        enteredValues: {
+          name,
+          description,
+          startDate,
+          endDate,
+          selectedTeam
+        },
+        success: false
+      };
+    }
+
+    // Validation passed - call API
     try {
       const projectData = {
-        name: project.name,
-        description: project.description,
-        startDate: new Date(project.startDate).toISOString(),
-        endDate: new Date(project.endDate).toISOString(),
+        name,
+        description,
+        startDate: new Date(startDate).toISOString(),
+        endDate: new Date(endDate).toISOString(),
         status: 'planned',
-        teamId: parseInt(project.selectedTeam, 10),
+        teamId: parseInt(selectedTeam, 10),
       };
 
       const newProject = await createProject(projectData);
 
-      alert(`Project "${newProject.name}" created successfully!`);
-      navigate('/manager/projects');
-
+      return {
+        errors: null,
+        success: true,
+        message: `Project "${newProject.name}" created successfully!`,
+        project: newProject
+      };
     } catch (err) {
-      console.error("Create project error:", err);
-      alert(err.message || 'Failed to create project');
-    } finally {
-      setLoading(false);
+      return {
+        errors: [err.message || 'Failed to create project'],
+        enteredValues: {
+          name,
+          description,
+          startDate,
+          endDate,
+          selectedTeam
+        },
+        success: false
+      };
     }
   };
 
-  const selectedTeamDetails = teams.find(t => t.id === parseInt(project.selectedTeam, 10));
+  const [formState, formAction, isPending] = useActionState(createProjectAction, {
+    errors: null,
+    enteredValues: {
+      name: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+      selectedTeam: ''
+    },
+    success: false
+  });
+
+  // Redirect on success
+  if (formState.success) {
+    setTimeout(() => {
+      navigate('/manager/projects');
+    }, 1500);
+  }
+
+  const selectedTeamDetails = teams.find(t => t.id === parseInt(formState.enteredValues?.selectedTeam, 10));
 
   if (fetchingTeams) {
     return (
@@ -111,7 +182,17 @@ const CreateProject = () => {
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form action={formAction} className="space-y-6">
+        {/* Success Message */}
+        {formState.success && (
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-700">{formState.message}</p>
+            <p className="text-sm text-green-600 mt-1">Redirecting to projects...</p>
+          </div>
+        )}
+
+    
+
         {/* Project Info */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
@@ -126,9 +207,7 @@ const CreateProject = () => {
               <input
                 type="text"
                 name="name"
-                value={project.name}
-                onChange={handleChange}
-                required
+                defaultValue={formState.enteredValues?.name}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 placeholder="Enter project name"
               />
@@ -140,9 +219,8 @@ const CreateProject = () => {
               </label>
               <textarea
                 name="description"
-                value={project.description}
-                onChange={handleChange}
                 rows="3"
+                defaultValue={formState.enteredValues?.description}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 placeholder="Describe the project"
               />
@@ -156,11 +234,13 @@ const CreateProject = () => {
                 <input
                   type="date"
                   name="startDate"
-                  value={project.startDate}
-                  onChange={handleChange}
-                  required
+                  defaultValue={formState.enteredValues?.startDate}
+                  min={today}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 />
+                <p className="text-xs text-gray-500 mt-1">
+                  Must be today or a future date
+                </p>
               </div>
 
               <div>
@@ -170,11 +250,11 @@ const CreateProject = () => {
                 <input
                   type="date"
                   name="endDate"
-                  value={project.endDate}
-                  onChange={handleChange}
-                  required
+                  defaultValue={formState.enteredValues?.endDate}
+                  min={formState.enteredValues?.startDate || today}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 />
+               
               </div>
             </div>
           </div>
@@ -194,9 +274,7 @@ const CreateProject = () => {
 
             <select
               name="selectedTeam"
-              value={project.selectedTeam}
-              onChange={handleChange}
-              required
+              defaultValue={formState.enteredValues?.selectedTeam}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
             >
               <option value="">Choose a team</option>
@@ -228,6 +306,20 @@ const CreateProject = () => {
             </div>
           )}
         </div>
+            {/* Error Display */}
+        {formState.errors && formState.errors.length > 0 && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-medium text-red-800 mb-1">Please fix the following errors:</h3>
+              <ul className="list-disc list-inside text-sm text-red-700">
+                {formState.errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {/* Submit */}
         <div className="flex justify-end space-x-3">
@@ -241,11 +333,11 @@ const CreateProject = () => {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={isPending || formState.success}
             className="px-6 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition flex items-center disabled:opacity-50"
           >
             <Save className="w-4 h-4 mr-2" />
-            {loading ? 'Creating...' : 'Create Project'}
+            {isPending ? 'Creating...' : 'Create Project'}
           </button>
         </div>
       </form>

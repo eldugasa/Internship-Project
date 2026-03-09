@@ -1,34 +1,38 @@
 // src/components/projectManager/EditProject.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { X, Save, Users, Loader2 } from 'lucide-react';
+import { useActionState } from 'react';
+import { X, Save, Users, Loader2, AlertCircle } from 'lucide-react';
 import { getProjectById, updateProject } from '../../services/projectsService';
 import { getTeams } from '../../services/teamsService';
+
+// Validation functions
+const isNotEmpty = (value) => value?.trim() !== '';
+const isValidDate = (dateString) => {
+  if (!dateString) return false;
+  const date = new Date(dateString);
+  return !isNaN(date.getTime());
+};
+const isEndDateAfterStart = (startDate, endDate) => {
+  if (!startDate || !endDate) return false;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  return end >= start;
+};
 
 const EditProject = () => {
   const navigate = useNavigate();
   const { id } = useParams();
 
-  const [project, setProject] = useState({
-    name: '',
-    description: '',
-    startDate: '',
-    endDate: '',
-    selectedTeam: '',
-    status: 'planned'
-  });
-
   const [teams, setTeams] = useState([]);
-  const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
-  const [error, setError] = useState('');
+  const [initialProjectData, setInitialProjectData] = useState(null);
 
   // Parse dates in various formats (DD/MM/YYYY, YYYY-MM-DD, etc.)
   const parseDate = (dateString) => {
     if (!dateString) return null;
     
     try {
-      // Check if it's in DD/MM/YYYY format
       if (typeof dateString === 'string' && dateString.includes('/')) {
         const [day, month, year] = dateString.split('/');
         if (day && month && year) {
@@ -36,7 +40,6 @@ const EditProject = () => {
         }
       }
       
-      // Try standard date parsing
       const date = new Date(dateString);
       if (!isNaN(date.getTime())) {
         return date;
@@ -74,7 +77,6 @@ const EditProject = () => {
       try {
         setFetchingData(true);
         
-        // Fetch both project and teams in parallel
         const [projectData, teamsData] = await Promise.all([
           getProjectById(id),
           getTeams()
@@ -82,19 +84,19 @@ const EditProject = () => {
 
         setTeams(teamsData);
 
-        // Safely format dates with fallbacks
-        setProject({
+        const initialData = {
           name: projectData.name || '',
           description: projectData.description || '',
           startDate: formatDateForInput(projectData.startDate),
           endDate: formatDateForInput(projectData.dueDate || projectData.endDate),
           selectedTeam: projectData.teamId?.toString() || '',
           status: projectData.status || 'planned'
-        });
+        };
+        
+        setInitialProjectData(initialData);
 
       } catch (err) {
         console.error("Failed to fetch project:", err);
-        setError(err.message || 'Failed to load project');
       } finally {
         setFetchingData(false);
       }
@@ -105,89 +107,116 @@ const EditProject = () => {
     }
   }, [id]);
 
-  // Handle form change
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setProject(prev => ({ ...prev, [name]: value }));
-    setError('');
-  };
+  const editProjectAction = async (prevFormState, formData) => {
+    const name = formData.get("name");
+    const description = formData.get("description");
+    const startDate = formData.get("startDate");
+    const endDate = formData.get("endDate");
+    const selectedTeam = formData.get("selectedTeam");
+    const status = formData.get("status");
 
-  // Validate dates
-  const validateDates = () => {
-    if (!project.startDate || !project.endDate) {
-      setError('Start date and end date are required');
-      return false;
+    let errors = [];
+
+    // Validate required fields
+    if (!isNotEmpty(name)) {
+      errors.push("Project name is required.");
     }
-    
+
+    if (!isNotEmpty(startDate)) {
+      errors.push("Start date is required.");
+    } else if (!isValidDate(startDate)) {
+      errors.push("Please enter a valid start date.");
+    }
+
+    if (!isNotEmpty(endDate)) {
+      errors.push("End date is required.");
+    } else if (!isValidDate(endDate)) {
+      errors.push("Please enter a valid end date.");
+    }
+
+    if (startDate && endDate && !isEndDateAfterStart(startDate, endDate)) {
+      errors.push("End date must be after start date.");
+    }
+
+    if (!isNotEmpty(selectedTeam)) {
+      errors.push("Please select a team for this project.");
+    }
+
+    // If validation fails, return errors and entered values
+    if (errors.length > 0) {
+      return {
+        errors,
+        enteredValues: {
+          name,
+          description,
+          startDate,
+          endDate,
+          selectedTeam,
+          status
+        },
+        success: false
+      };
+    }
+
+    // Validation passed - call API
     try {
-      const start = new Date(project.startDate);
-      const end = new Date(project.endDate);
+      const start = new Date(startDate);
+      const end = new Date(endDate);
       
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-        setError('Invalid date format');
-        return false;
-      }
-      
-      if (end < start) {
-        setError('End date cannot be before start date');
-        return false;
-      }
-      return true;
+      const projectData = {
+        name,
+        description,
+        startDate: start.toISOString(),
+        endDate: end.toISOString(),
+        status,
+        teamId: parseInt(selectedTeam, 10),
+      };
+
+      const updatedProject = await updateProject(id, projectData);
+
+      return {
+        errors: null,
+        success: true,
+        message: `Project "${updatedProject.name}" updated successfully!`,
+        projectId: id
+      };
     } catch (err) {
-      setError('Invalid date format');
-      return false;
+      return {
+        errors: [err.message || 'Failed to update project'],
+        enteredValues: {
+          name,
+          description,
+          startDate,
+          endDate,
+          selectedTeam,
+          status
+        },
+        success: false
+      };
     }
   };
 
-  // Submit project
+  const [formState, formAction, isPending] = useActionState(editProjectAction, {
+    errors: null,
+    enteredValues: initialProjectData || {
+      name: '',
+      description: '',
+      startDate: '',
+      endDate: '',
+      selectedTeam: '',
+      status: 'planned'
+    },
+    success: false
+  });
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-
-  if (!project.name || !project.startDate || !project.endDate || !project.selectedTeam) {
-    setError('Please fill in all required fields.');
-    return;
+  // Redirect on success
+  if (formState.success) {
+    setTimeout(() => {
+      navigate(`/manager/projects/${formState.projectId}`);
+    }, 1500);
   }
 
-  if (!validateDates()) {
-    return;
-  }
-
-  setLoading(true);
-  setError('');
-
-  try {
-    // Create dates safely
-    const startDate = new Date(project.startDate);
-    const endDate = new Date(project.endDate);
-    
-    // ✅ Create payload with ONLY fields that exist in schema
-    const projectData = {
-      name: project.name,
-      description: project.description,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),  // ✅ This will be used for both endDate and dueDate in UI
-      status: project.status,
-      teamId: parseInt(project.selectedTeam, 10),
-      // ❌ REMOVED dueDate - let the backend use endDate
-    };
-
-    console.log('Updating project with data:', projectData);
-
-    const updatedProject = await updateProject(id, projectData);
-
-    alert(`Project "${updatedProject.name}" updated successfully!`);
-    navigate(`/manager/projects/${id}`);
-
-  } catch (err) {
-    console.error("Update project error:", err);
-    setError(err.message || 'Failed to update project');
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const selectedTeamDetails = teams.find(t => t.id === parseInt(project.selectedTeam, 10));
+  const selectedTeamDetails = teams.find(t => t.id === parseInt(formState.enteredValues?.selectedTeam || initialProjectData?.selectedTeam, 10));
 
   if (fetchingData) {
     return (
@@ -195,22 +224,6 @@ const handleSubmit = async (e) => {
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin mx-auto mb-4" style={{ color: '#194f87' }} />
           <p className="text-gray-600">Loading project details...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !project.name) {
-    return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-4xl mx-auto text-center py-12">
-          <p className="text-red-500 mb-4">{error}</p>
-          <button
-            onClick={() => navigate('/manager/projects')}
-            className="px-6 py-2 bg-[#194f87] text-white rounded-lg hover:bg-[#0f5841] transition"
-          >
-            Back to Projects
-          </button>
         </div>
       </div>
     );
@@ -239,14 +252,17 @@ const handleSubmit = async (e) => {
           </button>
         </div>
 
-        {/* Error Display */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-600 text-sm">{error}</p>
+        {/* Success Message */}
+        {formState.success && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-green-700">{formState.message}</p>
+            <p className="text-sm text-green-600 mt-1">Redirecting to project details...</p>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+     
+
+        <form action={formAction} className="space-y-6">
           {/* Project Info */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">
@@ -262,9 +278,7 @@ const handleSubmit = async (e) => {
                 <input
                   type="text"
                   name="name"
-                  value={project.name}
-                  onChange={handleChange}
-                  required
+                  defaultValue={formState.enteredValues?.name || initialProjectData?.name}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#194f87] focus:border-transparent"
                   placeholder="Enter project name"
                 />
@@ -277,9 +291,8 @@ const handleSubmit = async (e) => {
                 </label>
                 <textarea
                   name="description"
-                  value={project.description}
-                  onChange={handleChange}
                   rows="3"
+                  defaultValue={formState.enteredValues?.description || initialProjectData?.description}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#194f87] focus:border-transparent"
                   placeholder="Describe the project"
                 />
@@ -292,8 +305,7 @@ const handleSubmit = async (e) => {
                 </label>
                 <select
                   name="status"
-                  value={project.status}
-                  onChange={handleChange}
+                  defaultValue={formState.enteredValues?.status || initialProjectData?.status}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#194f87] focus:border-transparent"
                 >
                   <option value="planned">Planned</option>
@@ -312,9 +324,7 @@ const handleSubmit = async (e) => {
                   <input
                     type="date"
                     name="startDate"
-                    value={project.startDate}
-                    onChange={handleChange}
-                    required
+                    defaultValue={formState.enteredValues?.startDate || initialProjectData?.startDate}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#194f87] focus:border-transparent"
                   />
                 </div>
@@ -326,9 +336,7 @@ const handleSubmit = async (e) => {
                   <input
                     type="date"
                     name="endDate"
-                    value={project.endDate}
-                    onChange={handleChange}
-                    required
+                    defaultValue={formState.enteredValues?.endDate || initialProjectData?.endDate}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#194f87] focus:border-transparent"
                   />
                 </div>
@@ -350,9 +358,7 @@ const handleSubmit = async (e) => {
 
               <select
                 name="selectedTeam"
-                value={project.selectedTeam}
-                onChange={handleChange}
-                required
+                defaultValue={formState.enteredValues?.selectedTeam || initialProjectData?.selectedTeam}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#194f87] focus:border-transparent"
               >
                 <option value="">Choose a team</option>
@@ -387,7 +393,20 @@ const handleSubmit = async (e) => {
               </div>
             )}
           </div>
-
+   {/* Error Display */}
+        {formState.errors && formState.errors.length > 0 && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-medium text-red-800 mb-1">Please fix the following errors:</h3>
+              <ul className="list-disc list-inside text-sm text-red-700">
+                {formState.errors.map((error, index) => (
+                  <li key={index}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row justify-end gap-3">
             <button
@@ -400,11 +419,11 @@ const handleSubmit = async (e) => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isPending || formState.success}
               className="px-6 py-2 text-white rounded-lg hover:shadow-lg transition flex items-center justify-center gap-2 disabled:opacity-50 order-1 sm:order-2"
               style={{ background: `linear-gradient(to right, #0f5841, #194f87)` }}
             >
-              {loading ? (
+              {isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Updating...

@@ -8,13 +8,17 @@ import {
   Users,
   Flag,
   Trophy,
-  Loader2
+  Loader2,
+  Trash2,
+  X
 } from 'lucide-react';
 import { 
   getNotifications, 
   getUnreadCount, 
   markAsRead, 
-  markAllAsRead 
+  markAllAsRead,
+  deleteNotification,
+  clearAllNotifications
 } from '../../services/notificationService';
 
 const NotificationBell = () => {
@@ -24,6 +28,8 @@ const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -96,6 +102,29 @@ const NotificationBell = () => {
     }
   };
 
+  // Delete single notification
+  const handleDeleteNotification = async (e, notificationId) => {
+    e.stopPropagation();
+    if (!window.confirm('Delete this notification?')) return;
+    
+    setDeletingId(notificationId);
+    try {
+      await deleteNotification(notificationId);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      // Update unread count if deleted notification was unread
+      const deletedNotif = notifications.find(n => n.id === notificationId);
+      if (deletedNotif && !deletedNotif.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      alert('Failed to delete notification');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   // Handle notification click
   const handleNotificationClick = (notification) => {
     handleMarkAsRead(notification.id);
@@ -133,6 +162,7 @@ const NotificationBell = () => {
 
   return (
     <div className="relative notifications-container">
+    
       <button
         onClick={() => setShowNotifications(!showNotifications)}
         className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -147,15 +177,25 @@ const NotificationBell = () => {
 
       {showNotifications && (
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 className="font-semibold text-gray-900">Notifications</h3>
-            {unreadCount > 0 && (
-              <button onClick={handleMarkAllAsRead} className="text-xs text-[#194f87] hover:underline">
-                Mark all as read
-              </button>
-            )}
+          {/* Header with actions */}
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold text-gray-900">Notifications</h3>
+              <div className="flex items-center gap-2">
+              
+                {unreadCount > 0 && (
+                  <button 
+                    onClick={handleMarkAllAsRead} 
+                    className="text-xs text-[#194f87] hover:underline"
+                  >
+                    Mark all read
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
+          {/* Notifications List */}
           <div className="max-h-96 overflow-y-auto">
             {loading ? (
               <div className="p-8 flex justify-center">
@@ -174,8 +214,7 @@ const NotificationBell = () => {
                 return (
                   <div
                     key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer ${
+                    className={`group relative p-4 border-b border-gray-100 hover:bg-gray-50 transition ${
                       !notification.read ? 'bg-blue-50/30' : ''
                     }`}
                   >
@@ -183,8 +222,11 @@ const NotificationBell = () => {
                       <div className={`flex-shrink-0 w-8 h-8 rounded-lg ${bg} flex items-center justify-center`}>
                         <Icon className={`w-4 h-4 ${color}`} />
                       </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <div className="flex justify-between items-start pr-6">
                           <p className="text-sm font-medium text-gray-900">{notification.title}</p>
                           {!notification.read && <span className="w-2 h-2 bg-[#0f5841] rounded-full"></span>}
                         </div>
@@ -205,15 +247,34 @@ const NotificationBell = () => {
                           </span>
                         </div>
                       </div>
+                      
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => handleDeleteNotification(e, notification.id)}
+                        disabled={deletingId === notification.id}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                        title="Delete notification"
+                      >
+                        {deletingId === notification.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <X className="w-3.5 h-3.5" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="p-8 text-center text-gray-500">No notifications</div>
+              <div className="p-12 text-center">
+                <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No notifications</p>
+                <p className="text-xs text-gray-400 mt-1">You're all caught up!</p>
+              </div>
             )}
           </div>
 
+          {/* Footer */}
           <div className="p-3 border-t border-gray-200 text-center">
             <button 
               onClick={handleViewAllClick}
