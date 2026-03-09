@@ -1,66 +1,120 @@
-import { useState } from 'react';
+// src/auth/Signup.jsx
+import { useActionState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
+// Validation functions
+const isEmail = (value) => value.includes('@') && value.includes('.');
+const isNotEmpty = (value) => value.trim() !== '';
+const hasMinLength = (value, minLength) => value.length >= minLength;
+const isEqualToOtherValue = (value1, value2) => value1 === value2;
+
+// NEW: Validate that name contains only letters and spaces
+const isValidName = (value) => {
+  if (!isNotEmpty(value)) return false;
+  // Regular expression: only letters and spaces, at least 2 characters
+  const nameRegex = /^[A-Za-z\s]{2,50}$/;
+  return nameRegex.test(value.trim());
+};
+
+// NEW: Validate that name has at least first and last name
+const hasFirstAndLastName = (value) => {
+  const trimmed = value.trim();
+  const parts = trimmed.split(/\s+/);
+  return parts.length >= 2 && parts.every(part => part.length >= 2);
+};
+
 const Signup = () => {
-  const [form, setForm] = useState({ 
-    name: '', 
-    email: '', 
-    password: '', 
-    confirmPassword: ''
-  });
-  const [error, setError] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const { signup } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    
-    // Validation
-    if (!form.name.trim()) {
-      setError('Please enter your full name');
-      return;
+  const signupAction = async (prevFormState, formData) => {
+    const name = formData.get("name");
+    const email = formData.get("email");
+    const password = formData.get("password");
+    const confirmPassword = formData.get("confirmPassword");
+
+    let errors = [];
+
+    // Validate Full Name
+    if (!isNotEmpty(name)) {
+      errors.push("Please enter your full name.");
+    } else if (!isValidName(name)) {
+      errors.push("Name can only contain letters and spaces.");
+    } else if (!hasFirstAndLastName(name)) {
+      errors.push("Please enter both your first and last name.");
     }
-    
-    if (!form.email.includes('@')) {
-      setError('Please enter a valid email address');
-      return;
+
+    // Validate Email
+    if (!isEmail(email)) {
+      errors.push("Please enter a valid email address.");
     }
-    
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      return;
+
+    // Validate Password
+    if (!isNotEmpty(password) || !hasMinLength(password, 6)) {
+      errors.push("Password must be at least 6 characters long.");
     }
-    
-    if (form.password !== form.confirmPassword) {
-      setError('Passwords do not match');
-      return;
+
+    // Validate Confirm Password
+    if (!isEqualToOtherValue(password, confirmPassword)) {
+      errors.push("Passwords do not match.");
     }
-    
-    setIsSubmitting(true);
-    
+
+    // If validation fails, return errors and entered values
+    if (errors.length > 0) {
+      return {
+        errors,
+        enteredValues: {
+          name,
+          email,
+          password,
+          confirmPassword
+        },
+        success: false
+      };
+    }
+
+    // Validation passed - call API
     try {
-      const result = await signup(form);
+      const result = await signup({ name, email, password });
       
       if (result.success) {
-        navigate('/team-member/dashboard');
+        return {
+          errors: null,
+          success: true,
+          message: 'Account created successfully!'
+        };
       } else {
-        setError(result.error || 'Signup failed. Please try again.');
+        return {
+          errors: [result.error || 'Signup failed. Please try again.'],
+          enteredValues: { name, email, password, confirmPassword },
+          success: false
+        };
       }
     } catch (err) {
-      setError('Signup failed. Please try again.');
-    } finally {
-      setIsSubmitting(false);
+      return {
+        errors: ['Signup failed. Please try again.'],
+        enteredValues: { name, email, password, confirmPassword },
+        success: false
+      };
     }
   };
 
-  const handleChange = (e) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
-    if (error) setError('');
-  };
+  const [formState, formAction, isPending] = useActionState(signupAction, {
+    errors: null,
+    enteredValues: {
+      name: '',
+      email: '',
+      password: '',
+      confirmPassword: ''
+    },
+    success: false
+  });
+
+  // Redirect on success
+  if (formState.success) {
+    navigate('/team-member/dashboard');
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50 flex items-center justify-center px-4 py-8">
@@ -83,20 +137,17 @@ const Signup = () => {
             </p>
           </div>
 
-          {/* Error Display */}
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200">
-              <p className="text-red-700">{error}</p>
-              {error.includes('already registered') && (
-                <Link to="/login" className="text-sm font-semibold text-[#4DA5AD] block mt-2">
-                  → Go to Login
-                </Link>
-              )}
+        
+
+          {/* Success Message */}
+          {formState.success && (
+            <div className="mb-6 p-4 rounded-xl bg-green-50 border border-green-200">
+              <p className="text-green-700">{formState.message}</p>
             </div>
           )}
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form action={formAction} className="space-y-5">
             {/* Name Field */}
             <div>
               <label className="block text-sm font-semibold text-[#2D4A6B] mb-2">
@@ -104,12 +155,13 @@ const Signup = () => {
               </label>
               <input
                 name="name"
-                placeholder="Elias"
-                required
-                value={form.name}
-                onChange={handleChange}
+                placeholder="Elias Dugasa"
+                defaultValue={formState.enteredValues?.name}
                 className="w-full px-5 py-3.5 bg-gray-50/50 border-2 border-gray-200 rounded-xl focus:border-[#4DA5AD] focus:ring-4 focus:ring-[#4DA5AD]/20 outline-none"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                Enter your first and last name (letters only)
+              </p>
             </div>
 
             {/* Email Field */}
@@ -121,9 +173,7 @@ const Signup = () => {
                 name="email"
                 type="email"
                 placeholder="elias@company.com"
-                required
-                value={form.email}
-                onChange={handleChange}
+                defaultValue={formState.enteredValues?.email}
                 className="w-full px-5 py-3.5 bg-gray-50/50 border-2 border-gray-200 rounded-xl focus:border-[#4DA5AD] focus:ring-4 focus:ring-[#4DA5AD]/20 outline-none"
               />
             </div>
@@ -138,10 +188,8 @@ const Signup = () => {
                   name="password"
                   type="password"
                   placeholder="••••••••"
-                  required
                   minLength="6"
-                  value={form.password}
-                  onChange={handleChange}
+                  defaultValue={formState.enteredValues?.password}
                   className="w-full px-5 py-3.5 bg-gray-50/50 border-2 border-gray-200 rounded-xl focus:border-[#4DA5AD] focus:ring-4 focus:ring-[#4DA5AD]/20 outline-none"
                 />
                 <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
@@ -154,21 +202,34 @@ const Signup = () => {
                   name="confirmPassword"
                   type="password"
                   placeholder="••••••••"
-                  required
-                  value={form.confirmPassword}
-                  onChange={handleChange}
+                  defaultValue={formState.enteredValues?.confirmPassword}
                   className="w-full px-5 py-3.5 bg-gray-50/50 border-2 border-gray-200 rounded-xl focus:border-[#4DA5AD] focus:ring-4 focus:ring-[#4DA5AD]/20 outline-none"
                 />
               </div>
             </div>
+              {/* Error Display */}
+          {formState.errors && formState.errors.length > 0 && (
+            <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200">
+              <ul className="list-disc list-inside text-red-700">
+                {formState.errors.map((error) => (
+                  <li key={error}>{error}</li>
+                ))}
+              </ul>
+              {formState.errors.some(e => e.includes('already registered')) && (
+                <Link to="/login" className="text-sm font-semibold text-[#4DA5AD] block mt-2">
+                  → Go to Login
+                </Link>
+              )}
+            </div>
+          )}
 
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isPending}
               className="w-full py-4 px-6 text-lg font-bold text-white bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-xl hover:shadow-lg transition-all disabled:opacity-50"
             >
-              {isSubmitting ? 'Creating Account...' : 'Sign Up'}
+              {isPending ? 'Creating Account...' : 'Sign Up'}
             </button>
           </form>
 
