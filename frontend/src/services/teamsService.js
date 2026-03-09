@@ -1,19 +1,65 @@
 // src/services/teamsService.js
 import { apiClient } from './apiClient';
 
-// Helper to normalize team data
-const normalizeTeam = (team) => ({
-  ...team,
-  id: team.id,
-  name: team.name || '',
-  description: team.description || '',
-  lead: team.lead || null,
-  leadName: team.lead?.name || team.leadName || 'Unassigned',
-  memberCount: team.members?.length || team.memberCount || 0,
-  members: team.members || [],
-  projects: team.projects || [],
-  createdAt: team.createdAt ? new Date(team.createdAt).toLocaleDateString() : null,
-});
+// Helper to safely get a number from any value
+const safeNumber = (value, defaultValue = 0) => {
+  const num = parseInt(value);
+  return isNaN(num) ? defaultValue : Math.max(0, num);
+};
+
+// Helper to safely get a string from any value
+const safeString = (value, defaultValue = '') => {
+  if (value === null || value === undefined) return defaultValue;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') return defaultValue;
+  return String(value);
+};
+
+// Helper to normalize team data - NO AUTO-ASSIGNMENT
+const normalizeTeam = (team) => {
+  // Safely extract member count
+  let memberCount = 0;
+  if (team.memberCount !== undefined) {
+    memberCount = safeNumber(team.memberCount);
+  } else if (team.members && Array.isArray(team.members)) {
+    memberCount = team.members.length;
+  } else if (team.users && Array.isArray(team.users)) {
+    memberCount = team.users.length;
+  }
+  
+  // Safely extract project count
+  let projectCount = 0;
+  if (team.projectCount !== undefined) {
+    projectCount = safeNumber(team.projectCount);
+  } else if (team.projects && Array.isArray(team.projects)) {
+    projectCount = team.projects.length;
+  }
+  
+  // Safely extract lead name - ONLY from explicit lead fields
+  let leadName = 'Unassigned';
+  
+  if (team.leadName && typeof team.leadName === 'string' && team.leadName !== 'Unassigned') {
+    leadName = team.leadName;
+  } else if (team.lead && typeof team.lead === 'string' && team.lead !== 'Unassigned') {
+    leadName = team.lead;
+  } else if (team.lead && typeof team.lead === 'object' && team.lead.name) {
+    leadName = safeString(team.lead.name, 'Unassigned');
+  }
+  // ❌ REMOVED: No auto-assignment from members
+  
+  return {
+    id: safeNumber(team.id),
+    name: safeString(team.name, 'Unnamed Team'),
+    description: safeString(team.description),
+    lead: leadName,
+    leadId: team.leadId ? safeNumber(team.leadId) : null,
+    leadName: leadName,
+    memberCount: memberCount,
+    projectCount: projectCount,
+    members: Array.isArray(team.members) ? team.members : [],
+    projects: Array.isArray(team.projects) ? team.projects : []
+  };
+};
 
 // Get all teams
 export const getTeams = async () => {
@@ -25,39 +71,30 @@ export const getTeams = async () => {
 // Get team by ID
 export const getTeamById = async (teamId) => {
   const response = await apiClient(`/teams/${teamId}`);
-  // Handle both { team } and direct team object responses
   const team = response.team || response;
   return normalizeTeam(team);
 };
 
-// Create new team - UPDATED to handle memberIds
+// Create new team
 export const createTeam = async (teamData) => {
   try {
-    // Prepare the payload including member IDs if they exist
     const payload = {
       name: teamData.name,
       description: teamData.description,
-      ...(teamData.leadId && { leadId: teamData.leadId }),
-      // Include member IDs if they were selected
+      ...(teamData.leadId && { leadId: safeNumber(teamData.leadId) }),
       ...(teamData.selectedMembers?.length > 0 && { 
-        memberIds: teamData.selectedMembers.map(id => parseInt(id)) 
+        memberIds: teamData.selectedMembers.map(id => safeNumber(id)) 
       })
     };
-
-    console.log('Sending to backend:', payload);
 
     const response = await apiClient('/teams', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
     
-    console.log('Raw createTeam response:', response);
-    
-    // Handle different response shapes
     const createdTeam = response.team || response;
     
     if (!createdTeam || !createdTeam.id) {
-      console.error('Unexpected response format:', response);
       throw new Error('Invalid response from server');
     }
     
@@ -85,11 +122,11 @@ export const deleteTeam = async (teamId) => {
   });
 };
 
-// Add member to team (keep for backward compatibility)
+// Add member to team
 export const addMemberToTeam = async (teamId, userId) => {
   const response = await apiClient(`/teams/${teamId}/add-member`, {
     method: 'PUT',
-    body: JSON.stringify({ userId })
+    body: JSON.stringify({ userId: safeNumber(userId) })
   });
   const team = response.team || response;
   return normalizeTeam(team);
@@ -99,7 +136,7 @@ export const addMemberToTeam = async (teamId, userId) => {
 export const removeMemberFromTeam = async (teamId, userId) => {
   const response = await apiClient(`/teams/${teamId}/remove-member`, {
     method: 'PUT',
-    body: JSON.stringify({ userId })
+    body: JSON.stringify({ userId: safeNumber(userId) })
   });
   const team = response.team || response;
   return normalizeTeam(team);

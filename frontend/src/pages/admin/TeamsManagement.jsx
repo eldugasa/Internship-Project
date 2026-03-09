@@ -9,6 +9,7 @@ import {
   getTeams,
 } from '../../services/teamsService';
 import { getUsers } from '../../services/usersService';
+import { Users } from 'lucide-react';
 
 const TeamsManagement = () => {
   const navigate = useNavigate();
@@ -27,6 +28,66 @@ const TeamsManagement = () => {
   });
   const [formErrors, setFormErrors] = useState({});
 
+  // Helper to safely get a number from any value
+  const safeNumber = (value, defaultValue = 0) => {
+    const num = parseInt(value);
+    return isNaN(num) ? defaultValue : Math.max(0, num);
+  };
+
+  // Helper to safely get a string from any value
+  const safeString = (value, defaultValue = '') => {
+    if (value === null || value === undefined) return defaultValue;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') return defaultValue;
+    return String(value);
+  };
+
+  // Helper to prepare team for display - ONLY shows lead if explicitly assigned
+  const prepareTeamForDisplay = (team) => {
+    const displayTeam = {
+      id: safeNumber(team.id),
+      name: safeString(team.name, 'Unnamed Team'),
+      lead: 'Unassigned', // Default to Unassigned
+      memberCount: 0,
+      projectCount: 0
+    };
+    
+    // Set member count
+    if (team.memberCount !== undefined) {
+      displayTeam.memberCount = safeNumber(team.memberCount);
+    } else if (team.members && Array.isArray(team.members)) {
+      displayTeam.memberCount = team.members.length;
+    } else if (team.users && Array.isArray(team.users)) {
+      displayTeam.memberCount = team.users.length;
+    }
+    
+    // Set project count
+    if (team.projectCount !== undefined) {
+      displayTeam.projectCount = safeNumber(team.projectCount);
+    } else if (team.projects && Array.isArray(team.projects)) {
+      displayTeam.projectCount = team.projects.length;
+    }
+    
+    // ONLY set lead if explicitly assigned via leadName or lead string
+    if (team.leadName && typeof team.leadName === 'string' && team.leadName !== 'Unassigned') {
+      displayTeam.lead = team.leadName;
+    } else if (team.lead && typeof team.lead === 'string' && team.lead !== 'Unassigned') {
+      displayTeam.lead = team.lead;
+    } else if (team.lead && typeof team.lead === 'object' && team.lead.name) {
+      displayTeam.lead = safeString(team.lead.name, 'Unassigned');
+    } else if (team.leadId) {
+      // If leadId exists but no name, still show Unassigned until we fetch the name
+      // Optionally, we could look up the name from users array if available
+      const leadUser = users.find(u => u.id === safeNumber(team.leadId));
+      if (leadUser && leadUser.name) {
+        displayTeam.lead = leadUser.name;
+      }
+    }
+    // NO AUTO-ASSIGNMENT - never infer lead from members
+    
+    return displayTeam;
+  };
+
   // Load teams and users data
   const loadData = async () => {
     setLoading(true);
@@ -37,15 +98,11 @@ const TeamsManagement = () => {
         getUsers()
       ]);
       
-      console.log('Teams data:', teamsData);
-      console.log('Users data:', usersData);
-      
       setTeams(teamsData || []);
       setUsers(usersData || []);
     } catch (err) {
       console.error('Error fetching teams/users:', err);
       
-      // Handle specific error types
       if (err.message?.includes('401')) {
         setError('Authentication failed. Please login again.');
         setTimeout(() => navigate('/login'), 2000);
@@ -65,17 +122,14 @@ const TeamsManagement = () => {
     loadData();
   }, []);
 
-  // Handle input changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setNewTeam((prev) => ({ ...prev, [name]: value }));
-    // Clear field error when user types
     if (formErrors[name]) {
       setFormErrors(prev => ({ ...prev, [name]: null }));
     }
   };
 
-  // Toggle member selection
   const toggleMemberSelection = (userId) => {
     setNewTeam((prev) => {
       const isSelected = prev.selectedMembers.includes(userId);
@@ -88,7 +142,6 @@ const TeamsManagement = () => {
     });
   };
 
-  // Validate form
   const validateForm = () => {
     const errors = {};
     
@@ -100,7 +153,6 @@ const TeamsManagement = () => {
       errors.name = 'Team name must be less than 50 characters';
     }
     
-    // Optional: Validate that lead is a valid user
     if (newTeam.leadId) {
       const leadExists = users.some(u => u.id === parseInt(newTeam.leadId));
       if (!leadExists) {
@@ -112,60 +164,48 @@ const TeamsManagement = () => {
     return Object.keys(errors).length === 0;
   };
 
- // src/pages/admin/TeamsManagement.jsx
-// Update only the handleCreateTeam function:
-
-const handleCreateTeam = async (e) => {
-  e.preventDefault();
-  
-  // Validate form
-  if (!validateForm()) {
-    return;
-  }
-
-  setOperationLoading(true);
-  setError(null);
-
-  try {
-    // Prepare team data with all information in one payload
-    const teamData = {
-      name: newTeam.name.trim(),
-      description: newTeam.description?.trim() || null,
-      leadId: newTeam.leadId ? parseInt(newTeam.leadId) : null,
-      selectedMembers: newTeam.selectedMembers // Pass selected members directly
-    };
-
-    console.log('Creating team with data:', teamData);
-
-    // Create the team - the service will handle memberIds
-    const createdTeam = await createTeam(teamData);
-    console.log('Team created successfully:', createdTeam);
-
-    // Refresh teams list
-    await loadData();
+  const handleCreateTeam = async (e) => {
+    e.preventDefault();
     
-    // Reset form
-    setNewTeam({ name: '', leadId: '', description: '', selectedMembers: [] });
-    setShowCreateTeamPopup(false);
-    setFormErrors({});
-    alert('Team created successfully!');
-    
-  } catch (err) {
-    console.error('Error creating team:', err);
-    
-    const errorMessage = err.message || 'Failed to create team';
-    
-    if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
-      setFormErrors({ name: 'A team with this name already exists' });
-    } else {
-      setError(errorMessage);
+    if (!validateForm()) {
+      return;
     }
-  } finally {
-    setOperationLoading(false);
-  }
-};
 
-  // Delete team
+    setOperationLoading(true);
+    setError(null);
+
+    try {
+      const teamData = {
+        name: newTeam.name.trim(),
+        description: newTeam.description?.trim() || null,
+        leadId: newTeam.leadId ? parseInt(newTeam.leadId) : null,
+        selectedMembers: newTeam.selectedMembers
+      };
+
+      const createdTeam = await createTeam(teamData);
+
+      await loadData();
+      
+      setNewTeam({ name: '', leadId: '', description: '', selectedMembers: [] });
+      setShowCreateTeamPopup(false);
+      setFormErrors({});
+      alert('Team created successfully!');
+      
+    } catch (err) {
+      console.error('Error creating team:', err);
+      
+      const errorMessage = err.message || 'Failed to create team';
+      
+      if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
+        setFormErrors({ name: 'A team with this name already exists' });
+      } else {
+        setError(errorMessage);
+      }
+    } finally {
+      setOperationLoading(false);
+    }
+  };
+
   const handleDeleteTeam = async (teamId, e) => {
     e?.stopPropagation();
     
@@ -192,23 +232,14 @@ const handleCreateTeam = async (e) => {
     }
   };
 
-  // Get potential leads
   const getLeadOptions = () => {
-    return users.filter(user => {
-      return user.name && user.id;
-    });
+    return users.filter(user => user.name && user.id);
   };
 
-  // Filter users for member selection
   const getFilteredUsers = () => {
-    return users.filter(user => 
-      user.role !== 'admin' && 
-      (user.role === 'team-member' || user.role === 'project-manager' || 
-       user.role === 'team_member' || user.role === 'project_manager')
-    );
+    return users.filter(user => user.role !== 'admin');
   };
 
-  // Retry loading
   const handleRetry = () => {
     setError(null);
     loadData();
@@ -258,41 +289,22 @@ const handleCreateTeam = async (e) => {
         </button>
       </div>
 
-      {/* Teams Grid */}
-      {teams.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-xl border border-gray-200">
-          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Users className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No teams yet</h3>
-          <p className="text-gray-500 mb-6">Get started by creating your first team</p>
-          <button
-            onClick={() => setShowCreateTeamPopup(true)}
-            className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-opacity-90"
-          >
-            Create Team
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {teams.map((team) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {teams.map((team) => {
+          const displayTeam = prepareTeamForDisplay(team);
+
+          return (
             <TeamCard
               key={team.id}
-              team={{
-                ...team,
-                members: team.memberCount || team.users?.length || 0,
-                projects: team.projects?.length || 0,
-                lead: team.leadName || team.lead || 'Unassigned',
-              }}
+              team={displayTeam}
               showActions={true}
               onDelete={(e) => handleDeleteTeam(team.id, e)}
               onClick={() => navigate(`/admin/teams/${team.id}`)}
             />
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-      {/* Create Team Popup */}
       {showCreateTeamPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
           <div className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-3xl flex flex-col" style={{ maxHeight: '80vh' }}>
@@ -312,7 +324,6 @@ const handleCreateTeam = async (e) => {
             </div>
             
             <form onSubmit={handleCreateTeam} className="flex-1 overflow-y-auto p-6 space-y-6">
-              {/* Form error display */}
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-600 text-sm">{error}</p>
@@ -354,22 +365,15 @@ const handleCreateTeam = async (e) => {
                     disabled={operationLoading}
                   >
                     <option value="">Select team lead (optional)</option>
-                    {getLeadOptions().length > 0 ? (
-                      getLeadOptions().map((u) => (
-                        <option key={u.id} value={u.id}>
-                          {u.name} {u.role ? `(${u.role})` : ''}
-                        </option>
-                      ))
-                    ) : (
-                      <option value="" disabled>No users available</option>
-                    )}
+                    {getLeadOptions().map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} {u.role ? `(${u.role})` : ''}
+                      </option>
+                    ))}
                   </select>
                   {formErrors.leadId && (
                     <p className="mt-1 text-sm text-red-600">{formErrors.leadId}</p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">
-                    {getLeadOptions().length} users available
-                  </p>
                 </div>
               </div>
 

@@ -3,20 +3,34 @@ import { prisma } from "../config/db.js";
 // ==============================
 // Create Team
 // ==============================
+// ==============================
+// Create Team - UPDATED VERSION
+// ==============================
 const createTeam = async (req, res) => {
   try {
-    const { name, lead, description, memberIds } = req.body;
+    const { name, leadId, description, memberIds } = req.body;
+
+    // If leadId is provided, get the user's name
+    let leadName = null;
+    if (leadId) {
+      const leadUser = await prisma.user.findUnique({
+        where: { id: Number(leadId) }
+      });
+      if (leadUser) {
+        leadName = leadUser.name;
+      }
+    }
 
     // Prepare nested users
-    const members = memberIds?.map(id => ({ id })) || [];
+    const members = memberIds?.map(id => ({ id: Number(id) })) || [];
 
     const team = await prisma.team.create({
       data: {
         name,
         description,
-        lead,
+        lead: leadName, // Store the name as string
         users: {
-          connect: members  // Connect existing users
+          connect: members
         }
       },
       include: {
