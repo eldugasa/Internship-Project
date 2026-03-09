@@ -144,7 +144,7 @@ const NotificationBell = () => {
     if (notification.link) {
       // If link is provided directly, use it
       console.log('Using provided link:', notification.link);
-      navigate(notification.link);
+      // navigate(notification.link);
     } else {
       // Generate link based on notification type
       let path = '/team-member/dashboard';

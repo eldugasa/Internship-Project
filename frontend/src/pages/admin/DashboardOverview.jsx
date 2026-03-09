@@ -519,9 +519,9 @@ const DashboardOverview = () => {
                     <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
                       Team
                     </th>
-                    <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                    {/* <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
                       Manager
-                    </th>
+                    </th> */}
                     <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Progress
                     </th>
@@ -559,9 +559,9 @@ const DashboardOverview = () => {
                             {project.teamName || project.team || "N/A"}
                           </span>
                         </td>
-                        <td className="px-3 sm:px-4 lg:px-6 py-4 hidden md:table-cell whitespace-nowrap text-sm">
+                        {/* <td className="px-3 sm:px-4 lg:px-6 py-4 hidden md:table-cell whitespace-nowrap text-sm">
                           {project.managerName || project.manager || "N/A"}
-                        </td>
+                        </td> */}
                         <td className="px-3 sm:px-4 lg:px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             <div className="w-12 sm:w-16 bg-gray-200 rounded-full h-1.5 sm:h-2">

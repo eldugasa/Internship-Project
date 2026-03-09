@@ -17,8 +17,8 @@ import {
   getUnreadCount, 
   markAsRead, 
   markAllAsRead,
-  deleteNotification,
-  clearAllNotifications
+  deleteNotification
+
 } from '../../services/notificationService';
 
 const NotificationBell = () => {
@@ -29,7 +29,6 @@ const NotificationBell = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -128,7 +127,7 @@ const NotificationBell = () => {
   // Handle notification click
   const handleNotificationClick = (notification) => {
     handleMarkAsRead(notification.id);
-    if (notification.link) navigate(notification.link);
+    // if (notification.link) navigate(notification.link);
     setShowNotifications(false);
   };
 

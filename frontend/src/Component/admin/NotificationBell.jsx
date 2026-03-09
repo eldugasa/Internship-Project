@@ -7,13 +7,16 @@ import {
   AlertCircle,
   Shield,
   CheckCircle,
-  Loader2
+  Loader2,
+  Trash2,
+  X
 } from 'lucide-react';
 import { 
   getNotifications, 
   getUnreadCount, 
   markAsRead, 
-  markAllAsRead 
+  markAllAsRead,
+  deleteNotification
 } from '../../services/notificationService';
 
 const NotificationBell = () => {
@@ -23,14 +26,23 @@ const NotificationBell = () => {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   // Fetch notifications
   const fetchNotifications = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getNotifications(1, 5); // Show only 5 recent in dropdown
-      setNotifications(response.notifications || []);
+      const response = await getNotifications(1, 5);
+      
+      // Remove duplicates by ID
+      const notificationsData = response.notifications || [];
+      const uniqueNotifications = notificationsData.filter(
+        (notification, index, self) => 
+          index === self.findIndex(n => n.id === notification.id)
+      );
+      
+      setNotifications(uniqueNotifications);
     } catch (err) {
       console.error('Error fetching notifications:', err);
       setError(err.message || 'Failed to load notifications');
@@ -54,11 +66,7 @@ const NotificationBell = () => {
     fetchNotifications();
     fetchUnreadCount();
     
-    // Poll for new notifications every 30 seconds
-    const interval = setInterval(() => {
-      fetchUnreadCount();
-    }, 30000);
-    
+    const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, []);
 
@@ -92,12 +100,33 @@ const NotificationBell = () => {
   const handleMarkAllAsRead = async () => {
     try {
       await markAllAsRead();
-      setNotifications(prev =>
-        prev.map(notif => ({ ...notif, read: true }))
-      );
+      setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
       setUnreadCount(0);
     } catch (err) {
       console.error('Error marking all as read:', err);
+    }
+  };
+
+  // Delete single notification
+  const handleDeleteNotification = async (e, notificationId) => {
+    e.stopPropagation(); // Prevent triggering the parent click
+    if (!window.confirm('Delete this notification?')) return;
+    
+    setDeletingId(notificationId);
+    try {
+      await deleteNotification(notificationId);
+      setNotifications(prev => prev.filter(n => n.id !== notificationId));
+      
+      // Update unread count if deleted notification was unread
+      const deletedNotif = notifications.find(n => n.id === notificationId);
+      if (deletedNotif && !deletedNotif.read) {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+      alert('Failed to delete notification');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -151,6 +180,7 @@ const NotificationBell = () => {
       {/* Notifications Dropdown */}
       {showNotifications && (
         <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
+          {/* Header */}
           <div className="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="font-semibold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (
@@ -184,8 +214,7 @@ const NotificationBell = () => {
                 return (
                   <div
                     key={notification.id}
-                    onClick={() => handleNotificationClick(notification)}
-                    className={`p-4 border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer ${
+                    className={`group relative p-4 border-b border-gray-100 hover:bg-gray-50 transition ${
                       !notification.read ? 'bg-blue-50/30' : ''
                     }`}
                   >
@@ -193,8 +222,11 @@ const NotificationBell = () => {
                       <div className={`flex-shrink-0 w-8 h-8 rounded-lg ${bg} flex items-center justify-center`}>
                         <Icon className={`w-4 h-4 ${color}`} />
                       </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
+                      <div 
+                        className="flex-1 cursor-pointer"
+                        onClick={() => handleNotificationClick(notification)}
+                      >
+                        <div className="flex justify-between items-start pr-6">
                           <p className="text-sm font-medium text-gray-900">
                             {notification.title}
                           </p>
@@ -221,13 +253,29 @@ const NotificationBell = () => {
                           </span>
                         </div>
                       </div>
+                      
+                      {/* Delete button */}
+                      <button
+                        onClick={(e) => handleDeleteNotification(e, notification.id)}
+                        disabled={deletingId === notification.id}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                        title="Delete notification"
+                      >
+                        {deletingId === notification.id ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <X className="w-3.5 h-3.5" />
+                        )}
+                      </button>
                     </div>
                   </div>
                 );
               })
             ) : (
-              <div className="p-8 text-center text-gray-500">
-                No notifications
+              <div className="p-12 text-center">
+                <Bell className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                <p className="text-gray-500">No notifications</p>
+                <p className="text-xs text-gray-400 mt-1">You're all caught up!</p>
               </div>
             )}
           </div>
