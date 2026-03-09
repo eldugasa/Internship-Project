@@ -112,77 +112,58 @@ const TeamsManagement = () => {
     return Object.keys(errors).length === 0;
   };
 
-  // Create team
-  const handleCreateTeam = async (e) => {
-    e.preventDefault();
+ // src/pages/admin/TeamsManagement.jsx
+// Update only the handleCreateTeam function:
+
+const handleCreateTeam = async (e) => {
+  e.preventDefault();
+  
+  // Validate form
+  if (!validateForm()) {
+    return;
+  }
+
+  setOperationLoading(true);
+  setError(null);
+
+  try {
+    // Prepare team data with all information in one payload
+    const teamData = {
+      name: newTeam.name.trim(),
+      description: newTeam.description?.trim() || null,
+      leadId: newTeam.leadId ? parseInt(newTeam.leadId) : null,
+      selectedMembers: newTeam.selectedMembers // Pass selected members directly
+    };
+
+    console.log('Creating team with data:', teamData);
+
+    // Create the team - the service will handle memberIds
+    const createdTeam = await createTeam(teamData);
+    console.log('Team created successfully:', createdTeam);
+
+    // Refresh teams list
+    await loadData();
     
-    // Validate form
-    if (!validateForm()) {
-      return;
+    // Reset form
+    setNewTeam({ name: '', leadId: '', description: '', selectedMembers: [] });
+    setShowCreateTeamPopup(false);
+    setFormErrors({});
+    alert('Team created successfully!');
+    
+  } catch (err) {
+    console.error('Error creating team:', err);
+    
+    const errorMessage = err.message || 'Failed to create team';
+    
+    if (errorMessage.includes('duplicate') || errorMessage.includes('already exists')) {
+      setFormErrors({ name: 'A team with this name already exists' });
+    } else {
+      setError(errorMessage);
     }
-
-    setOperationLoading(true);
-    setError(null);
-
-    try {
-      // Prepare team data
-      const teamData = {
-        name: newTeam.name.trim(),
-        description: newTeam.description?.trim() || null,
-      };
-      
-      // If a lead is selected, add the leadId
-      if (newTeam.leadId) {
-        teamData.leadId = parseInt(newTeam.leadId);
-      }
-
-      console.log('Creating team with data:', teamData);
-
-      // Create the team
-      const createdTeam = await createTeam(teamData);
-      
-      if (!createdTeam || !createdTeam.id) {
-        throw new Error('Invalid response from server');
-      }
-
-      // Add selected members to the team
-      if (newTeam.selectedMembers.length > 0) {
-        try {
-          await Promise.all(
-            newTeam.selectedMembers.map((userId) => 
-              addMemberToTeam(createdTeam.id, userId)
-            ),
-          );
-        } catch (memberErr) {
-          console.error('Error adding members:', memberErr);
-          // Show warning but don't fail the whole operation
-          alert('Team created but some members could not be added. You can add them later.');
-        }
-      }
-
-      // Refresh teams list
-      await loadData();
-      
-      // Reset form
-      setNewTeam({ name: '', leadId: '', description: '', selectedMembers: [] });
-      setShowCreateTeamPopup(false);
-      setFormErrors({});
-      alert('Team created successfully!');
-    } catch (err) {
-      console.error('Error creating team:', err);
-      
-      // Handle specific error cases
-      if (err.message?.includes('duplicate') || err.message?.includes('already exists')) {
-        setFormErrors({ name: 'A team with this name already exists' });
-      } else if (err.message?.includes('lead')) {
-        setFormErrors({ leadId: 'Invalid team lead selected' });
-      } else {
-        setError(err.message || 'Failed to create team');
-      }
-    } finally {
-      setOperationLoading(false);
-    }
-  };
+  } finally {
+    setOperationLoading(false);
+  }
+};
 
   // Delete team
   const handleDeleteTeam = async (teamId, e) => {
