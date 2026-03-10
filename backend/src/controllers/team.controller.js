@@ -1,10 +1,8 @@
 import { prisma } from "../config/db.js";
+import { createNotification, NOTIFICATION_TYPES } from "../utils/notificationHelper.js"; // Add this import
 
 // ==============================
 // Create Team
-// ==============================
-// ==============================
-// Create Team - UPDATED VERSION
 // ==============================
 const createTeam = async (req, res) => {
   try {
@@ -28,7 +26,7 @@ const createTeam = async (req, res) => {
       data: {
         name,
         description,
-        lead: leadName, // Store the name as string
+        lead: leadName,
         users: {
           connect: members
         }
@@ -38,6 +36,25 @@ const createTeam = async (req, res) => {
         projects: true
       }
     });
+
+    // Send notifications to all members added to the team
+    if (members.length > 0) {
+      try {
+        for (const member of members) {
+          await createNotification({
+            userId: member.id,
+            type: NOTIFICATION_TYPES.ADDED_TO_TEAM,
+            title: 'Added to Team',
+            message: `You have been added to team "${team.name}"`,
+            data: { teamId: team.id },
+            link: `/team-member/teams/${team.id}`
+          });
+        }
+        console.log(`✅ Sent notifications to ${members.length} team members`);
+      } catch (notifErr) {
+        console.error('Error sending team creation notifications:', notifErr);
+      }
+    }
 
     res.status(201).json({ team });
   } catch (error) {
@@ -171,17 +188,37 @@ const deleteTeam = async (req, res) => {
 };
 
 // ==============================
-// Assign User To Team
+// Assign User To Team - WITH NOTIFICATION
 // ==============================
 const assignUserToTeam = async (req, res) => {
   try {
     const { userId } = req.body;
     const { teamId } = req.params;
 
+    // Get team details for notification
+    const team = await prisma.team.findUnique({
+      where: { id: Number(teamId) }
+    });
+
     const user = await prisma.user.update({
       where: { id: Number(userId) },
       data: { teamId: Number(teamId) },
     });
+
+    // Send notification to the user who was added
+    try {
+      await createNotification({
+        userId: Number(userId),
+        type: NOTIFICATION_TYPES.ADDED_TO_TEAM,
+        title: 'Added to Team',
+        message: `You have been added to team "${team.name}"`,
+        data: { teamId: team.id },
+        link: `/team-member/teams/${team.id}`
+      });
+      console.log(`✅ Notification sent to user ${userId} for team addition`);
+    } catch (notifErr) {
+      console.error('Error sending team addition notification:', notifErr);
+    }
 
     res.json({ message: "User assigned to team", user });
   } catch (err) {
@@ -191,16 +228,36 @@ const assignUserToTeam = async (req, res) => {
 };
 
 // ==============================
-// Remove User From Team
+// Remove User From Team - WITH NOTIFICATION
 // ==============================
 const removeUserFromTeam = async (req, res) => {
   try {
     const { userId } = req.body;
+    const { teamId } = req.params;
+
+    // Get team details for notification
+    const team = await prisma.team.findUnique({
+      where: { id: Number(teamId) }
+    });
 
     const user = await prisma.user.update({
       where: { id: Number(userId) },
       data: { teamId: null },
     });
+
+    // Send notification to the user who was removed
+    try {
+      await createNotification({
+        userId: Number(userId),
+        type: NOTIFICATION_TYPES.MEMBER_REMOVED,
+        title: 'Removed from Team',
+        message: `You have been removed from team "${team.name}"`,
+        data: { teamId: team.id }
+      });
+      console.log(`✅ Notification sent to user ${userId} for team removal`);
+    } catch (notifErr) {
+      console.error('Error sending team removal notification:', notifErr);
+    }
 
     res.json({ message: "User removed from team", user });
   } catch (err) {

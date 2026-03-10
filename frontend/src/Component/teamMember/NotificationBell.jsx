@@ -1,3 +1,4 @@
+// src/components/teamMember/NotificationBell.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -7,6 +8,7 @@ import {
   Clock,
   MessageSquare,
   UserPlus,
+  UserMinus, // Add this import
   Loader2,
   Trash2,
   X
@@ -129,7 +131,7 @@ const NotificationBell = () => {
     }
   };
 
-  // Handle notification click - FIXED VERSION
+  // Handle notification click
   const handleNotificationClick = (notification) => {
     // Mark as read
     handleMarkAsRead(notification.id);
@@ -144,12 +146,12 @@ const NotificationBell = () => {
     if (notification.link) {
       // If link is provided directly, use it
       console.log('Using provided link:', notification.link);
-      // navigate(notification.link);
+      navigate(notification.link);
     } else {
       // Generate link based on notification type
       let path = '/team-member/dashboard';
       
-      // Check for taskId in different possible locations
+      // Check for IDs in different possible locations
       const taskId = notification.taskId || notification.task?.id || notification.data?.taskId;
       const teamId = notification.teamId || notification.team?.id || notification.data?.teamId;
       const projectId = notification.projectId || notification.project?.id || notification.data?.projectId;
@@ -172,12 +174,18 @@ const NotificationBell = () => {
           break;
           
         case 'added_to_team':
+        case 'member_joined': // Add this
           // Team related - go to team page if teamId exists
           if (teamId) {
             path = `/team-member/teams/${teamId}`;
           } else {
             path = '/team-member/teams';
           }
+          break;
+          
+        case 'member_removed': // Add this
+          // Team removal - go to teams list
+          path = '/team-member/teams';
           break;
           
         case 'project_created':
@@ -206,7 +214,7 @@ const NotificationBell = () => {
     navigate('/team-member/notifications', { replace: true });
   };
 
-  // Get icon based on notification type
+  // Get icon based on notification type - UPDATED with member events
   const getNotificationIcon = (type) => {
     switch(type) {
       case 'task_assigned':
@@ -223,7 +231,10 @@ const NotificationBell = () => {
       case 'comment_added':
         return { icon: MessageSquare, color: 'text-blue-500', bg: 'bg-blue-50' };
       case 'added_to_team':
-        return { icon: UserPlus, color: 'text-purple-500', bg: 'bg-purple-50' };
+      case 'member_joined': // Add this
+        return { icon: UserPlus, color: 'text-green-500', bg: 'bg-green-50' };
+      case 'member_removed': // Add this
+        return { icon: UserMinus, color: 'text-red-500', bg: 'bg-red-50' };
       default:
         return { icon: Bell, color: 'text-gray-500', bg: 'bg-gray-50' };
     }

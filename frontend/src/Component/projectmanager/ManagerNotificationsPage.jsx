@@ -57,16 +57,18 @@ const ManagerNotificationsPage = () => {
       case 'task_overdue':
         return AlertCircle;
       case 'deadline':
-      case 'deadline_passed':
+      case 'deadline_approaching':
         return Clock;
+      case 'deadline_passed':  // Only once!
+        return Flag;
       case 'team_created':
         return Users;
       case 'member_joined':
         return Users;
       case 'project_started':
         return Trophy;
-      case 'deadline_passed':
-        return Flag;
+      case 'project_created':
+        return FolderKanban;
       default:
         return Bell;
     }
@@ -79,6 +81,7 @@ const ManagerNotificationsPage = () => {
       case 'task_overdue':
         return 'text-red-500';
       case 'deadline':
+      case 'deadline_approaching':
         return 'text-yellow-500';
       case 'deadline_passed':
         return 'text-orange-500';
@@ -100,6 +103,7 @@ const ManagerNotificationsPage = () => {
       case 'task_overdue':
         return 'bg-red-50';
       case 'deadline':
+      case 'deadline_approaching':
         return 'bg-yellow-50';
       case 'deadline_passed':
         return 'bg-orange-50';
@@ -149,7 +153,7 @@ const ManagerNotificationsPage = () => {
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <h1 className="text-xl font-semibold text-gray-900">Project Manager Notifications</h1>
+            <h1 className="text-xl font-semibold text-gray-900">Notifications</h1>
           </div>
         </div>
       </div>

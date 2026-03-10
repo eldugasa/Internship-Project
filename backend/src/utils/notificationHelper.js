@@ -23,7 +23,8 @@ const typeToPrefMap = {
   'task_overdue_for_me': 'taskOverdueForMe',
   'deadline_approaching': 'deadlineApproaching',
   'comment_added': 'commentAdded',
-  'added_to_team': 'addedToTeam'
+  'added_to_team': 'addedToTeam',
+  'member_removed': 'memberRemoved' // ADD THIS
 };
 
 // Create single notification with preference check
@@ -182,5 +183,6 @@ export const NOTIFICATION_TYPES = {
   TASK_OVERDUE_FOR_ME: 'task_overdue_for_me',
   DEADLINE_APPROACHING: 'deadline_approaching',
   COMMENT_ADDED: 'comment_added',
-  ADDED_TO_TEAM: 'added_to_team'
+  ADDED_TO_TEAM: 'added_to_team',
+  MEMBER_REMOVED: 'member_removed' // ADD THIS
 };
