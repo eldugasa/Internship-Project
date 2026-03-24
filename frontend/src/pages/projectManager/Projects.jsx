@@ -7,7 +7,7 @@ import {
   BarChart3, Eye, Edit, MoreVertical,
   Download, RefreshCw
 } from 'lucide-react';
-import { getProjects, deleteProject } from '../../services/projectsService';
+import { getProjects, deleteProject, updateProject } from '../../services/projectsService'; // Added updateProject import
 import { getTeams } from '../../services/teamsService';
 
 const Projects = () => {
@@ -41,6 +41,57 @@ const Projects = () => {
       return null;
     }
   };
+
+  // ===== NEW: Auto-activation function =====
+  const activateProjectsByStartDate = async (projectsList) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let hasChanges = false;
+    let activatedCount = 0;
+    
+    const updatedProjects = await Promise.all(projectsList.map(async (project) => {
+      // Only check planned projects
+      if (project.status !== 'planned') return project;
+      
+      const startDate = parseDate(project.startDate);
+      if (!startDate) return project;
+      
+      startDate.setHours(0, 0, 0, 0);
+      
+      // If start date is today or in the past, activate it
+      if (startDate <= today) {
+        try {
+          console.log(`Auto-activating project: ${project.name}`);
+          
+          // ONLY update the status - everything else stays the same
+          await updateProject(project.id, { 
+            status: 'IN_PROGRESS' 
+          });
+          
+          hasChanges = true;
+          activatedCount++;
+          
+          // Update local state with 'active' for UI
+          return { 
+            ...project, 
+            status: 'active' 
+          };
+        } catch (err) {
+          console.error(`Error activating project ${project.name}:`, err);
+          return project;
+        }
+      }
+      return project;
+    }));
+    
+    if (activatedCount > 0) {
+      console.log(`Activated ${activatedCount} project(s)`);
+    }
+    
+    return { updatedProjects, hasChanges };
+  };
+  // ===== END NEW FUNCTION =====
 
   // Check if project is overdue
   const isOverdue = (project) => {
@@ -77,7 +128,21 @@ const Projects = () => {
 
   useEffect(() => {
     fetchProjects();
-  }, []);
+    
+    // ===== NEW: Set up interval to check for activation every minute =====
+    const interval = setInterval(async () => {
+      if (projects.length > 0) {
+        const { updatedProjects, hasChanges } = await activateProjectsByStartDate(projects);
+        if (hasChanges) {
+          setProjects(updatedProjects);
+          calculateStats(updatedProjects);
+        }
+      }
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(interval);
+    // ===== END NEW INTERVAL =====
+  }, []); // Empty dependency array - runs once on mount
 
   const fetchProjects = async () => {
     setLoading(true);
@@ -95,7 +160,7 @@ const Projects = () => {
         }
       });
       
-      const projectsWithTeams = projectsData.map(project => {
+      let projectsWithTeams = projectsData.map(project => {
         let teamName = 'Unassigned';
         
         if (project.teamName) {
@@ -124,9 +189,13 @@ const Projects = () => {
         };
       });
       
+      // ===== NEW: Auto-activate projects on initial load =====
+      const { updatedProjects } = await activateProjectsByStartDate(projectsWithTeams);
+      // ===== END NEW ACTIVATION =====
+      
       setTeams(teamsData);
-      setProjects(projectsWithTeams);
-      calculateStats(projectsWithTeams);
+      setProjects(updatedProjects);
+      calculateStats(updatedProjects);
       
     } catch (err) {
       console.error('Error fetching projects:', err);

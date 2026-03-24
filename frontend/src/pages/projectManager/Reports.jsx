@@ -270,33 +270,73 @@ const Reports = () => {
         completedTasks: t.completedTasks
       }))
     },
-    {
-      id: 'deadlines',
-      name: 'Deadline Overview',
-      description: 'Upcoming and overdue deadlines',
-      icon: <Clock className="w-6 h-6" />,
-      getMetrics: () => [
-        { label: 'Overdue Tasks', value: stats.overdueTasks },
-        { label: 'Upcoming Deadlines', value: stats.upcomingDeadlines },
-        { label: 'Total Tasks', value: stats.totalTasks },
-        { label: 'Completion Rate', value: `${Math.round((stats.completedTasks / stats.totalTasks) * 100) || 0}%` },
-      ],
-      getDetails: () => {
-        const now = new Date();
-        const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+   {
+  id: 'deadlines',
+  name: 'Deadline Overview',
+  description: 'Upcoming and overdue deadlines',
+  icon: <Clock className="w-6 h-6" />,
+  getMetrics: () => [
+    { label: 'Overdue Tasks', value: stats.overdueTasks },
+    { label: 'Upcoming Deadlines', value: stats.upcomingDeadlines },
+    { label: 'Total Tasks', value: stats.totalTasks },
+    { label: 'Completion Rate', value: `${Math.round((stats.completedTasks / stats.totalTasks) * 100) || 0}%` },
+  ],
+  getDetails: () => {
+    const now = new Date();
+    const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    
+    return tasks
+      .filter(t => t.dueDate && t.status !== 'completed')
+      .map(t => {
+        // Parse the date properly
+        let formattedDate = 'No date';
+        let dueDateObj = null;
         
-        return tasks
-          .filter(t => t.dueDate && t.status !== 'completed')
-          .map(t => ({
-            name: t.title,
-            project: t.projectName,
-            dueDate: new Date(t.dueDate).toLocaleDateString(),
-            status: new Date(t.dueDate) < now ? 'overdue' : 'upcoming',
-            priority: t.priority
-          }))
-          .slice(0, 5);
-      }
-    }
+        if (t.dueDate) {
+          // Handle different date formats
+          if (typeof t.dueDate === 'string') {
+            // Check if it's in DD/MM/YYYY format (from your database)
+            if (t.dueDate.includes('/')) {
+              const [day, month, year] = t.dueDate.split('/');
+              dueDateObj = new Date(`${year}-${month}-${day}`);
+            } else {
+              dueDateObj = new Date(t.dueDate);
+            }
+          } else if (t.dueDate instanceof Date) {
+            dueDateObj = t.dueDate;
+          }
+          
+          // Format the date if valid
+          if (dueDateObj && !isNaN(dueDateObj.getTime())) {
+            formattedDate = dueDateObj.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+          } else {
+            formattedDate = t.dueDate; // Use original string if parsing fails
+          }
+        }
+        
+        // Determine status
+        let status = 'upcoming';
+        if (dueDateObj && !isNaN(dueDateObj.getTime())) {
+          status = dueDateObj < now ? 'overdue' : 'upcoming';
+        }
+        
+        return {
+          name: t.title || 'Unnamed Task',
+          project: t.projectName || t.project?.name || 'Unknown Project',
+          dueDate: formattedDate,
+          status: status,
+          priority: t.priority || 'medium'
+        };
+      })
+      .sort((a, b) => {
+        // Sort overdue first
+        if (a.status === 'overdue' && b.status !== 'overdue') return -1;
+        if (a.status !== 'overdue' && b.status === 'overdue') return 1;
+        return 0;
+      })
+      .slice(0, 5);
+  }
+}
   ];
 
   const currentReport = reports.find(r => r.id === selectedReport);

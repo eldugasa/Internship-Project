@@ -1,5 +1,5 @@
 import { prisma } from "../config/db.js";
-import { createNotification, NOTIFICATION_TYPES } from "../utils/notificationHelper.js"; // Add this import
+import { createNotification, NOTIFICATION_TYPES } from "../utils/notificationHelper.js";
 
 // ==============================
 // Create Team
@@ -46,7 +46,7 @@ const createTeam = async (req, res) => {
             type: NOTIFICATION_TYPES.ADDED_TO_TEAM,
             title: 'Added to Team',
             message: `You have been added to team "${team.name}"`,
-            data: { teamId: team.id },
+            data: { teamId: team.id, teamName: team.name },
             link: `/team-member/teams/${team.id}`
           });
         }
@@ -169,6 +169,24 @@ const deleteTeam = async (req, res) => {
       });
     }
 
+    // Notify all members that team is being deleted
+    if (team.users.length > 0) {
+      try {
+        for (const user of team.users) {
+          await createNotification({
+            userId: user.id,
+            type: 'team_deleted',
+            title: 'Team Deleted',
+            message: `Team "${team.name}" has been deleted`,
+            data: { teamId: team.id, teamName: team.name }
+          });
+        }
+        console.log(`✅ Sent deletion notifications to ${team.users.length} members`);
+      } catch (notifErr) {
+        console.error('Error sending team deletion notifications:', notifErr);
+      }
+    }
+
     // Remove team reference from all users
     await prisma.user.updateMany({
       where: { teamId: Number(teamId) },
@@ -200,6 +218,11 @@ const assignUserToTeam = async (req, res) => {
       where: { id: Number(teamId) }
     });
 
+    if (!team) {
+      return res.status(404).json({ message: "Team not found" });
+    }
+
+    // Update user's team assignment
     const user = await prisma.user.update({
       where: { id: Number(userId) },
       data: { teamId: Number(teamId) },
@@ -212,7 +235,11 @@ const assignUserToTeam = async (req, res) => {
         type: NOTIFICATION_TYPES.ADDED_TO_TEAM,
         title: 'Added to Team',
         message: `You have been added to team "${team.name}"`,
-        data: { teamId: team.id },
+        data: { 
+          teamId: team.id, 
+          teamName: team.name,
+          userId: user.id 
+        },
         link: `/team-member/teams/${team.id}`
       });
       console.log(`✅ Notification sent to user ${userId} for team addition`);
@@ -235,12 +262,23 @@ const removeUserFromTeam = async (req, res) => {
     const { userId } = req.body;
     const { teamId } = req.params;
 
-    // Get team details for notification
-    const team = await prisma.team.findUnique({
-      where: { id: Number(teamId) }
+    // Get user with current team before removal
+    const user = await prisma.user.findUnique({
+      where: { id: Number(userId) },
+      include: {
+        team: true
+      }
     });
 
-    const user = await prisma.user.update({
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const previousTeam = user.team;
+    const previousTeamName = previousTeam?.name || 'Unknown Team';
+
+    // Remove user from team
+    const updatedUser = await prisma.user.update({
       where: { id: Number(userId) },
       data: { teamId: null },
     });
@@ -251,15 +289,19 @@ const removeUserFromTeam = async (req, res) => {
         userId: Number(userId),
         type: NOTIFICATION_TYPES.MEMBER_REMOVED,
         title: 'Removed from Team',
-        message: `You have been removed from team "${team.name}"`,
-        data: { teamId: team.id }
+        message: `You have been removed from team "${previousTeamName}"`,
+        data: { 
+          teamId: Number(teamId), 
+          teamName: previousTeamName,
+          userId: user.id 
+        }
       });
       console.log(`✅ Notification sent to user ${userId} for team removal`);
     } catch (notifErr) {
       console.error('Error sending team removal notification:', notifErr);
     }
 
-    res.json({ message: "User removed from team", user });
+    res.json({ message: "User removed from team", user: updatedUser });
   } catch (err) {
     console.error("Error in removeUserFromTeam:", err);
     res.status(500).json({ message: err.message });

@@ -113,41 +113,7 @@ const SignIn = () => {
     }
   };
 
-  const handleDemoLogin = (email) => {
-    const demoPasswords = {
-      'admin@taskflow.com': 'adminpass',
-      'pm@task.com': 'pmpass',  // FIXED: Correct email from DataService
-      'member@task.com': 'memberpass'  // FIXED: Correct email from DataService
-    };
-
-    const password = demoPasswords[email] || 'password123';
-    setForm({ email, password, rememberMe: false });
-    setTimeout(async () => {
-      try {
-        const user = await login(email, password);
-        if (user) {
-            const normalizeRole = (r = '') => (r || '').toLowerCase().replace(/_/g, '-');
-            const userRole = normalizeRole(user.role);
-
-            switch (userRole) {
-              case 'admin':
-                navigate('/admin/dashboard');
-                break;
-              case 'project-manager':
-                navigate('/manager/dashboard');
-                break;
-              case 'team-member':
-                navigate('/team-member/dashboard');
-                break;
-              default:
-                navigate('/team-member/dashboard');
-            }
-        }
-      } catch (err) {
-        setError('Demo login failed. Please check demo credentials.');
-      }
-    }, 100);
-  };
+ 
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-indigo-50 flex items-center justify-center px-4 py-8">
@@ -192,12 +158,18 @@ const SignIn = () => {
                   onChange={(e) => setForgotEmail(e.target.value)}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4DA5AD]"
                 />
+                 
+
                 <button
+
                   onClick={handleForgotPassword}
-                  className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:opacity-90"
+                 className={`px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:opacity-90 ${isLoading ? 'opacity-50' : ''}`}
+                  disabled={isLoading}
                 >
-                  Send
+                  {isLoading ? 'Sending...' : 'Send'}
+                  
                 </button>
+
               </div>
               
               {forgotMessage && (

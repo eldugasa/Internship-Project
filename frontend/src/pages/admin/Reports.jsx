@@ -266,12 +266,7 @@ const Reports = () => {
       icon: FolderKanban,
       description: 'Project status and completion rates'
     },
-    {
-      id: 'tasks',
-      name: 'Task Completion Report',
-      icon: CheckSquare,
-      description: 'Task distribution and priority analysis'
-    }
+ 
   ];
 
   return (
@@ -337,7 +332,7 @@ const Reports = () => {
       </div>
 
       {/* Report Selection Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {reports.map((report) => {
           const Icon = report.icon;
           return (
@@ -399,31 +394,6 @@ const Reports = () => {
               <MetricCard label="Total Tasks" value={dashboardStats.totalTasks} />
             </div>
 
-            {/* Task Summary */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <SummaryCard
-                title="Task Completion"
-                value={dashboardStats.completedTasks}
-                total={dashboardStats.totalTasks}
-                color="green"
-                label="Completed"
-              />
-              <SummaryCard
-                title="In Progress"
-                value={dashboardStats.inProgressTasks}
-                total={dashboardStats.totalTasks}
-                color="blue"
-                label="In Progress"
-              />
-              <SummaryCard
-                title="Pending & Overdue"
-                value={dashboardStats.pendingTasks + dashboardStats.overdueTasks}
-                total={dashboardStats.totalTasks}
-                color="yellow"
-                label="Pending"
-              />
-            </div>
-
             {/* Breakdown Tables */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Project Status */}
@@ -455,26 +425,7 @@ const Reports = () => {
               </BreakdownCard>
 
               {/* Task Priority */}
-              <BreakdownCard title="Task Priority">
-                <BreakdownRow 
-                  label="High" 
-                  value={dashboardStats.taskPriority.high} 
-                  total={dashboardStats.totalTasks}
-                  color="red"
-                />
-                <BreakdownRow 
-                  label="Medium" 
-                  value={dashboardStats.taskPriority.medium} 
-                  total={dashboardStats.totalTasks}
-                  color="yellow"
-                />
-                <BreakdownRow 
-                  label="Low" 
-                  value={dashboardStats.taskPriority.low} 
-                  total={dashboardStats.totalTasks}
-                  color="green"
-                />
-              </BreakdownCard>
+           
 
               {/* User Roles */}
               <BreakdownCard title="User Roles">

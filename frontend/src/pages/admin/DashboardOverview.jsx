@@ -89,13 +89,13 @@ const DashboardOverview = () => {
         const inProgressTasks = tasksData.filter(t => t.status === 'in-progress' || t.status === 'in_progress').length;
 
         setStats({
-          totalUsers: usersData.length,
+          totalUsers: users.length,
           totalProjects: projectsData.length,
-          totalTeams: teamsData.length,
+          totalTeams: teams.length,
           totalProjectManagers: projectManagers,
           activeProjects: projectsData.filter(p => p.status === 'active' || p.status === 'in_progress').length,
           completedProjects: projectsData.filter(p => p.status === 'completed').length,
-          totalTasks: tasksData.length,
+          totalTasks: tasks.length,
           completedTasks,
           pendingTasks,
           inProgressTasks,
@@ -269,6 +269,13 @@ const DashboardOverview = () => {
       icon: "📊",
       bgColor: "bg-purple-50",
       textColor: "text-purple-600",
+    },
+    {
+      title: "Completed Projects",
+      value: stats.completedProjects,
+      icon: "🎉",
+      bgColor: "bg-emerald-50",
+      textColor: "text-emerald-600",
     },
     {
       title: "Total Tasks",

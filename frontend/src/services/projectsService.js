@@ -71,17 +71,28 @@ export const createProject = async (projectData) => {
   return normalizeProject(project);
 };
 
-
-
-// Update project
-// src/services/projectsService.js
-
 // Update project
 export const updateProject = async (id, projectData) => {
   try {
     console.log('Updating project with data:', { id, ...projectData });
     
-    // Convert UI status to backend status
+    // If we're only updating status with a direct backend value
+    if (Object.keys(projectData).length === 1 && projectData.status === 'IN_PROGRESS') {
+      const payload = {
+        status: 'IN_PROGRESS'  // Send directly without mapping
+      };
+      console.log('Sending status-only payload to backend:', payload);
+      
+      const project = await apiClient(`/projects/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      
+      console.log('Project updated successfully:', project);
+      return normalizeProject(project);
+    }
+    
+    // For normal updates with UI status values
     const backendStatus = {
       'planned': 'PLANNED',
       'active': 'IN_PROGRESS',
@@ -90,18 +101,17 @@ export const updateProject = async (id, projectData) => {
       'cancelled': 'CANCELLED'
     }[projectData.status] || 'PLANNED';
 
-    // ✅ Create payload with ONLY fields that exist in schema
+    // Create payload with ONLY fields that exist in schema
     const payload = {
       name: projectData.name,
       description: projectData.description,
       startDate: projectData.startDate,
-      endDate: projectData.endDate,  // ✅ Use endDate, not dueDate
+      endDate: projectData.endDate,
       status: backendStatus,
       teamId: projectData.teamId
-      // ❌ REMOVED dueDate - it doesn't exist in schema
     };
 
-    console.log('Sending payload to backend:', payload);
+    console.log('Sending full payload to backend:', payload);
 
     const project = await apiClient(`/projects/${id}`, {
       method: 'PUT',
