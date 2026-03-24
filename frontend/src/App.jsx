@@ -1,8 +1,8 @@
-// src/App.jsx
-import React from "react";
-import './App.css';
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+// src/router.jsx
+import { createBrowserRouter, Navigate } from 'react-router-dom';
+import React from 'react';
+
+// Auth
 import ProtectedRoute from './auth/ProtectedRoute';
 
 // Public imports
@@ -21,7 +21,6 @@ import ProjectsManagement from './pages/admin/ProjectsManagement';
 import Reports from './pages/admin/Reports';
 import SettingsPage from './pages/admin/SettingsPage';
 import TeamDetailsPage from './pages/admin/TeamDetailsPage';
-
 import AdminNotificationsPage from './Component/admin/AdminNotificationsPage';
 
 // Project Manager imports
@@ -38,7 +37,6 @@ import TaskDetails from './pages/projectManager/TaskDetails';
 import Progress from './pages/projectManager/Progress';
 import Settings from './pages/projectManager/Settings';
 import EditProject from "./pages/projectManager/EditProject";
-
 import ManagerNotificationsPage from './Component/projectmanager/ManagerNotificationsPage';
 
 // Team Member imports
@@ -49,89 +47,229 @@ import TeamMemberTaskDetails from './pages/teamMember/TaskDetails';
 import TeamMemberProgress from './pages/teamMember/Progress';
 import TeamMemberReports from './pages/teamMember/Reports';
 import TeamMemberProfile from './pages/teamMember/Profile';
-
 import TeamMemberNotificationsPage from './Component/teamMember/TeamMemberNotificationsPage';
 
-export default function App() {
-  return (
-    <AuthProvider>
-      <Routes>
-        {/* Public routes */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgetPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
+// Create the router
+export const router = createBrowserRouter([
+  // Public routes
+  {
+    path: "/",
+    element: <LandingPage />,
+  },
+  {
+    path: "/signup",
+    element: <Signup />,
+  },
+  {
+    path: "/login",
+    element: <Login />,
+  },
+  {
+    path: "/forgot-password",
+    element: <ForgetPassword />,
+  },
+  {
+    path: "/reset-password",
+    element: <ResetPassword />,
+  },
 
-        {/* Admin routes - Protected */}
-        <Route path="/admin" element={
-          <ProtectedRoute allowedRoles={['admin']}>
-            <AdminLayout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<DashboardOverview />} />
-          <Route path="users" element={<UsersManagement />} />
-          <Route path="teams" element={<TeamsManagement />} />
-          <Route path="teams/:teamId" element={<TeamDetailsPage />} />
-          <Route path="projects" element={<ProjectsManagement />} />
-          <Route path="reports" element={<Reports />} />
-          <Route path="settings" element={<SettingsPage />} />
-          {/* ADD THIS ROUTE */}
-          <Route path="notifications" element={<AdminNotificationsPage />} />
-        </Route>
+  // Admin routes
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute allowedRoles={['admin']}>
+        <AdminLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <Navigate to="dashboard" replace />,
+      },
+      {
+        path: "dashboard",
+        element: <DashboardOverview />,
+      },
+      {
+        path: "users",
+        element: <UsersManagement />,
+      },
+      {
+        path: "teams",
+        children: [
+          {
+            index: true,
+            element: <TeamsManagement />,
+          },
+          {
+            path: ":teamId",
+            element: <TeamDetailsPage />,
+          },
+        ],
+      },
+      {
+        path: "projects",
+        element: <ProjectsManagement />,
+      },
+      {
+        path: "reports",
+        element: <Reports />,
+      },
+      {
+        path: "settings",
+        element: <SettingsPage />,
+      },
+      {
+        path: "notifications",
+        element: <AdminNotificationsPage />,
+      },
+    ],
+  },
 
-        {/* Project Manager routes - Protected */}
-        <Route path="/manager" element={
-          <ProtectedRoute allowedRoles={['project-manager', 'project_manager', 'admin']}>
-            <ManagerLayout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<ProjectManagerDashboard />} />
-          <Route path="projects" element={<Projects />} />
-          <Route path="projects/create" element={<CreateProject />} />
-          <Route path="projects/:id" element={<ProjectDetails />} />
-          <Route path="projects/edit/:id" element={<EditProject />} />
-          <Route path="tasks" element={<Tasks />} />
-          <Route path="tasks/create" element={<CreateTask />} />
-          <Route path="tasks/edit/:id" element={<EditTask />} />
-          <Route path="tasks/:id" element={<TaskDetails />} />
-          <Route path="progress" element={<Progress />} />
-          <Route path="reports" element={<Reportpm />} />
-          <Route path="settings" element={<Settings />} />
-          {/* ADD THIS ROUTE */}
-          <Route path="notifications" element={<ManagerNotificationsPage />} />
-        </Route>
+  // Project Manager routes
+  {
+    path: "/manager",
+    element: (
+      <ProtectedRoute allowedRoles={['project-manager', 'project_manager', 'admin']}>
+        <ManagerLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <Navigate to="dashboard" replace />,
+      },
+      {
+        path: "dashboard",
+        element: <ProjectManagerDashboard />,
+      },
+      {
+        path: "projects",
+        children: [
+          {
+            index: true,
+            element: <Projects />,
+          },
+          {
+            path: "create",
+            element: <CreateProject />,
+          },
+          {
+            path: ":id",
+            element: <ProjectDetails />,
+          },
+          {
+            path: "edit/:id",
+            element: <EditProject />,
+          },
+        ],
+      },
+      {
+        path: "tasks",
+        children: [
+          {
+            index: true,
+            element: <Tasks />,
+          },
+          {
+            path: "create",
+            element: <CreateTask />,
+          },
+          {
+            path: "edit/:id",
+            element: <EditTask />,
+          },
+          {
+            path: ":id",
+            element: <TaskDetails />,
+          },
+        ],
+      },
+      {
+        path: "progress",
+        element: <Progress />,
+      },
+      {
+        path: "reports",
+        element: <Reportpm />,
+      },
+      {
+        path: "settings",
+        element: <Settings />,
+      },
+      {
+        path: "notifications",
+        element: <ManagerNotificationsPage />,
+      },
+    ],
+  },
 
-        {/* Team Member routes - Protected */}
-        <Route path="/team-member" element={
-          <ProtectedRoute allowedRoles={['team-member', 'team_member', 'admin']}>
-            <TeamMemberLayout />
-          </ProtectedRoute>
-        }>
-          <Route index element={<Navigate to="dashboard" replace />} />
-          <Route path="dashboard" element={<TeamMemberDashboard />} />
-          <Route path="tasks" element={<TeamMemberTasks />} />
-          <Route path="tasks/:id" element={<TeamMemberTaskDetails />} />
-          <Route path="progress" element={<TeamMemberProgress />} />
-          <Route path="reports" element={<TeamMemberReports />} />
-          <Route path="profile" element={<TeamMemberProfile />} />
-          {/* ADD THIS ROUTE */}
-          <Route path="notifications" element={<TeamMemberNotificationsPage />} />
-          <Route path="*" element={<Navigate to="dashboard" replace />} />
-        </Route>
+  // Team Member routes
+  {
+    path: "/team-member",
+    element: (
+      <ProtectedRoute allowedRoles={['team-member', 'team_member', 'admin']}>
+        <TeamMemberLayout />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <Navigate to="dashboard" replace />,
+      },
+      {
+        path: "dashboard",
+        element: <TeamMemberDashboard />,
+      },
+      {
+        path: "tasks",
+        children: [
+          {
+            index: true,
+            element: <TeamMemberTasks />,
+          },
+          {
+            path: ":id",
+            element: <TeamMemberTaskDetails />,
+          },
+        ],
+      },
+      {
+        path: "progress",
+        element: <TeamMemberProgress />,
+      },
+      {
+        path: "reports",
+        element: <TeamMemberReports />,
+      },
+      {
+        path: "profile",
+        element: <TeamMemberProfile />,
+      },
+      {
+        path: "notifications",
+        element: <TeamMemberNotificationsPage />,
+      },
+      {
+        path: "*",
+        element: <Navigate to="dashboard" replace />,
+      },
+    ],
+  },
 
-        {/* Redirect old /dashboard route */}
-        <Route path="/dashboard" element={
-          <ProtectedRoute>
-            <Navigate to="/team-member/dashboard" replace />
-          </ProtectedRoute>
-        } />
+  // Dashboard redirect (for backward compatibility)
+  {
+    path: "/dashboard",
+    element: (
+      <ProtectedRoute>
+        <Navigate to="/team-member/dashboard" replace />
+      </ProtectedRoute>
+    ),
+  },
 
-        {/* Catch-all route - redirect to login */}
-        <Route path="*" element={<Navigate to="/login" />} />
-      </Routes>
-    </AuthProvider>
-  );
-}
+  // Catch all - redirect to login
+  {
+    path: "*",
+    element: <Navigate to="/login" />,
+  },
+]);
