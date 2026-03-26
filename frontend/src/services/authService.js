@@ -22,7 +22,9 @@ export const loginApi = async (email, password) => {
   
   localStorage.setItem("user", JSON.stringify(user));
   // Keep legacy `userData` key in sync for layouts that read it
-  try { localStorage.setItem("userData", JSON.stringify(user)); } catch (e) {}
+  try { localStorage.setItem("userData", JSON.stringify(user)); } catch (e) {
+    console.error("Error setting userData in localStorage:", e);
+  }
   
   return user;
 };
@@ -58,7 +60,9 @@ export const registerApi = async ({ name, email, password }) => {
   }
 
   localStorage.setItem("user", JSON.stringify(user));
-  try { localStorage.setItem("userData", JSON.stringify(user)); } catch (e) {}
+  try { localStorage.setItem("userData", JSON.stringify(user)); } catch (e) {
+    console.error("Error setting userData in localStorage:", e);
+  }
 
   return user;
 };
@@ -93,7 +97,9 @@ export const resetPasswordApi = async (token, newPassword) => {
 
 export const logoutApi = () => {
   localStorage.removeItem("user");
-  try { localStorage.removeItem("userData"); } catch (e) {}
+  try { localStorage.removeItem("userData"); } catch (e) {
+    console.error("Error removing userData from localStorage:", e);
+  }
 };
 
 export const getCurrentUser = () => {
@@ -101,6 +107,6 @@ export const getCurrentUser = () => {
     const userStr = localStorage.getItem("user");
     return userStr ? JSON.parse(userStr) : null;
   } catch (e) {
-    return null;
+    return e.message;
   }
 };

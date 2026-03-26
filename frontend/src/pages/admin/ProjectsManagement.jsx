@@ -1,169 +1,183 @@
-import React, { useState, useEffect } from "react";
-import { apiClient } from "../../services/apiClient";
-import ProjectCard from "../../Component/admin/ProjectCard";
+// src/pages/admin/ProjectsManagement.jsx
+import React, { useState, Suspense } from 'react';
+import { useLoaderData, Await } from 'react-router-dom';
+import ProjectCard from '../../Component/admin/ProjectCard';
+import { projectsLoader, calculateStats } from '../../loader/admin/ProjectsManagement.loader';
 
-const ProjectsManagement = () => {
-  const [projects, setProjects] = useState([]);
-  const [filter, setFilter] = useState("all");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+// Re-export the loader for the route
+export { projectsLoader as loader };
 
-  const normalizeStatus = (status) => {
-    if (!status) return "active";
-
-    if (status === "COMPLETED") return "completed";
-    if (status === "IN_PROGRESS") return "active";
-    if (status === "PLANNED") return "active";
-
-    return status.toLowerCase();
-  };
-
-  useEffect(() => {
-    const fetchProjects = async () => {
-      try {
-        const data = await apiClient('/projects');
-
-        const mappedProjects = data.map((p) => {
-          const totalTasks = Array.isArray(p.tasks) ? p.tasks.length : 0;
-          const completedTasks = Array.isArray(p.tasks)
-            ? p.tasks.filter((t) => t.status === "COMPLETED").length
-            : 0;
-
-          const progress =
-            totalTasks > 0
-              ? Math.round((completedTasks / totalTasks) * 100)
-              : p.status === "COMPLETED"
-              ? 100
-              : 0;
-
-          return {
-            id: p.id,
-            name: p.name,
-            team: p.team?.name || "N/A",
-            manager: `Manager #${p.managerId}`,
-            progress,
-            status: normalizeStatus(p.status),
-            dueDate: new Date(p.endDate).toLocaleDateString(),
-          };
-        });
-
-        setProjects(mappedProjects);
-      } catch (err) {
-        console.error("Project fetch error:", err);
-        setError("Something went wrong.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProjects();
-  }, []);
-
-  const filteredProjects =
-    filter === "all"
-      ? projects
-      : projects.filter((project) => project.status === filter);
-
-  const stats = {
-    total: projects.length,
-    active: projects.filter((p) => p.status === "active").length,
-    completed: projects.filter((p) => p.status === "completed").length,
-    averageProgress:
-      projects.length > 0
-        ? Math.round(
-            projects.reduce((sum, p) => sum + p.progress, 0) /
-              projects.length
-          )
-        : 0,
-  };
-
-  if (loading) {
-    return <div className="text-center py-10">Loading projects...</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="text-center text-red-500 py-10 font-medium">
-        {error}
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          Project Management
-        </h1>
-        <p className="text-gray-600">
-          View and monitor all projects across teams
-        </p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total Projects" value={stats.total} />
-        <StatCard title="Active Projects" value={stats.active} />
-        <StatCard title="Completed" value={stats.completed} />
-        <StatCard
-          title="Avg. Progress"
-          value={`${stats.averageProgress}%`}
-        />
-      </div>
-
-      {/* Filter & Projects */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-bold text-gray-900">
-            All Projects
-          </h2>
-
-          <div className="flex space-x-2">
-            {["all", "active", "completed"].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className={`px-4 py-2 rounded-lg ${
-                  filter === f
-                    ? "bg-[#4DA5AD] text-white"
-                    : "bg-gray-100 text-gray-700"
-                }`}
-              >
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </button>
-            ))}
-          </div>
+// Loading skeleton component
+const ProjectsSkeleton = () => (
+  <div className="space-y-6">
+    <div>
+      <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
+      <div className="h-4 w-64 bg-gray-200 rounded mt-2 animate-pulse"></div>
+    </div>
+    
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="h-8 w-16 bg-gray-200 rounded animate-pulse mb-2"></div>
+          <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
+      ))}
+    </div>
+    
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+      <div className="flex justify-between items-center mb-6">
+        <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div>
+        <div className="flex space-x-2">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-10 w-20 bg-gray-200 rounded animate-pulse"></div>
           ))}
         </div>
-
-        {filteredProjects.length === 0 && (
-          <div className="text-center py-12">
-            <div className="text-gray-400 text-6xl mb-4">📁</div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No projects found
-            </h3>
-            <p className="text-gray-500">
-              Try selecting a different filter
-            </p>
-          </div>
-        )}
       </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-gray-100 rounded-xl p-6 animate-pulse">
+            <div className="h-6 w-32 bg-gray-200 rounded mb-3"></div>
+            <div className="h-4 w-24 bg-gray-200 rounded mb-2"></div>
+            <div className="h-4 w-40 bg-gray-200 rounded"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// Error component
+const ProjectsError = ({ error, onRetry }) => (
+  <div className="flex justify-center items-center min-h-[400px]">
+    <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md text-center">
+      <h3 className="text-lg font-semibold text-red-800 mb-2">Failed to Load Projects</h3>
+      <p className="text-red-600 mb-4">{error?.message || 'An error occurred while loading projects'}</p>
+      <button
+        onClick={onRetry}
+        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+      >
+        Retry
+      </button>
+    </div>
+  </div>
+);
+
+// Empty state component
+const ProjectsEmpty = ({ filter, onClearFilter }) => (
+  <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+    <div className="text-gray-400 text-6xl mb-4">📁</div>
+    <h3 className="text-lg font-medium text-gray-900 mb-2">
+      {filter !== 'all' ? 'No projects found' : 'No projects yet'}
+    </h3>
+    <p className="text-gray-500 mb-4">
+      {filter !== 'all' 
+        ? `No ${filter} projects available. Try a different filter.` 
+        : 'Create your first project to get started.'}
+    </p>
+    {filter !== 'all' && (
+      <button
+        onClick={onClearFilter}
+        className="px-4 py-2 text-[#4DA5AD] hover:underline"
+      >
+        Show all projects
+      </button>
+    )}
+  </div>
+);
+
+// Stat Card Component
+const StatCard = ({ title, value, color = "gray" }) => {
+  const colorClasses = {
+    gray: "text-gray-900",
+    green: "text-green-600",
+    blue: "text-blue-600",
+    purple: "text-purple-600"
+  };
+  
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+      <div className={`text-2xl font-bold ${colorClasses[color]} mb-2`}>{value}</div>
+      <p className="font-medium text-gray-900">{title}</p>
     </div>
   );
 };
 
-const StatCard = ({ title, value }) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-    <div className="text-2xl font-bold text-gray-900 mb-2">
-      {value}
-    </div>
-    <p className="font-medium text-gray-900">{title}</p>
-  </div>
-);
+const ProjectsManagement = () => {
+  const loaderData = useLoaderData();
+  const [filter, setFilter] = useState("all");
+
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
+  const handleClearFilter = () => {
+    setFilter("all");
+  };
+
+  return (
+    <Suspense fallback={<ProjectsSkeleton />}>
+      <Await 
+        resolve={loaderData.projects}
+        errorElement={<ProjectsError error={{ message: 'Failed to load projects data' }} onRetry={handleRetry} />}
+      >
+        {(projects) => {
+          const safeProjects = Array.isArray(projects) ? projects : [];
+          const stats = calculateStats(safeProjects);
+          
+          const filteredProjects = filter === "all"
+            ? safeProjects
+            : safeProjects.filter((project) => project.status === filter);
+
+          return (
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900 mb-2">Project Management</h1>
+                <p className="text-gray-600">View and monitor all projects across teams</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <StatCard title="Total Projects" value={stats.total} color="gray" />
+                <StatCard title="Active Projects" value={stats.active} color="green" />
+                <StatCard title="Completed" value={stats.completed} color="blue" />
+                <StatCard title="Avg. Progress" value={`${stats.averageProgress}%`} color="purple" />
+              </div>
+
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                  <h2 className="text-lg font-bold text-gray-900">All Projects</h2>
+                  <div className="flex space-x-2">
+                    {["all", "active", "completed"].map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setFilter(f)}
+                        className={`px-4 py-2 rounded-lg transition-all ${
+                          filter === f
+                            ? "bg-[#4DA5AD] text-white shadow-md"
+                            : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        }`}
+                      >
+                        {f.charAt(0).toUpperCase() + f.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {filteredProjects.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredProjects.map((project) => (
+                      <ProjectCard key={project.id} project={project} />
+                    ))}
+                  </div>
+                ) : (
+                  <ProjectsEmpty filter={filter} onClearFilter={handleClearFilter} />
+                )}
+              </div>
+            </div>
+          );
+        }}
+      </Await>
+    </Suspense>
+  );
+};
 
 export default ProjectsManagement;

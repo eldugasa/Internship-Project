@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+// src/pages/projectManager/Projects.jsx
+import React, { useState, Suspense } from 'react';
+import { useNavigate, useLoaderData, Await } from 'react-router-dom';
 import { 
   Plus, Search, Filter, Trash2, X, 
   FolderKanban, Calendar, Clock, Users,
@@ -7,503 +8,14 @@ import {
   BarChart3, Eye, Edit, MoreVertical,
   Download, RefreshCw
 } from 'lucide-react';
-import { getProjects, deleteProject, updateProject } from '../../services/projectsService'; // Added updateProject import
-import { getTeams } from '../../services/teamsService';
+import { deleteProject } from '../../services/projectsService';
+import { projectsLoader, calculateStats, isOverdue, parseDate } from '../../loader/manager/Projects.loader';
 
-const Projects = () => {
-  const navigate = useNavigate();
-  const [projects, setProjects] = useState([]);
-  const [teams, setTeams] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [viewMode, setViewMode] = useState('grid');
-  const [sortBy, setSortBy] = useState('deadline');
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    completed: 0,
-    planned: 0,
-    overdue: 0
-  });
-
-  // Date parsing helper for DD/MM/YYYY format
-  const parseDate = (dateStr) => {
-    if (!dateStr) return null;
-    
-    try {
-      if (typeof dateStr === 'string' && dateStr.includes('/')) {
-        const [day, month, year] = dateStr.split('/');
-        return new Date(`${year}-${month}-${day}`);
-      }
-      return new Date(dateStr);
-    } catch {
-      return null;
-    }
-  };
-
-  // ===== NEW: Auto-activation function =====
-  const activateProjectsByStartDate = async (projectsList) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    let hasChanges = false;
-    let activatedCount = 0;
-    
-    const updatedProjects = await Promise.all(projectsList.map(async (project) => {
-      // Only check planned projects
-      if (project.status !== 'planned') return project;
-      
-      const startDate = parseDate(project.startDate);
-      if (!startDate) return project;
-      
-      startDate.setHours(0, 0, 0, 0);
-      
-      // If start date is today or in the past, activate it
-      if (startDate <= today) {
-        try {
-          console.log(`Auto-activating project: ${project.name}`);
-          
-          // ONLY update the status - everything else stays the same
-          await updateProject(project.id, { 
-            status: 'IN_PROGRESS' 
-          });
-          
-          hasChanges = true;
-          activatedCount++;
-          
-          // Update local state with 'active' for UI
-          return { 
-            ...project, 
-            status: 'active' 
-          };
-        } catch (err) {
-          console.error(`Error activating project ${project.name}:`, err);
-          return project;
-        }
-      }
-      return project;
-    }));
-    
-    if (activatedCount > 0) {
-      console.log(`Activated ${activatedCount} project(s)`);
-    }
-    
-    return { updatedProjects, hasChanges };
-  };
-  // ===== END NEW FUNCTION =====
-
-  // Check if project is overdue
-  const isOverdue = (project) => {
-    if (project.status === 'completed') return false;
-    
-    const deadlineStr = project.dueDate || project.endDate;
-    if (!deadlineStr) return false;
-    
-    const deadlineDate = parseDate(deadlineStr);
-    if (!deadlineDate) return false;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    deadlineDate.setHours(0, 0, 0, 0);
-    
-    return deadlineDate < today;
-  };
-
-  // Calculate statistics
-  const calculateStats = (projectsData) => {
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    
-    const overdue = projectsData.filter(p => isOverdue(p)).length;
-
-    setStats({
-      total: projectsData.length,
-      active: projectsData.filter(p => p.status === 'active').length,
-      completed: projectsData.filter(p => p.status === 'completed').length,
-      planned: projectsData.filter(p => p.status === 'planned').length,
-      overdue: overdue
-    });
-  };
-
-  useEffect(() => {
-    fetchProjects();
-    
-    // ===== NEW: Set up interval to check for activation every minute =====
-    const interval = setInterval(async () => {
-      if (projects.length > 0) {
-        const { updatedProjects, hasChanges } = await activateProjectsByStartDate(projects);
-        if (hasChanges) {
-          setProjects(updatedProjects);
-          calculateStats(updatedProjects);
-        }
-      }
-    }, 60000); // Check every minute
-    
-    return () => clearInterval(interval);
-    // ===== END NEW INTERVAL =====
-  }, []); // Empty dependency array - runs once on mount
-
-  const fetchProjects = async () => {
-    setLoading(true);
-    try {
-      const [projectsData, teamsData] = await Promise.all([
-        getProjects(),
-        getTeams()
-      ]);
-      
-      const teamMap = {};
-      teamsData.forEach(team => {
-        const teamId = team.id || team._id;
-        if (teamId) {
-          teamMap[teamId] = team.name;
-        }
-      });
-      
-      let projectsWithTeams = projectsData.map(project => {
-        let teamName = 'Unassigned';
-        
-        if (project.teamName) {
-          teamName = project.teamName;
-        } else if (project.team && project.team.name) {
-          teamName = project.team.name;
-        } else {
-          const possibleTeamIds = [
-            project.teamId,
-            project.team_id,
-            project.team?._id,
-            project.team?.id
-          ].filter(id => id != null);
-          
-          for (const tid of possibleTeamIds) {
-            if (teamMap[tid]) {
-              teamName = teamMap[tid];
-              break;
-            }
-          }
-        }
-        
-        return {
-          ...project,
-          teamName: teamName
-        };
-      });
-      
-      // ===== NEW: Auto-activate projects on initial load =====
-      const { updatedProjects } = await activateProjectsByStartDate(projectsWithTeams);
-      // ===== END NEW ACTIVATION =====
-      
-      setTeams(teamsData);
-      setProjects(updatedProjects);
-      calculateStats(updatedProjects);
-      
-    } catch (err) {
-      console.error('Error fetching projects:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filter projects
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = searchQuery === '' || 
-      project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
-    
-    return matchesSearch && matchesStatus;
-  });
-
-  // Sort projects
-  const sortedProjects = [...filteredProjects].sort((a, b) => {
-    switch(sortBy) {
-      case 'deadline': {
-        const dateA = parseDate(a.dueDate || a.endDate);
-        const dateB = parseDate(b.dueDate || b.endDate);
-        if (!dateA && !dateB) return 0;
-        if (!dateA) return 1;
-        if (!dateB) return -1;
-        return dateA - dateB;
-      }
-      case 'progress':
-        return (b.progress || 0) - (a.progress || 0);
-      case 'name':
-        return (a.name || '').localeCompare(b.name || '');
-      default:
-        return 0;
-    }
-  });
-
-  const handleDeleteProject = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this project?')) return;
-    try {
-      await deleteProject(id);
-      const updatedProjects = projects.filter(p => p.id !== id);
-      setProjects(updatedProjects);
-      calculateStats(updatedProjects);
-    } catch (err) {
-      console.error('Error deleting project:', err);
-    }
-  };
-
-  const getStatusBadge = (status) => {
-    const config = {
-      active: { color: 'bg-green-100 text-green-800', label: 'Active', icon: TrendingUp },
-      completed: { color: 'bg-blue-100 text-blue-800', label: 'Completed', icon: CheckCircle },
-      planned: { color: 'bg-purple-100 text-purple-800', label: 'Planned', icon: Calendar },
-      'on-hold': { color: 'bg-yellow-100 text-yellow-800', label: 'On Hold', icon: AlertCircle }
-    };
-    const statusConfig = config[status] || config.planned;
-    const Icon = statusConfig.icon;
-    return (
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
-        <Icon className="w-3 h-3 mr-1" />
-        {statusConfig.label}
-      </span>
-    );
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="w-20 h-20 border-4 border-[#4DA5AD] border-t-transparent rounded-full animate-spin mx-auto"></div>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <FolderKanban className="w-8 h-8 text-[#4DA5AD] animate-pulse" />
-            </div>
-          </div>
-          <p className="mt-4 text-gray-600 font-medium">Loading your projects...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="p-6 max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Projects Dashboard</h1>
-              <p className="text-gray-600 mt-1">Manage and monitor all your projects in one place</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={fetchProjects}
-                className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                title="Refresh"
-              >
-                <RefreshCw className="w-5 h-5 text-gray-600" />
-              </button>
-              <button
-                onClick={() => navigate('/manager/projects/create')}
-                className="px-4 py-2 bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                <span>New Project</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
-            <StatCard 
-              title="Total Projects" 
-              value={stats.total} 
-              icon={FolderKanban} 
-              color="bg-blue-500"
-              bgColor="bg-blue-50"
-            />
-            <StatCard 
-              title="Active" 
-              value={stats.active} 
-              icon={TrendingUp} 
-              color="bg-green-500"
-              bgColor="bg-green-50"
-            />
-            <StatCard 
-              title="Completed" 
-              value={stats.completed} 
-              icon={CheckCircle} 
-              color="bg-emerald-500"
-              bgColor="bg-emerald-50"
-            />
-            <StatCard 
-              title="Planned" 
-              value={stats.planned} 
-              icon={Calendar} 
-              color="bg-purple-500"
-              bgColor="bg-purple-50"
-            />
-            <StatCard 
-              title="Overdue" 
-              value={stats.overdue} 
-              icon={AlertCircle} 
-              color="bg-red-500"
-              bgColor="bg-red-50"
-            />
-          </div>
-        </div>
-
-        {/* Filters & Search Bar */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search projects by name or description..."
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
-              />
-            </div>
-
-            <div className="flex items-center gap-3">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] bg-white"
-              >
-                <option value="all">All Status</option>
-                <option value="active">Active</option>
-                <option value="planned">Planned</option>
-                <option value="completed">Completed</option>
-                <option value="on-hold">On Hold</option>
-              </select>
-
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] bg-white"
-              >
-                <option value="deadline">Sort by Deadline</option>
-                <option value="progress">Sort by Progress</option>
-                <option value="name">Sort by Name</option>
-              </select>
-
-              <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setViewMode('grid')}
-                  className={`p-2.5 ${viewMode === 'grid' ? 'bg-[#4DA5AD] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                >
-                  <BarChart3 className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`p-2.5 ${viewMode === 'list' ? 'bg-[#4DA5AD] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                >
-                  <Filter className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Projects Grid/List */}
-        {sortedProjects.length > 0 ? (
-          viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {sortedProjects.map(project => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  onDelete={handleDeleteProject}
-                  onView={() => navigate(`/manager/projects/${project.id}`)}
-                  getStatusBadge={getStatusBadge}
-                  isOverdue={isOverdue}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Project</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deadline</th>
-                    <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {sortedProjects.map(project => (
-                    <tr key={project.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="font-medium text-gray-900">{project.name}</div>
-                          {project.description && (
-                            <div className="text-sm text-gray-500 truncate max-w-xs">{project.description}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">
-                          {project.teamName || 'Unassigned'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">{getStatusBadge(project.status)}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-24 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-[#4DA5AD] h-2 rounded-full transition-all"
-                              style={{ width: `${project.progress || 0}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-gray-600">{project.progress || 0}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className={`text-sm ${isOverdue(project) ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
-                            {project.dueDate || project.endDate || 'N/A'}
-                            {isOverdue(project) && ' (Overdue)'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => navigate(`/manager/projects/${project.id}`)}
-                            className="p-2 text-[#4DA5AD] hover:bg-[#4DA5AD]/10 rounded-lg transition-colors"
-                          >
-                            <Eye className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteProject(project.id)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-5 h-5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )
-        ) : (
-          <EmptyState 
-            searchQuery={searchQuery} 
-            onClear={() => setSearchQuery('')}
-            onCreate={() => navigate('/manager/projects/create')}
-          />
-        )}
-      </div>
-    </div>
-  );
-};
+// Re-export the loader for the route
+export { projectsLoader as loader };
 
 // Stat Card Component
-const StatCard = ({ title, value, icon: Icon, color, bgColor }) => (
+const StatCard = ({ title, value, icon: Icon,  color, bgColor }) => (
   <div className={`${bgColor} rounded-xl p-4 border border-gray-200/50 hover:shadow-md transition-all`}>
     <div className="flex items-center justify-between">
       <div>
@@ -517,6 +29,78 @@ const StatCard = ({ title, value, icon: Icon, color, bgColor }) => (
   </div>
 );
 
+// Loading skeleton component
+const ProjectsSkeleton = () => (
+  <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="p-6 max-w-7xl mx-auto">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <div>
+          <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-4 w-64 bg-gray-200 rounded mt-2 animate-pulse"></div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 bg-gray-200 rounded-lg animate-pulse"></div>
+          <div className="h-10 w-32 bg-gray-200 rounded-lg animate-pulse"></div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="bg-white rounded-xl p-4">
+            <div className="h-12 w-12 bg-gray-200 rounded-lg animate-pulse mb-2"></div>
+            <div className="h-6 w-12 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-4 w-20 bg-gray-200 rounded mt-1 animate-pulse"></div>
+          </div>
+        ))}
+      </div>
+      
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+        <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex-1 h-10 bg-gray-200 rounded animate-pulse"></div>
+          <div className="flex gap-3">
+            <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-32 h-10 bg-gray-200 rounded animate-pulse"></div>
+            <div className="w-24 h-10 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-3"></div>
+            <div className="h-4 w-full bg-gray-200 rounded animate-pulse mb-4"></div>
+            <div className="h-2 w-full bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// Error component
+const ProjectsError = ({ error, onRetry }) => {
+  const errorMessage = error?.message || error || 'Unable to load projects';
+  const isAuthError = errorMessage.toLowerCase().includes('auth') || errorMessage.toLowerCase().includes('login') || errorMessage.toLowerCase().includes('401');
+  
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md text-center">
+        <div className="text-5xl mb-4">{isAuthError ? '🔐' : '⚠️'}</div>
+        <h3 className="text-lg font-semibold text-red-800 mb-2">
+          {isAuthError ? 'Authentication Required' : 'Failed to Load Projects'}
+        </h3>
+        <p className="text-red-600 mb-6">{errorMessage}</p>
+        <div className="flex gap-3 justify-center">
+          <button onClick={onRetry} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
+            {isAuthError ? 'Go to Login' : 'Retry'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Project Card Component
 const ProjectCard = ({ project, onDelete, onView, getStatusBadge, isOverdue }) => {
   const [showMenu, setShowMenu] = useState(false);
@@ -525,7 +109,6 @@ const ProjectCard = ({ project, onDelete, onView, getStatusBadge, isOverdue }) =
   return (
     <div className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
       <div className="p-6">
-        {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
             <div className="flex items-center gap-2 mb-2">
@@ -537,30 +120,15 @@ const ProjectCard = ({ project, onDelete, onView, getStatusBadge, isOverdue }) =
             )}
           </div>
           <div className="relative">
-            <button
-              onClick={() => setShowMenu(!showMenu)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
+            <button onClick={() => setShowMenu(!showMenu)} className="p-2 hover:bg-gray-100 rounded-lg">
               <MoreVertical className="w-5 h-5 text-gray-500" />
             </button>
             {showMenu && (
               <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-                <button
-                  onClick={() => {
-                    onView();
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                >
+                <button onClick={() => { onView(); setShowMenu(false); }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
                   <Eye className="w-4 h-4" /> View Details
                 </button>
-                <button
-                  onClick={() => {
-                    onDelete(project.id);
-                    setShowMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                >
+                <button onClick={() => { onDelete(project.id); setShowMenu(false); }} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
                   <Trash2 className="w-4 h-4" /> Delete Project
                 </button>
               </div>
@@ -568,32 +136,25 @@ const ProjectCard = ({ project, onDelete, onView, getStatusBadge, isOverdue }) =
           </div>
         </div>
 
-        {/* Status Badge */}
         <div className="mb-4 flex items-center justify-between">
           {getStatusBadge(project.status)}
           {overdue && (
             <span className="flex items-center gap-1 text-xs text-red-600 bg-red-50 px-2 py-1 rounded-full">
-              <AlertCircle className="w-3 h-3" />
-              Overdue
+              <AlertCircle className="w-3 h-3" /> Overdue
             </span>
           )}
         </div>
 
-        {/* Progress */}
         <div className="mb-4">
           <div className="flex justify-between items-center mb-2">
             <span className="text-sm font-medium text-gray-700">Progress</span>
             <span className="text-sm font-semibold text-[#4DA5AD]">{project.progress || 0}%</span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-            <div 
-              className="bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] h-2.5 rounded-full transition-all duration-500"
-              style={{ width: `${project.progress || 0}%` }}
-            />
+            <div className="bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] h-2.5 rounded-full" style={{ width: `${project.progress || 0}%` }} />
           </div>
         </div>
 
-        {/* Project Info */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-gray-50 rounded-lg p-3">
             <Clock className="w-4 h-4 text-gray-400 mb-1" />
@@ -607,7 +168,6 @@ const ProjectCard = ({ project, onDelete, onView, getStatusBadge, isOverdue }) =
           </div>
         </div>
 
-        {/* Timeline */}
         <div className="flex items-center gap-2 text-sm text-gray-500 border-t border-gray-100 pt-4">
           <Calendar className="w-4 h-4 text-gray-400" />
           <span>Start: {project.startDate || 'N/A'}</span>
@@ -617,14 +177,9 @@ const ProjectCard = ({ project, onDelete, onView, getStatusBadge, isOverdue }) =
           <span>Deadline: {project.dueDate || project.endDate || 'N/A'}</span>
         </div>
 
-        {/* Actions */}
         <div className="flex gap-2 mt-4">
-          <button
-            onClick={onView}
-            className="flex-1 px-4 py-2.5 bg-[#4DA5AD]/10 text-[#4DA5AD] rounded-lg hover:bg-[#4DA5AD] hover:text-white transition-all duration-300 font-medium text-sm flex items-center justify-center gap-2"
-          >
-            <Eye className="w-4 h-4" />
-            View Details
+          <button onClick={onView} className="flex-1 px-4 py-2.5 bg-[#4DA5AD]/10 text-[#4DA5AD] rounded-lg hover:bg-[#4DA5AD] hover:text-white transition-all duration-300 font-medium text-sm flex items-center justify-center gap-2">
+            <Eye className="w-4 h-4" /> View Details
           </button>
         </div>
       </div>
@@ -642,10 +197,7 @@ const EmptyState = ({ searchQuery, onClear, onCreate }) => (
         </div>
         <h3 className="text-xl font-bold text-gray-900 mb-2">No results found</h3>
         <p className="text-gray-500 mb-6">No projects match "{searchQuery}"</p>
-        <button
-          onClick={onClear}
-          className="px-6 py-2.5 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition-colors font-medium"
-        >
+        <button onClick={onClear} className="px-6 py-2.5 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition-colors font-medium">
           Clear Search
         </button>
       </>
@@ -656,16 +208,194 @@ const EmptyState = ({ searchQuery, onClear, onCreate }) => (
         </div>
         <h3 className="text-xl font-bold text-gray-900 mb-2">No projects yet</h3>
         <p className="text-gray-500 mb-6">Get started by creating your first project</p>
-        <button
-          onClick={onCreate}
-          className="px-6 py-2.5 bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] text-white rounded-lg hover:shadow-lg transition-all font-medium inline-flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Create Project
+        <button onClick={onCreate} className="px-6 py-2.5 bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] text-white rounded-lg hover:shadow-lg transition-all font-medium inline-flex items-center gap-2">
+          <Plus className="w-5 h-5" /> Create Project
         </button>
       </>
     )}
   </div>
 );
+
+const Projects = () => {
+  const navigate = useNavigate();
+  const loaderData = useLoaderData();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [viewMode, setViewMode] = useState('grid');
+  const [sortBy, setSortBy] = useState('deadline');
+
+  const handleDeleteProject = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this project?')) return;
+    try {
+      await deleteProject(id);
+      window.location.reload();
+    } catch (err) {
+      console.error('Error deleting project:', err);
+      alert(err.message || 'Failed to delete project');
+    }
+  };
+
+  const getStatusBadge = (status) => {
+    const config = {
+      active: { color: 'bg-green-100 text-green-800', label: 'Active', icon: TrendingUp },
+      completed: { color: 'bg-blue-100 text-blue-800', label: 'Completed', icon: CheckCircle },
+      planned: { color: 'bg-purple-100 text-purple-800', label: 'Planned', icon: Calendar },
+      'on-hold': { color: 'bg-yellow-100 text-yellow-800', label: 'On Hold', icon: AlertCircle }
+    };
+    const statusConfig = config[status] || config.planned;
+    const Icon = statusConfig.icon;
+    return (
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.color}`}>
+        <Icon className="w-3 h-3 mr-1" /> {statusConfig.label}
+      </span>
+    );
+  };
+
+  const handleRetry = () => {
+    window.location.reload();
+  };
+
+  if (!loaderData) {
+    return <ProjectsError error="No data received from server" onRetry={handleRetry} />;
+  }
+
+  return (
+    <Suspense fallback={<ProjectsSkeleton />}>
+      <Await 
+        resolve={loaderData.projects}
+        errorElement={<ProjectsError error="Failed to load projects data" onRetry={handleRetry} />}
+      >
+        {(projects) => {
+          const safeProjects = Array.isArray(projects) ? projects : [];
+          const stats = calculateStats(safeProjects);
+          
+          const filteredProjects = safeProjects.filter(project => {
+            const matchesSearch = searchQuery === '' || 
+              project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()));
+            const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
+            return matchesSearch && matchesStatus;
+          });
+
+          const sortedProjects = [...filteredProjects].sort((a, b) => {
+            switch(sortBy) {
+              case 'deadline': {
+                const dateA = parseDate(a.dueDate || a.endDate);
+                const dateB = parseDate(b.dueDate || b.endDate);
+                if (!dateA && !dateB) return 0;
+                if (!dateA) return 1;
+                if (!dateB) return -1;
+                return dateA - dateB;
+              }
+              case 'progress':
+                return (b.progress || 0) - (a.progress || 0);
+              case 'name':
+                return (a.name || '').localeCompare(b.name || '');
+              default:
+                return 0;
+            }
+          });
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+              <div className="p-6 max-w-7xl mx-auto">
+                {/* Header Section */}
+                <div className="mb-8">
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <div>
+                      <h1 className="text-3xl font-bold text-gray-900">Projects Dashboard</h1>
+                      <p className="text-gray-600 mt-1">Manage and monitor all your projects in one place</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button onClick={handleRetry} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50" title="Refresh">
+                        <RefreshCw className="w-5 h-5 text-gray-600" />
+                      </button>
+                      <button onClick={() => navigate('/manager/projects/create')} className="px-4 py-2 bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2">
+                        <Plus className="w-5 h-5" /> New Project
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-6">
+                    <StatCard title="Total Projects" value={stats.total} icon={FolderKanban} color="bg-blue-500" bgColor="bg-blue-50" />
+                    <StatCard title="Active" value={stats.active} icon={TrendingUp} color="bg-green-500" bgColor="bg-green-50" />
+                    <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="bg-emerald-500" bgColor="bg-emerald-50" />
+                    <StatCard title="Planned" value={stats.planned} icon={Calendar} color="bg-purple-500" bgColor="bg-purple-50" />
+                    <StatCard title="Overdue" value={stats.overdue} icon={AlertCircle} color="bg-red-500" bgColor="bg-red-50" />
+                  </div>
+                </div>
+
+                {/* Filters & Search Bar */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
+                  <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search projects by name or description..." className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent" />
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] bg-white">
+                        <option value="all">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="planned">Planned</option>
+                        <option value="completed">Completed</option>
+                        <option value="on-hold">On Hold</option>
+                      </select>
+                      <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] bg-white">
+                        <option value="deadline">Sort by Deadline</option>
+                        <option value="progress">Sort by Progress</option>
+                        <option value="name">Sort by Name</option>
+                      </select>
+                      <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                        <button onClick={() => setViewMode('grid')} className={`p-2.5 ${viewMode === 'grid' ? 'bg-[#4DA5AD] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                          <BarChart3 className="w-5 h-5" />
+                        </button>
+                        <button onClick={() => setViewMode('list')} className={`p-2.5 ${viewMode === 'list' ? 'bg-[#4DA5AD] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                          <Filter className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Projects Grid/List */}
+                {sortedProjects.length > 0 ? (
+                  viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {sortedProjects.map(project => (
+                        <ProjectCard key={project.id} project={project} onDelete={handleDeleteProject} onView={() => navigate(`/manager/projects/${project.id}`)} getStatusBadge={getStatusBadge} isOverdue={isOverdue} />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50">
+                          <tr><th className="px-6 py-4 text-left text-xs font-medium text-gray-500">Project</th><th className="px-6 py-4 text-left text-xs font-medium text-gray-500 hidden sm:table-cell">Team</th><th className="px-6 py-4 text-left text-xs font-medium text-gray-500">Status</th><th className="px-6 py-4 text-left text-xs font-medium text-gray-500">Progress</th><th className="px-6 py-4 text-left text-xs font-medium text-gray-500">Deadline</th><th className="px-6 py-4 text-left text-xs font-medium text-gray-500">Actions</th></tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {sortedProjects.map(project => (
+                            <tr key={project.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4"><div className="font-medium text-gray-900">{project.name}</div>{project.description && <div className="text-sm text-gray-500 truncate max-w-xs">{project.description}</div>}</td>
+                              <td className="px-6 py-4 hidden sm:table-cell"><span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm">{project.teamName || 'Unassigned'}</span></td>
+                              <td className="px-6 py-4">{getStatusBadge(project.status)}</td>
+                              <td className="px-6 py-4"><div className="flex items-center gap-3"><div className="w-24 bg-gray-200 rounded-full h-2"><div className="bg-[#4DA5AD] h-2 rounded-full" style={{ width: `${project.progress || 0}%` }} /></div><span className="text-sm text-gray-600">{project.progress || 0}%</span></div></td>
+                              <td className="px-6 py-4"><div className="flex items-center gap-2"><Calendar className="w-4 h-4 text-gray-400" /><span className={`text-sm ${isOverdue(project) ? 'text-red-600 font-bold' : 'text-gray-600'}`}>{project.dueDate || project.endDate || 'N/A'}{isOverdue(project) && ' (Overdue)'}</span></div></td>
+                              <td className="px-6 py-4"><div className="flex items-center gap-2"><button onClick={() => navigate(`/manager/projects/${project.id}`)} className="p-2 text-[#4DA5AD] hover:bg-[#4DA5AD]/10 rounded-lg"><Eye className="w-5 h-5" /></button><button onClick={() => handleDeleteProject(project.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 className="w-5 h-5" /></button></div></td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )
+                ) : (
+                  <EmptyState searchQuery={searchQuery} onClear={() => setSearchQuery('')} onCreate={() => navigate('/manager/projects/create')} />
+                )}
+              </div>
+            </div>
+          );
+        }}
+      </Await>
+    </Suspense>
+  );
+};
 
 export default Projects;

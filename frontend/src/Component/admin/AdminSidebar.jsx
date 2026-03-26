@@ -18,7 +18,7 @@ const AdminSidebar = ({ collapsed, onToggle, onClose, isMobile }) => {
   const navigate = useNavigate();
 
   const menuItems = [
-    { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/users', label: 'Users', icon: Users },
     { path: '/admin/teams', label: 'Teams', icon: UsersRound },
     { path: '/admin/projects', label: 'Projects', icon: FolderKanban },
@@ -110,7 +110,8 @@ const AdminSidebar = ({ collapsed, onToggle, onClose, isMobile }) => {
               <NavLink
                 key={item.path}
                 to={item.path}
-                end={item.path === '/admin'}
+                end={item.path === 'admin/dashboard'}
+                aria-current={item.path === 'admin/Dashboard'}
                 onClick={handleNavClick}
                 className={({ isActive }) =>
                   `flex items-center ${collapsed && !isMobile ? 'justify-center' : 'px-3'} py-2.5 text-sm font-medium rounded-lg transition-all ${

@@ -4,6 +4,7 @@ import React from 'react';
 
 // Auth
 import ProtectedRoute from './auth/ProtectedRoute';
+import ErrorPage from './pages/ErrorPage';
 
 // Public imports
 import LandingPage from "./LandingPage";
@@ -14,28 +15,28 @@ import ResetPassword from './auth/ResetPassword';
 
 // Admin imports
 import AdminLayout from './Component/admin/AdminLayout';
-import DashboardOverview from './pages/admin/DashboardOverview';
-import UsersManagement from './pages/admin/UsersManagement';
-import TeamsManagement from './pages/admin/TeamsManagement';
-import ProjectsManagement from './pages/admin/ProjectsManagement';
-import Reports from './pages/admin/Reports';
-import SettingsPage from './pages/admin/SettingsPage';
-import TeamDetailsPage from './pages/admin/TeamDetailsPage';
+import DashboardOverview, { loader as dashboardLoader } from './pages/admin/DashboardOverview';
+import UsersManagement, { loader as usersLoader }from './pages/admin/UsersManagement';
+import TeamsManagement, { loader as teamsLoader } from './pages/admin/TeamsManagement';
+import ProjectsManagement, { loader as projectsLoader } from './pages/admin/ProjectsManagement';
+import Reports, { loader as reportsLoader } from './pages/admin/Reports';
+import SettingsPage, { loader as settingsLoader }from './pages/admin/SettingsPage';
+import TeamDetailsPage, { loader as teamDetailsLoader } from './pages/admin/TeamDetailsPage';
 import AdminNotificationsPage from './Component/admin/AdminNotificationsPage';
 
 // Project Manager imports
 import ManagerLayout from './Component/projectmanager/PromanagerLayout';
-import ProjectManagerDashboard from './pages/projectManager/ProjectManagerDashboard';
-import Projects from './pages/projectManager/Projects';
+import ProjectManagerDashboard, { loader as pmdashboardLoader } from './pages/projectManager/ProjectManagerDashboard';
+import Projects, { loader as pmprojectsLoader } from './pages/projectManager/Projects';
 import CreateProject from './pages/projectManager/CreateProject';
 import ProjectDetails from './pages/projectManager/ProjectDetails';
-import Tasks from './pages/projectManager/Tasks';
-import Reportpm from './pages/projectManager/Reports';
+import Tasks, { loader as pmtasksLoader } from './pages/projectManager/Tasks';
+import Reportpm, { loader as reportpmLoader } from './pages/projectManager/Reports';
 import CreateTask from './pages/projectManager/CreateTask';
 import EditTask from './pages/projectManager/EditTask';
 import TaskDetails from './pages/projectManager/TaskDetails';
-import Progress from './pages/projectManager/Progress';
-import Settings from './pages/projectManager/Settings';
+import Progress, { loader as pmprogressLoader } from './pages/projectManager/Progress';
+import Settings, { loader as settingspmLoader } from './pages/projectManager/Settings';
 import EditProject from "./pages/projectManager/EditProject";
 import ManagerNotificationsPage from './Component/projectmanager/ManagerNotificationsPage';
 
@@ -55,6 +56,7 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: <LandingPage />,
+    errorElement: <ErrorPage />,
   },
   {
     path: "/signup",
@@ -81,6 +83,7 @@ export const router = createBrowserRouter([
         <AdminLayout />
       </ProtectedRoute>
     ),
+    errorElement: <ErrorPage />,
     children: [
       {
         index: true,
@@ -89,10 +92,12 @@ export const router = createBrowserRouter([
       {
         path: "dashboard",
         element: <DashboardOverview />,
+        loader: dashboardLoader,
       },
       {
         path: "users",
         element: <UsersManagement />,
+        loader: usersLoader,
       },
       {
         path: "teams",
@@ -100,24 +105,29 @@ export const router = createBrowserRouter([
           {
             index: true,
             element: <TeamsManagement />,
+            loader: teamsLoader,
           },
           {
             path: ":teamId",
             element: <TeamDetailsPage />,
+            loader: teamDetailsLoader,
           },
         ],
       },
       {
         path: "projects",
         element: <ProjectsManagement />,
+        loader: projectsLoader,
       },
       {
         path: "reports",
         element: <Reports />,
+        loader: reportsLoader,
       },
       {
         path: "settings",
         element: <SettingsPage />,
+        loader: settingsLoader,
       },
       {
         path: "notifications",
@@ -134,6 +144,7 @@ export const router = createBrowserRouter([
         <ManagerLayout />
       </ProtectedRoute>
     ),
+    errorElement: <ErrorPage />,
     children: [
       {
         index: true,
@@ -142,13 +153,16 @@ export const router = createBrowserRouter([
       {
         path: "dashboard",
         element: <ProjectManagerDashboard />,
+        loader: pmdashboardLoader,
       },
       {
         path: "projects",
+        
         children: [
           {
             index: true,
             element: <Projects />,
+            loader: pmprojectsLoader,
           },
           {
             path: "create",
@@ -170,6 +184,7 @@ export const router = createBrowserRouter([
           {
             index: true,
             element: <Tasks />,
+            loader: pmtasksLoader,
           },
           {
             path: "create",
@@ -188,14 +203,17 @@ export const router = createBrowserRouter([
       {
         path: "progress",
         element: <Progress />,
+        loader: pmprogressLoader,
       },
       {
         path: "reports",
         element: <Reportpm />,
+        loader: reportpmLoader,
       },
       {
         path: "settings",
         element: <Settings />,
+        loader: settingspmLoader,
       },
       {
         path: "notifications",
@@ -212,6 +230,7 @@ export const router = createBrowserRouter([
         <TeamMemberLayout />
       </ProtectedRoute>
     ),
+    errorElement: <ErrorPage />,
     children: [
       {
         index: true,

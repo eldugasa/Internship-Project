@@ -19,7 +19,8 @@ export const apiClient = async (endpoint, options = {}) => {
     const user = JSON.parse(userStr);
     token = user?.token;
   } catch (e) {
-    // Ignore parse errors
+    console.error("Error parsing user from localStorage:", e);
+    
   }
 
   const res = await fetch(`${API_URL}${endpoint}`, {
