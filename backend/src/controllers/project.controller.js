@@ -1,6 +1,10 @@
 // src/controllers/project.controller.js
 import { prisma } from "../config/db.js";
-import { createNotification, createBulkNotifications, NOTIFICATION_TYPES } from '../utils/notificationHelper.js';
+import {
+  createNotification,
+  createBulkNotifications,
+  NOTIFICATION_TYPES,
+} from "../utils/notificationHelper.js";
 
 // Helper to normalize role
 const normalizeRole = (role) => (role || "").toUpperCase().replace("-", "_");
@@ -13,7 +17,7 @@ export const createProject = async (req, res) => {
     const managerId = req.user.id;
     const role = normalizeRole(req.user.role);
 
-    if (role !== "PROJECT_MANAGER") {
+    if (role !== "PROJECT_MANAGER" && role !== "ADMIN") {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -31,24 +35,24 @@ export const createProject = async (req, res) => {
 
     // Notify admins about new project creation
     try {
-      const admins = await prisma.user.findMany({ 
-        where: { role: 'ADMIN' } 
+      const admins = await prisma.user.findMany({
+        where: { role: "ADMIN" },
       });
-      
+
       if (admins.length > 0) {
         await createBulkNotifications(
-          admins.map(admin => ({
+          admins.map((admin) => ({
             userId: admin.id,
             type: NOTIFICATION_TYPES.PROJECT_CREATED,
-            title: 'New Project Created',
+            title: "New Project Created",
             message: `Project "${project.name}" has been created`,
             data: { projectId: project.id },
-            link: `/admin/projects/${project.id}`
-          }))
+            link: `/admin/projects/${project.id}`,
+          })),
         );
       }
     } catch (notifErr) {
-      console.error('Error creating project notifications:', notifErr);
+      console.error("Error creating project notifications:", notifErr);
     }
 
     res.status(201).json({ message: "Project created", project });
@@ -64,13 +68,13 @@ export const updateProject = async (req, res) => {
     const { id } = req.params;
     const { name, description, startDate, endDate, status, teamId } = req.body;
 
-    console.log('=== UPDATE PROJECT CONTROLLER ===');
-    console.log('Project ID:', id);
-    console.log('Request body:', req.body);
+    console.log("=== UPDATE PROJECT CONTROLLER ===");
+    console.log("Project ID:", id);
+    console.log("Request body:", req.body);
 
     // Check if project exists
     const existingProject = await prisma.project.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: parseInt(id) },
     });
 
     if (!existingProject) {
@@ -85,39 +89,39 @@ export const updateProject = async (req, res) => {
     if (endDate !== undefined) updateData.endDate = new Date(endDate);
     if (status !== undefined) updateData.status = status;
     if (teamId !== undefined) updateData.teamId = parseInt(teamId);
-    
-    console.log('Update data:', updateData);
+
+    console.log("Update data:", updateData);
 
     const updatedProject = await prisma.project.update({
       where: { id: parseInt(id) },
       data: updateData,
       include: {
         team: {
-          select: { id: true, name: true, lead: true }
-        }
-      }
+          select: { id: true, name: true, lead: true },
+        },
+      },
     });
 
-    console.log('Project updated successfully');
+    console.log("Project updated successfully");
 
     // Check if project status changed to COMPLETED
-    if (status === 'COMPLETED' && existingProject.status !== 'COMPLETED') {
+    if (status === "COMPLETED" && existingProject.status !== "COMPLETED") {
       try {
         // Notify admins
-        const admins = await prisma.user.findMany({ 
-          where: { role: 'ADMIN' } 
+        const admins = await prisma.user.findMany({
+          where: { role: "ADMIN" },
         });
-        
+
         if (admins.length > 0) {
           await createBulkNotifications(
-            admins.map(admin => ({
+            admins.map((admin) => ({
               userId: admin.id,
               type: NOTIFICATION_TYPES.PROJECT_COMPLETED,
-              title: 'Project Completed',
+              title: "Project Completed",
               message: `Project "${updatedProject.name}" has been completed`,
               data: { projectId: updatedProject.id },
-              link: `/admin/projects/${updatedProject.id}`
-            }))
+              link: `/admin/projects/${updatedProject.id}`,
+            })),
           );
         }
 
@@ -126,10 +130,10 @@ export const updateProject = async (req, res) => {
           await createNotification({
             userId: updatedProject.managerId,
             type: NOTIFICATION_TYPES.PROJECT_COMPLETED,
-            title: 'Project Completed',
+            title: "Project Completed",
             message: `Your project "${updatedProject.name}" has been marked as completed`,
             data: { projectId: updatedProject.id },
-            link: `/manager/projects/${updatedProject.id}`
+            link: `/manager/projects/${updatedProject.id}`,
           });
         }
 
@@ -138,25 +142,28 @@ export const updateProject = async (req, res) => {
           const teamMembers = await prisma.user.findMany({
             where: {
               teamId: updatedProject.teamId,
-              role: 'TEAM_MEMBER'
-            }
+              role: "TEAM_MEMBER",
+            },
           });
 
           if (teamMembers.length > 0) {
             await createBulkNotifications(
-              teamMembers.map(member => ({
+              teamMembers.map((member) => ({
                 userId: member.id,
                 type: NOTIFICATION_TYPES.PROJECT_COMPLETED,
-                title: 'Project Completed',
+                title: "Project Completed",
                 message: `Project "${updatedProject.name}" has been completed`,
                 data: { projectId: updatedProject.id },
-                link: `/team-member/projects/${updatedProject.id}`
-              }))
+                link: `/team-member/projects/${updatedProject.id}`,
+              })),
             );
           }
         }
       } catch (notifErr) {
-        console.error('Error creating project completion notifications:', notifErr);
+        console.error(
+          "Error creating project completion notifications:",
+          notifErr,
+        );
       }
     }
 
@@ -171,14 +178,13 @@ export const updateProject = async (req, res) => {
       teamId: updatedProject.teamId,
       teamName: updatedProject.team?.name || null,
       teamLead: updatedProject.team?.lead || null,
-      updatedAt: updatedProject.updatedAt
+      updatedAt: updatedProject.updatedAt,
     });
-
   } catch (err) {
     console.error("Error updating project:", err);
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Failed to update project",
-      error: err.message 
+      error: err.message,
     });
   }
 };
@@ -190,16 +196,8 @@ export const getAllProjects = async (req, res) => {
     const role = normalizeRole(req.user.role);
 
     let projects;
-    if (role === "ADMIN") {
+    if (role === "ADMIN" || role === "PROJECT_MANAGER") {
       projects = await prisma.project.findMany({
-        include: {
-          tasks: true,
-          team: { select: { id: true, name: true } },
-        },
-      });
-    } else if (role === "PROJECT_MANAGER") {
-      projects = await prisma.project.findMany({
-        where: { managerId: req.user.id },
         include: {
           tasks: true,
           team: { select: { id: true, name: true } },
@@ -220,7 +218,7 @@ export const getAllProjects = async (req, res) => {
       endDate: project.endDate,
       dueDate: project.endDate, // For UI compatibility
       teamId: project.team?.id || null,
-      teamName: project.team?.name || 'Unassigned', // ✅ Add teamName field
+      teamName: project.team?.name || "Unassigned", // ✅ Add teamName field
       team: project.team, // ✅ Keep the original team object
       managerId: project.managerId,
       createdAt: project.createdAt,
@@ -229,8 +227,9 @@ export const getAllProjects = async (req, res) => {
         total: project.tasks.length,
         completed: project.tasks.filter((t) => t.status === "COMPLETED").length,
         pending: project.tasks.filter((t) => t.status === "PENDING").length,
-        inProgress: project.tasks.filter((t) => t.status === "IN_PROGRESS").length,
-      }
+        inProgress: project.tasks.filter((t) => t.status === "IN_PROGRESS")
+          .length,
+      },
     }));
 
     res.json(formattedProjects);
@@ -244,22 +243,29 @@ export const getAllProjects = async (req, res) => {
 export const getProjectById = async (req, res) => {
   try {
     const { id } = req.params;
+    const projectId = Number.parseInt(id, 10);
+    if (Number.isNaN(projectId)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
     const role = normalizeRole(req.user.role);
 
     const project = await prisma.project.findUnique({
-      where: { id: Number(id) },
-      include: { 
+      where: { id: projectId },
+      include: {
         tasks: {
           include: {
-            assignee: { select: { id: true, name: true, email: true } }
-          }
-        }, 
+            assignee: { select: { id: true, name: true, email: true } },
+          },
+        },
         team: {
           include: {
-            users: { select: { id: true, name: true, email: true, role: true } }
-          }
+            users: {
+              select: { id: true, name: true, email: true, role: true },
+            },
+          },
         },
-        manager: { select: { id: true, name: true, email: true } }
+        manager: { select: { id: true, name: true, email: true } },
       },
     });
 
@@ -280,22 +286,26 @@ export const getProjectById = async (req, res) => {
 export const getProjectMembers = async (req, res) => {
   try {
     const { projectId } = req.params;
+    const projectIdNumber = Number.parseInt(projectId, 10);
+    if (Number.isNaN(projectIdNumber)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
 
     const project = await prisma.project.findUnique({
-      where: { id: parseInt(projectId) },
+      where: { id: projectIdNumber },
       include: {
         team: {
           include: {
             users: {
-              select: { id: true, name: true, email: true, role: true }
-            }
-          }
-        }
-      }
+              select: { id: true, name: true, email: true, role: true },
+            },
+          },
+        },
+      },
     });
 
     if (!project) {
-      return res.status(404).json({ message: 'Project not found' });
+      return res.status(404).json({ message: "Project not found" });
     }
 
     const members = project.team?.users || [];
@@ -316,8 +326,13 @@ export const deleteProject = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
+    const projectIdNumber = Number.parseInt(id, 10);
+    if (Number.isNaN(projectIdNumber)) {
+      return res.status(400).json({ message: "Invalid project ID" });
+    }
+
     const project = await prisma.project.findUnique({
-      where: { id: parseInt(id) }
+      where: { id: projectIdNumber },
     });
 
     if (!project) {
@@ -326,12 +341,12 @@ export const deleteProject = async (req, res) => {
 
     // Delete related tasks first (due to foreign key constraints)
     await prisma.task.deleteMany({
-      where: { projectId: parseInt(id) }
+      where: { projectId: projectIdNumber },
     });
 
     // Delete the project
     await prisma.project.delete({
-      where: { id: parseInt(id) }
+      where: { id: projectIdNumber },
     });
 
     res.json({ message: "Project deleted successfully" });

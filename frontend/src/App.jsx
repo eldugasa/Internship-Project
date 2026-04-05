@@ -1,54 +1,77 @@
 // src/router.jsx
-import { createBrowserRouter, Navigate } from 'react-router-dom';
-import React from 'react';
+import { createBrowserRouter, Navigate } from "react-router-dom";
+import React from "react";
 
 // Auth
-import ProtectedRoute from './auth/ProtectedRoute';
-import ErrorPage from './pages/ErrorPage';
+import ProtectedRoute from "./auth/ProtectedRoute";
+import ErrorPage from "./pages/ErrorPage";
 
 // Public imports
 import LandingPage from "./LandingPage";
-import Signup from './auth/Signup';
-import Login from './auth/Login';
-import ForgetPassword from './auth/ForgetPassword';
-import ResetPassword from './auth/ResetPassword';
+import Signup from "./auth/Signup";
+import Login from "./auth/Login";
+import ForgetPassword from "./auth/ForgetPassword";
+import ResetPassword from "./auth/ResetPassword";
 
 // Admin imports
-import AdminLayout from './Component/admin/AdminLayout';
-import DashboardOverview, { loader as dashboardLoader } from './pages/admin/DashboardOverview';
-import UsersManagement, { loader as usersLoader }from './pages/admin/UsersManagement';
-import TeamsManagement, { loader as teamsLoader } from './pages/admin/TeamsManagement';
-import ProjectsManagement, { loader as projectsLoader } from './pages/admin/ProjectsManagement';
-import Reports, { loader as reportsLoader } from './pages/admin/Reports';
-import SettingsPage, { loader as settingsLoader }from './pages/admin/SettingsPage';
-import TeamDetailsPage, { loader as teamDetailsLoader } from './pages/admin/TeamDetailsPage';
-import AdminNotificationsPage from './Component/admin/AdminNotificationsPage';
+import AdminLayout from "./Component/admin/AdminLayout";
+import DashboardOverview, {
+  loader as dashboardLoader,
+} from "./pages/admin/DashboardOverview";
+import UsersManagement, {
+  loader as usersLoader,
+} from "./pages/admin/UsersManagement";
+import TeamsManagement, {
+  loader as teamsLoader,
+} from "./pages/projectManager/TeamsManagement";
+import ProjectsManagement, {
+  loader as projectsLoader,
+} from "./pages/admin/ProjectsManagement";
+import Reports, { loader as reportsLoader } from "./pages/admin/Reports";
+import SettingsPage, {
+  loader as settingsLoader,
+} from "./pages/admin/SettingsPage";
+import TeamDetailsPage, {
+  loader as teamDetailsLoader,
+} from "./pages/projectManager/TeamDetailsPage";
+import AdminNotificationsPage from "./Component/admin/AdminNotificationsPage";
 
 // Project Manager imports
-import ManagerLayout from './Component/projectmanager/PromanagerLayout';
-import ProjectManagerDashboard, { loader as pmdashboardLoader } from './pages/projectManager/ProjectManagerDashboard';
-import Projects, { loader as pmprojectsLoader } from './pages/projectManager/Projects';
-import CreateProject from './pages/projectManager/CreateProject';
-import ProjectDetails from './pages/projectManager/ProjectDetails';
-import Tasks, { loader as pmtasksLoader } from './pages/projectManager/Tasks';
-import Reportpm, { loader as reportpmLoader } from './pages/projectManager/Reports';
-import CreateTask from './pages/projectManager/CreateTask';
-import EditTask from './pages/projectManager/EditTask';
-import TaskDetails from './pages/projectManager/TaskDetails';
-import Progress, { loader as pmprogressLoader } from './pages/projectManager/Progress';
-import Settings, { loader as settingspmLoader } from './pages/projectManager/Settings';
+import ManagerLayout from "./Component/projectmanager/PromanagerLayout";
+import ProjectManagerDashboard, {
+  loader as pmdashboardLoader,
+} from "./pages/projectManager/ProjectManagerDashboard";
+import Projects, {
+  loader as pmprojectsLoader,
+} from "./pages/projectManager/Projects";
+import CreateProject from "./pages/projectManager/CreateProject";
+
+import ProjectDetails from "./pages/projectManager/ProjectDetails";
+import Tasks, { loader as pmtasksLoader } from "./pages/projectManager/Tasks";
+import Reportpm, {
+  loader as reportpmLoader,
+} from "./pages/projectManager/Reports";
+import CreateTask from "./pages/projectManager/CreateTask";
+import EditTask from "./pages/projectManager/EditTask";
+import TaskDetails from "./pages/projectManager/TaskDetails";
+import Progress, {
+  loader as pmprogressLoader,
+} from "./pages/projectManager/Progress";
+import Settings, {
+  loader as settingspmLoader,
+} from "./pages/projectManager/Settings";
 import EditProject from "./pages/projectManager/EditProject";
-import ManagerNotificationsPage from './Component/projectmanager/ManagerNotificationsPage';
+import ManagerNotificationsPage from "./Component/projectmanager/ManagerNotificationsPage";
 
 // Team Member imports
-import TeamMemberLayout from './Component/teamMember/TeamMemberLayout';
-import TeamMemberDashboard from './pages/teamMember/Dashboard';
-import TeamMemberTasks from './pages/teamMember/Tasks';
-import TeamMemberTaskDetails from './pages/teamMember/TaskDetails';
-import TeamMemberProgress from './pages/teamMember/Progress';
-import TeamMemberReports from './pages/teamMember/Reports';
-import TeamMemberProfile from './pages/teamMember/Profile';
-import TeamMemberNotificationsPage from './Component/teamMember/TeamMemberNotificationsPage';
+import TeamMemberLayout from "./Component/teamMember/TeamMemberLayout";
+import TeamMemberDashboard from "./pages/teamMember/Dashboard";
+import TeamMemberTasks from "./pages/teamMember/Tasks";
+import TeamMemberTaskDetails from "./pages/teamMember/TaskDetails";
+import TeamMemberProgress from "./pages/teamMember/Progress";
+import TeamMemberReports from "./pages/teamMember/Reports";
+import TeamMemberProfile from "./pages/teamMember/Profile";
+import TeamMemberNotificationsPage from "./Component/teamMember/TeamMemberNotificationsPage";
 
 // Create the router
 export const router = createBrowserRouter([
@@ -79,7 +102,7 @@ export const router = createBrowserRouter([
   {
     path: "/admin",
     element: (
-      <ProtectedRoute allowedRoles={['admin']}>
+      <ProtectedRoute allowedRoles={["admin"]}>
         <AdminLayout />
       </ProtectedRoute>
     ),
@@ -140,7 +163,9 @@ export const router = createBrowserRouter([
   {
     path: "/manager",
     element: (
-      <ProtectedRoute allowedRoles={['project-manager', 'project_manager', 'admin']}>
+      <ProtectedRoute
+        allowedRoles={["project-manager", "project_manager", "admin"]}
+      >
         <ManagerLayout />
       </ProtectedRoute>
     ),
@@ -156,8 +181,23 @@ export const router = createBrowserRouter([
         loader: pmdashboardLoader,
       },
       {
+        path: "teams",
+        children: [
+          {
+            index: true,
+            element: <TeamsManagement />,
+            loader: teamsLoader,
+          },
+          {
+            path: ":teamId",
+            element: <TeamDetailsPage />,
+            loader: teamDetailsLoader,
+          },
+        ],
+      },
+      {
         path: "projects",
-        
+
         children: [
           {
             index: true,
@@ -226,7 +266,7 @@ export const router = createBrowserRouter([
   {
     path: "/team-member",
     element: (
-      <ProtectedRoute allowedRoles={['team-member', 'team_member', 'admin']}>
+      <ProtectedRoute allowedRoles={["team-member", "team_member", "admin"]}>
         <TeamMemberLayout />
       </ProtectedRoute>
     ),

@@ -37,12 +37,17 @@ const SignIn = () => {
     
     try {
       const user = await login(form.email, form.password);
-      
+ 
+
       // Remember me functionality
       if (form.rememberMe) {
         localStorage.setItem('rememberedEmail', form.email);
       } else {
         localStorage.removeItem('rememberedEmail');
+      }
+      //  Correct syntax
+      if (!user) {
+        throw new Error('Login failed. Please check your credentials and try again.');
       }
       
       // Redirect based on role - FIXED PATHS
@@ -65,8 +70,19 @@ const SignIn = () => {
         }
       }
     } catch (err) {
-      setError('Invalid email or password. Please try again.');
-    } finally {
+  console.error("Technical Error:", err.message); // Keep this for you in the console
+
+ 
+   if (!window.navigator.onLine) {
+    setError('No internet connection.');
+  } else if (err.message.includes('prisma') || err.message.includes('database')) {
+    setError(' Please try again later.');
+  }
+   else {
+    setError('Invalid email or password.');
+  }
+}
+    finally {
       setIsLoading(false);
     }
   };

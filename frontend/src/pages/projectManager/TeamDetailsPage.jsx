@@ -1,9 +1,18 @@
-// src/pages/admin/TeamDetailsPage.jsx
+// src/pages/projectManager/TeamDetailsPage.jsx
 import React, { useState, Suspense } from "react";
-import { useParams, useNavigate, useLoaderData, Await, useRevalidator } from "react-router-dom";
-import { addMemberToTeam, removeMemberFromTeam } from "../../services/teamsService";
+import {
+  useParams,
+  useNavigate,
+  useLoaderData,
+  Await,
+  useRevalidator,
+} from "react-router-dom";
+import {
+  addMemberToTeam,
+  removeMemberFromTeam,
+} from "../../services/teamsService";
 import { deleteProject } from "../../services/projectsService";
-import { UserPlus, UserMinus, X, ArrowLeft, RefreshCw } from 'lucide-react';
+import { UserPlus, UserMinus, X, ArrowLeft, RefreshCw } from "lucide-react";
 import { teamDetailsLoader } from "../../loader/admin/TeamDetailsPage.loader";
 
 // Re-export the loader for the route
@@ -30,7 +39,10 @@ const TeamDetailsSkeleton = () => (
         <div className="h-6 w-32 bg-gray-200 rounded mb-4 animate-pulse"></div>
         <div className="space-y-3">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 bg-gray-100 rounded animate-pulse"></div>
+            <div
+              key={i}
+              className="h-16 bg-gray-100 rounded animate-pulse"
+            ></div>
           ))}
         </div>
       </div>
@@ -38,7 +50,10 @@ const TeamDetailsSkeleton = () => (
         <div className="h-6 w-32 bg-gray-200 rounded mb-4 animate-pulse"></div>
         <div className="space-y-3">
           {[...Array(2)].map((_, i) => (
-            <div key={i} className="h-24 bg-gray-100 rounded animate-pulse"></div>
+            <div
+              key={i}
+              className="h-24 bg-gray-100 rounded animate-pulse"
+            ></div>
           ))}
         </div>
       </div>
@@ -50,8 +65,12 @@ const TeamDetailsSkeleton = () => (
 const TeamDetailsError = ({ error, teamId }) => (
   <div className="p-6 flex items-center justify-center min-h-[400px]">
     <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md text-center">
-      <h3 className="text-lg font-semibold text-red-800 mb-2">Failed to Load Team</h3>
-      <p className="text-red-600 mb-4">{error || 'Team not found or unable to load'}</p>
+      <h3 className="text-lg font-semibold text-red-800 mb-2">
+        Failed to Load Team
+      </h3>
+      <p className="text-red-600 mb-4">
+        {error || "Team not found or unable to load"}
+      </p>
       <div className="flex gap-3 justify-center">
         <button
           onClick={() => window.location.reload()}
@@ -60,7 +79,7 @@ const TeamDetailsError = ({ error, teamId }) => (
           Retry
         </button>
         <button
-          onClick={() => window.location.href = '/admin/teams'}
+          onClick={() => (window.location.href = "/manager/teams")}
           className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
         >
           Back to Teams
@@ -75,6 +94,7 @@ const TeamDetailsPage = () => {
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const loaderData = useLoaderData();
+  const isAdmin = loaderData.role === "admin";
 
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -120,7 +140,7 @@ const TeamDetailsPage = () => {
   // Remove team member
   const removeTeamMember = async (userId) => {
     if (!window.confirm("Are you sure you want to remove this member?")) return;
-    
+
     setActionLoading(true);
     try {
       await removeMemberFromTeam(teamId, userId);
@@ -152,8 +172,9 @@ const TeamDetailsPage = () => {
 
   // Remove project
   const removeProject = async (projectId) => {
-    if (!window.confirm("Are you sure you want to delete this project?")) return;
-    
+    if (!window.confirm("Are you sure you want to delete this project?"))
+      return;
+
     setActionLoading(true);
     try {
       await deleteProject(projectId);
@@ -172,7 +193,7 @@ const TeamDetailsPage = () => {
       {/* Header with refresh button */}
       <div className="flex items-center justify-between mb-8">
         <button
-          onClick={() => navigate("/admin/teams")}
+          onClick={() => navigate("/manager/teams")}
           className="flex items-center text-gray-600 hover:text-gray-900"
           disabled={actionLoading}
         >
@@ -184,11 +205,13 @@ const TeamDetailsPage = () => {
             disabled={revalidator.state === "loading" || actionLoading}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 flex items-center"
           >
-            <RefreshCw className={`w-4 h-4 mr-2 ${revalidator.state === "loading" ? 'animate-spin' : ''}`} />
+            <RefreshCw
+              className={`w-4 h-4 mr-2 ${revalidator.state === "loading" ? "animate-spin" : ""}`}
+            />
             {revalidator.state === "loading" ? "Refreshing..." : "Refresh"}
           </button>
           <button
-            onClick={() => navigate("/admin/teams")}
+            onClick={() => navigate("/manager/teams")}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             disabled={actionLoading}
           >
@@ -199,23 +222,32 @@ const TeamDetailsPage = () => {
 
       {/* Data Loading with Suspense and Await */}
       <Suspense fallback={<TeamDetailsSkeleton />}>
-        <Await 
+        <Await
           resolve={Promise.all([loaderData.team, loaderData.users])}
-          errorElement={<TeamDetailsError error="Failed to load team data" teamId={teamId} />}
+          errorElement={
+            <TeamDetailsError
+              error="Failed to load team data"
+              teamId={teamId}
+            />
+          }
         >
           {([team, allUsers]) => {
             // Handle team not found
             if (!team) {
-              return <TeamDetailsError error="Team not found" teamId={teamId} />;
+              return (
+                <TeamDetailsError error="Team not found" teamId={teamId} />
+              );
             }
 
             const teamMembers = team.users || team.members || [];
             const teamProjects = team.projects || [];
             const averageProgress = calculateAverageProgress(teamProjects);
-            
+
             // Filter available users (not already in team and not admin)
             const availableUsers = allUsers.filter(
-              user => !teamMembers.some(member => member.id === user.id) && user.role !== 'admin'
+              (user) =>
+                !teamMembers.some((member) => member.id === user.id) &&
+                user.role !== "admin",
             );
 
             return (
@@ -232,29 +264,43 @@ const TeamDetailsPage = () => {
                       </div>
                       <div>
                         <h1 className="text-2xl font-bold text-gray-900">
-                          {team.name || "N/A"} <span className="text-sm font-normal text-gray-500">(ID: {team.id})</span>
+                          {team.name || "N/A"}{" "}
+                          <span className="text-sm font-normal text-gray-500">
+                            (ID: {team.id})
+                          </span>
                         </h1>
                         <p className="text-gray-600 mt-1">
-                          <span className="font-medium">Team Lead:</span> {team.leadName || team.lead || "Unassigned"}
+                          <span className="font-medium">Team Lead:</span>{" "}
+                          {team.leadName || team.lead || "Unassigned"}
                         </p>
                         {team.description && (
-                          <p className="text-gray-500 mt-2 max-w-2xl">{team.description}</p>
+                          <p className="text-gray-500 mt-2 max-w-2xl">
+                            {team.description}
+                          </p>
                         )}
                       </div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-6 bg-gray-50 p-4 rounded-lg">
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-[#4DA5AD]">{teamMembers.length}</div>
+                        <div className="text-3xl font-bold text-[#4DA5AD]">
+                          {teamMembers.length}
+                        </div>
                         <div className="text-sm text-gray-600">Members</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-[#4DA5AD]">{teamProjects.length}</div>
+                        <div className="text-3xl font-bold text-[#4DA5AD]">
+                          {teamProjects.length}
+                        </div>
                         <div className="text-sm text-gray-600">Projects</div>
                       </div>
                       <div className="text-center">
-                        <div className="text-3xl font-bold text-[#4DA5AD]">{averageProgress}%</div>
-                        <div className="text-sm text-gray-600">Avg. Progress</div>
+                        <div className="text-3xl font-bold text-[#4DA5AD]">
+                          {averageProgress}%
+                        </div>
+                        <div className="text-sm text-gray-600">
+                          Avg. Progress
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -268,25 +314,31 @@ const TeamDetailsPage = () => {
                       <h2 className="text-xl font-bold text-gray-900">
                         Team Members ({teamMembers.length})
                       </h2>
-                      <button
-                        onClick={() => setShowAddMemberPopup(true)}
-                        disabled={actionLoading}
-                        className="px-3 py-2 text-sm bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center disabled:opacity-50"
-                      >
-                        <UserPlus className="w-4 h-4 mr-1" /> Add Member
-                      </button>
+                      {!isAdmin && (
+                        <button
+                          onClick={() => setShowAddMemberPopup(true)}
+                          disabled={actionLoading}
+                          className="px-3 py-2 text-sm bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center disabled:opacity-50"
+                        >
+                          <UserPlus className="w-4 h-4 mr-1" /> Add Member
+                        </button>
+                      )}
                     </div>
 
                     <div className="space-y-3 max-h-96 overflow-y-auto">
                       {teamMembers.length === 0 ? (
                         <div className="text-center py-8 bg-gray-50 rounded-lg">
-                          <p className="text-gray-500">No members in this team</p>
-                          <button
-                            onClick={() => setShowAddMemberPopup(true)}
-                            className="mt-2 text-sm text-[#4DA5AD] hover:underline"
-                          >
-                            Add your first member
-                          </button>
+                          <p className="text-gray-500">
+                            No members in this team
+                          </p>
+                          {!isAdmin && (
+                            <button
+                              onClick={() => setShowAddMemberPopup(true)}
+                              className="mt-2 text-sm text-[#4DA5AD] hover:underline"
+                            >
+                              Add your first member
+                            </button>
+                          )}
                         </div>
                       ) : (
                         teamMembers.map((member) => (
@@ -299,21 +351,27 @@ const TeamDetailsPage = () => {
                                 {member.name?.charAt(0).toUpperCase() || "U"}
                               </div>
                               <div>
-                                <p className="font-semibold text-gray-900">{member.name}</p>
-                                <p className="text-sm text-gray-500">{member.email}</p>
+                                <p className="font-semibold text-gray-900">
+                                  {member.name}
+                                </p>
+                                <p className="text-sm text-gray-500">
+                                  {member.email}
+                                </p>
                                 <p className="text-xs text-gray-400 mt-1 capitalize">
                                   {member.role?.replace(/[_-]/g, " ")}
                                 </p>
                               </div>
                             </div>
-                            <button
-                              onClick={() => removeTeamMember(member.id)}
-                              disabled={actionLoading}
-                              className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
-                              title="Remove member"
-                            >
-                              <UserMinus className="w-5 h-5" />
-                            </button>
+                            {!isAdmin && (
+                              <button
+                                onClick={() => removeTeamMember(member.id)}
+                                disabled={actionLoading}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
+                                title="Remove member"
+                              >
+                                <UserMinus className="w-5 h-5" />
+                              </button>
+                            )}
                           </div>
                         ))
                       )}
@@ -331,7 +389,9 @@ const TeamDetailsPage = () => {
                     <div className="space-y-4 max-h-96 overflow-y-auto">
                       {teamProjects.length === 0 ? (
                         <div className="text-center py-8 bg-gray-50 rounded-lg">
-                          <p className="text-gray-500">No projects assigned to this team</p>
+                          <p className="text-gray-500">
+                            No projects assigned to this team
+                          </p>
                         </div>
                       ) : (
                         teamProjects.map((project) => (
@@ -342,17 +402,26 @@ const TeamDetailsPage = () => {
                           >
                             <div className="flex justify-between items-start mb-3">
                               <div>
-                                <h3 className="font-semibold text-gray-900">{project.name}</h3>
+                                <h3 className="font-semibold text-gray-900">
+                                  {project.name}
+                                </h3>
                                 {project.description && (
-                                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">{project.description}</p>
+                                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                                    {project.description}
+                                  </p>
                                 )}
                               </div>
                               <div className="flex items-center space-x-2">
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(project.priority)}`}>
+                                <span
+                                  className={`px-2 py-1 rounded text-xs font-medium ${getPriorityColor(project.priority)}`}
+                                >
                                   {project.priority || "Low"}
                                 </span>
-                                <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(project.status)}`}>
-                                  {project.status?.replace(/[_-]/g, " ") || "Planned"}
+                                <span
+                                  className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(project.status)}`}
+                                >
+                                  {project.status?.replace(/[_-]/g, " ") ||
+                                    "Planned"}
                                 </span>
                               </div>
                             </div>
@@ -360,7 +429,9 @@ const TeamDetailsPage = () => {
                             <div className="mb-3">
                               <div className="flex justify-between text-sm text-gray-600 mb-1">
                                 <span>Progress</span>
-                                <span className="font-medium">{project.progress || 0}%</span>
+                                <span className="font-medium">
+                                  {project.progress || 0}%
+                                </span>
                               </div>
                               <div className="w-full bg-gray-200 rounded-full h-2.5">
                                 <div
@@ -372,20 +443,30 @@ const TeamDetailsPage = () => {
 
                             <div className="flex justify-between items-center text-sm text-gray-600">
                               <div>
-                                <span className="font-medium">Manager:</span> {project.managerName || project.manager || "N/A"}
+                                <span className="font-medium">Manager:</span>{" "}
+                                {project.managerName ||
+                                  project.manager ||
+                                  "N/A"}
                                 <span className="mx-2">•</span>
-                                <span className="font-medium">Due:</span> {project.dueDate ? new Date(project.dueDate).toLocaleDateString() : "N/A"}
+                                <span className="font-medium">Due:</span>{" "}
+                                {project.dueDate
+                                  ? new Date(
+                                      project.dueDate,
+                                    ).toLocaleDateString()
+                                  : "N/A"}
                               </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeProject(project.id);
-                                }}
-                                disabled={actionLoading}
-                                className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition disabled:opacity-50"
-                              >
-                                Delete
-                              </button>
+                              {!isAdmin && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeProject(project.id);
+                                  }}
+                                  disabled={actionLoading}
+                                  className="px-3 py-1 text-sm bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition disabled:opacity-50"
+                                >
+                                  Delete
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))
@@ -400,7 +481,9 @@ const TeamDetailsPage = () => {
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-2xl w-full max-h-[80vh] flex flex-col">
                       <div className="p-6 border-b border-gray-200 flex justify-between items-center">
                         <div>
-                          <h2 className="text-xl font-bold text-gray-900">Add Members to Team</h2>
+                          <h2 className="text-xl font-bold text-gray-900">
+                            Add Members to Team
+                          </h2>
                           <p className="text-sm text-gray-500 mt-1">
                             Select users to add to {team.name}
                           </p>
@@ -416,7 +499,9 @@ const TeamDetailsPage = () => {
 
                       <div className="flex-1 overflow-y-auto p-6">
                         {availableUsers.length === 0 ? (
-                          <p className="text-center text-gray-500 py-8">No available users to add</p>
+                          <p className="text-center text-gray-500 py-8">
+                            No available users to add
+                          </p>
                         ) : (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {availableUsers.map((user) => (
@@ -430,8 +515,12 @@ const TeamDetailsPage = () => {
                                     {user.name?.charAt(0).toUpperCase() || "U"}
                                   </div>
                                   <div className="flex-1">
-                                    <p className="font-semibold text-gray-900">{user.name}</p>
-                                    <p className="text-sm text-gray-500">{user.email}</p>
+                                    <p className="font-semibold text-gray-900">
+                                      {user.name}
+                                    </p>
+                                    <p className="text-sm text-gray-500">
+                                      {user.email}
+                                    </p>
                                     <p className="text-xs text-gray-400 mt-1 capitalize">
                                       {user.role?.replace(/[_-]/g, " ")}
                                     </p>
@@ -461,7 +550,9 @@ const TeamDetailsPage = () => {
                   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-2xl w-full p-6">
                       <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-2xl font-bold text-gray-900">{selectedProject.name}</h2>
+                        <h2 className="text-2xl font-bold text-gray-900">
+                          {selectedProject.name}
+                        </h2>
                         <button
                           onClick={() => setSelectedProject(null)}
                           className="p-2 hover:bg-gray-100 rounded-lg"
@@ -473,28 +564,51 @@ const TeamDetailsPage = () => {
                       <div className="space-y-6">
                         {selectedProject.description && (
                           <div>
-                            <h3 className="text-sm font-medium text-gray-500 mb-2">Description</h3>
-                            <p className="text-gray-700">{selectedProject.description}</p>
+                            <h3 className="text-sm font-medium text-gray-500 mb-2">
+                              Description
+                            </h3>
+                            <p className="text-gray-700">
+                              {selectedProject.description}
+                            </p>
                           </div>
                         )}
 
                         <div className="grid grid-cols-2 gap-4">
                           <div className="bg-gray-50 p-4 rounded-lg">
                             <p className="text-sm text-gray-500 mb-1">Status</p>
-                            <p className="font-semibold capitalize">{selectedProject.status?.replace(/[_-]/g, " ") || "Planned"}</p>
+                            <p className="font-semibold capitalize">
+                              {selectedProject.status?.replace(/[_-]/g, " ") ||
+                                "Planned"}
+                            </p>
                           </div>
                           <div className="bg-gray-50 p-4 rounded-lg">
-                            <p className="text-sm text-gray-500 mb-1">Priority</p>
-                            <p className="font-semibold capitalize">{selectedProject.priority || "Medium"}</p>
+                            <p className="text-sm text-gray-500 mb-1">
+                              Priority
+                            </p>
+                            <p className="font-semibold capitalize">
+                              {selectedProject.priority || "Medium"}
+                            </p>
                           </div>
                           <div className="bg-gray-50 p-4 rounded-lg">
-                            <p className="text-sm text-gray-500 mb-1">Manager</p>
-                            <p className="font-semibold">{selectedProject.managerName || selectedProject.manager || "Unassigned"}</p>
-                          </div>
-                          <div className="bg-gray-50 p-4 rounded-lg">
-                            <p className="text-sm text-gray-500 mb-1">Due Date</p>
+                            <p className="text-sm text-gray-500 mb-1">
+                              Manager
+                            </p>
                             <p className="font-semibold">
-                              {selectedProject.dueDate ? new Date(selectedProject.dueDate).toLocaleDateString() : "Not set"}
+                              {selectedProject.managerName ||
+                                selectedProject.manager ||
+                                "Unassigned"}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 p-4 rounded-lg">
+                            <p className="text-sm text-gray-500 mb-1">
+                              Due Date
+                            </p>
+                            <p className="font-semibold">
+                              {selectedProject.dueDate
+                                ? new Date(
+                                    selectedProject.dueDate,
+                                  ).toLocaleDateString()
+                                : "Not set"}
                             </p>
                           </div>
                         </div>
@@ -502,12 +616,16 @@ const TeamDetailsPage = () => {
                         <div>
                           <div className="flex justify-between text-sm text-gray-600 mb-2">
                             <span>Progress</span>
-                            <span className="font-semibold">{selectedProject.progress || 0}%</span>
+                            <span className="font-semibold">
+                              {selectedProject.progress || 0}%
+                            </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-4">
                             <div
                               className="bg-[#4DA5AD] h-4 rounded-full transition-all duration-300"
-                              style={{ width: `${selectedProject.progress || 0}%` }}
+                              style={{
+                                width: `${selectedProject.progress || 0}%`,
+                              }}
                             ></div>
                           </div>
                         </div>

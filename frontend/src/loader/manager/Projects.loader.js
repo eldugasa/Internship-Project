@@ -41,8 +41,8 @@ export const calculateStats = (projects) => {
   };
 };
 
-// Auto-activation function (called after initial load)
-export const activateProjects = async (projectsList) => {
+// Auto-activation function - runs in background after load
+export const activateProjectsInBackground = async (projectsList) => {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   let hasChanges = false;
@@ -50,6 +50,7 @@ export const activateProjects = async (projectsList) => {
   
   const updatedProjects = await Promise.all(projectsList.map(async (project) => {
     if (project.status !== 'planned') return project;
+    
     const startDate = parseDate(project.startDate);
     if (!startDate) return project;
     startDate.setHours(0, 0, 0, 0);
@@ -59,9 +60,10 @@ export const activateProjects = async (projectsList) => {
         await updateProject(project.id, { status: 'IN_PROGRESS' });
         hasChanges = true;
         activatedCount++;
+        console.log(`✅ Activated project: ${project.name} (ID: ${project.id})`);
         return { ...project, status: 'active' };
       } catch (err) {
-        console.error(`Error activating project ${project.name}:`, err);
+        console.error(`❌ Error activating project ${project.name}:`, err);
         return project;
       }
     }
@@ -69,13 +71,13 @@ export const activateProjects = async (projectsList) => {
   }));
   
   if (activatedCount > 0) {
-    console.log(`Activated ${activatedCount} project(s)`);
+    console.log(`📊 Auto-activated ${activatedCount} project(s) successfully`);
   }
   return { updatedProjects, hasChanges };
 };
 
 // Helper to map team names
-const mapTeamNames = (projects, teams) => {
+export const mapTeamNames = (projects, teams) => {
   const teamMap = {};
   teams.forEach(team => {
     const teamId = team.id || team._id;
@@ -108,24 +110,37 @@ const mapTeamNames = (projects, teams) => {
   });
 };
 
-// ✅ React Router v7 - Return promises directly for instant navigation
+// ✅ FIXED: Return promises directly for instant navigation
 export function projectsLoader() {
+  console.log('🔄 Loading projects data...');
+  
   // Return promises directly - NO AWAIT!
   const projectsPromise = getProjects();
   const teamsPromise = getTeams();
   
+  // Process and return the promise that resolves to the final data
+  const processedPromise = Promise.all([projectsPromise, teamsPromise])
+    .then(async ([projects, teams]) => {
+      console.log(`📦 Fetched ${projects.length} projects and ${teams.length} teams`);
+      
+      // Map team names to projects
+      const projectsWithTeams = mapTeamNames(projects, teams);
+      
+      // Run auto-activation in background (don't wait for it to complete)
+      activateProjectsInBackground(projectsWithTeams).catch(err => {
+        console.error('Background activation error:', err);
+      });
+      
+      // Return projects immediately without waiting for activation
+      return projectsWithTeams;
+    })
+    .catch(error => {
+      console.error('❌ Error loading projects:', error);
+      throw error;
+    });
+  
   return {
-    projects: projectsPromise.then(projects => 
-      teamsPromise.then(teams => {
-        const projectsWithTeams = mapTeamNames(projects, teams);
-        // Run auto-activation in background (don't wait for it)
-        activateProjects(projectsWithTeams).then(({ updatedProjects }) => {
-          // Store updated projects for next render
-          window.__projectsData = updatedProjects;
-        }).catch(console.error);
-        return projectsWithTeams;
-      })
-    ),
+    projects: processedPromise,
     teams: teamsPromise
   };
 }

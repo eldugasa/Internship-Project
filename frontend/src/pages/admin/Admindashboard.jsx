@@ -1,35 +1,35 @@
 // src/pages/admin/AdminDashboard.jsx
-import React, { useState } from 'react';
-import AdminLayout from '../../Component/admin/AdminLayout';
-import DashboardOverview from './DashboardOverview';
-import UsersManagement from './UsersManagement';
-import TeamsManagement from './TeamsManagement';
-import ProjectsManagement from './ProjectsManagement';
-import SettingsPage from './SettingsPage';
+import React, { useState } from "react";
+import AdminLayout from "../../Component/admin/AdminLayout";
+import DashboardOverview from "./DashboardOverview";
+import UsersManagement from "./UsersManagement";
+import TeamsManagement from "../projectManager/TeamsManagement";
+import ProjectsManagement from "./ProjectsManagement";
+import SettingsPage from "./SettingsPage";
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
+
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { id: 'users', label: 'Users', icon: '👥' },
-    { id: 'teams', label: 'Teams', icon: '👨‍👩‍👧‍👦' },
-    { id: 'projects', label: 'Projects', icon: '📋' },
-    { id: 'settings', label: 'Settings', icon: '⚙️' },
+    { id: "dashboard", label: "Dashboard", icon: "📊" },
+    { id: "users", label: "Users", icon: "👥" },
+    { id: "teams", label: "Teams", icon: "👨‍👩‍👧‍👦" },
+    { id: "projects", label: "Projects", icon: "📋" },
+    { id: "settings", label: "Settings", icon: "⚙️" },
   ];
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':
+      case "dashboard":
         return <DashboardOverview />;
-      case 'users':
+      case "users":
         return <UsersManagement />;
-      case 'teams':
+      case "teams":
         return <TeamsManagement />;
-      case 'projects':
+      case "projects":
         return <ProjectsManagement />;
-      case 'settings':
+      case "settings":
         return <SettingsPage />;
       default:
         return <DashboardOverview />;
@@ -51,10 +51,16 @@ const AdminDashboard = () => {
                 }}
                 className={`flex items-center px-4 py-2 rounded-lg whitespace-nowrap transition-all ${
                   activeTab === tab.id
-                    ? 'text-white'
-                    : 'text-gray-700 bg-gray-100 hover:bg-gray-200'
+                    ? "text-white"
+                    : "text-gray-700 bg-gray-100 hover:bg-gray-200"
                 }`}
-                style={activeTab === tab.id ? { background: `linear-gradient(to right, #0f5841, #194f87)` } : {}}
+                style={
+                  activeTab === tab.id
+                    ? {
+                        background: `linear-gradient(to right, #0f5841, #194f87)`,
+                      }
+                    : {}
+                }
               >
                 <span className="mr-2">{tab.icon}</span>
                 <span className="text-sm font-medium">{tab.label}</span>
@@ -65,9 +71,7 @@ const AdminDashboard = () => {
       </div>
 
       {/* Content Area */}
-      <div className="px-2 sm:px-4 lg:px-6">
-        {renderContent()}
-      </div>
+      <div className="px-2 sm:px-4 lg:px-6">{renderContent()}</div>
     </AdminLayout>
   );
 };

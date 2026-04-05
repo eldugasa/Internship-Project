@@ -8,6 +8,7 @@ import {
   TrendingUp,
   FileText,
   Settings,
+  Users,
   LogOut,
   Search,
   X,
@@ -47,6 +48,7 @@ const ProjectManagerLayout = () => {
   const navItems = [
     { path: "/manager/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { path: "/manager/projects", icon: FolderKanban, label: "Projects" },
+    { path: "/manager/teams", icon: Users, label: "Teams" },
     { path: "/manager/tasks", icon: CheckSquare, label: "Tasks" },
     { path: "/manager/progress", icon: TrendingUp, label: "Progress" },
     { path: "/manager/reports", icon: FileText, label: "Reports" },
@@ -60,15 +62,17 @@ const ProjectManagerLayout = () => {
         setIsMobileMenuOpen(false);
       }
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   // Search handler
   const handleSearch = (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    navigate(`/manager/projects?search=${encodeURIComponent(searchQuery.trim())}`);
+    navigate(
+      `/manager/projects?search=${encodeURIComponent(searchQuery.trim())}`,
+    );
     setSearchQuery("");
   };
 
@@ -120,7 +124,7 @@ const ProjectManagerLayout = () => {
             {/* Search */}
             <form
               onSubmit={handleSearch}
-              className={`flex-1 max-w-md ${isMobileMenuOpen ? 'ml-14' : 'ml-14 lg:ml-0'}`}
+              className={`flex-1 max-w-md ${isMobileMenuOpen ? "ml-14" : "ml-14 lg:ml-0"}`}
             >
               {/* <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -151,15 +155,19 @@ const ProjectManagerLayout = () => {
               {/* Desktop Profile */}
               <div className="hidden lg:flex items-center space-x-3 ml-2">
                 <div className="text-right">
-                  <p className="font-medium text-gray-900 text-sm">{userName}</p>
+                  <p className="font-medium text-gray-900 text-sm">
+                    {userName}
+                  </p>
                   <p className="text-xs text-gray-500 capitalize">
-                    {userRole.replace(/_/g, ' ')}
+                    {userRole.replace(/_/g, " ")}
                   </p>
                 </div>
 
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition"
-                  style={{ background: `linear-gradient(to bottom right, #0f5841, #194f87)` }}
+                  style={{
+                    background: `linear-gradient(to bottom right, #0f5841, #194f87)`,
+                  }}
                   onClick={() => navigate("/manager/settings")}
                 >
                   {userInitials}
@@ -183,8 +191,12 @@ const ProjectManagerLayout = () => {
               <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-red-100 mb-4">
                 <LogOut className="w-6 h-6 text-red-600" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Confirm Logout</h3>
-              <p className="text-sm text-gray-500 mb-6">Are you sure you want to logout?</p>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Confirm Logout
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Are you sure you want to logout?
+              </p>
               <div className="flex space-x-3">
                 <button
                   onClick={() => setShowLogoutConfirm(false)}

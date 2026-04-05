@@ -7,19 +7,22 @@ import {
   createUser,
   updateUserRole,
   getMe,
-  updateCurrentUser,   // ✅ fixed name
-  changePassword, 
-  deleteUser
+  updateCurrentUser, // ✅ fixed name
+  changePassword,
+  deleteUser,
 } from "../controllers/user.controller.js";
 
 const router = express.Router();
 
 // -------------------- Admin Endpoints --------------------
 
-
-
-// Get all users (Admin only)
-router.get("/", authenticate, authorize("ADMIN"), getAllUsers);
+// Get all users (Admin and Project Manager)
+router.get(
+  "/",
+  authenticate,
+  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  getAllUsers,
+);
 
 // Create a new user (Admin only)
 router.post("/", authenticate, authorize("ADMIN"), createUser);

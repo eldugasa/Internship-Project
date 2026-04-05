@@ -4,9 +4,12 @@ import { getUsers } from '../../services/usersService';
 
 // In React Router v7, just return the promises directly - no defer needed!
 export async function teamsLoader() {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const userRole = user.role || 'guest';
   return {
-    teams: getTeams(),  // Return promise directly
-    users: getUsers()   // Return promise directly
+    role: userRole,
+    teams: getTeams(),  
+    users: getUsers()   
   };
 }
 
