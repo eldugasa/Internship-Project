@@ -1,14 +1,45 @@
 // src/loader/admin/UsersManagement.loader.js
 import { getUsers } from '../../services/usersService';
+import { getTeams } from '../../services/teamsService';
 
-// In React Router v7, just return the promise directly - no defer needed!
-export async function usersLoader() {
+// Define query keys as constants for consistency
+export const userQueryKeys = {
+  all: ['users'],
+  details: () => [...userQueryKeys.all, 'detail'],
+  detail: (id) => [...userQueryKeys.details(), id],
+};
+
+// Query configuration for users
+export const usersQuery = () => ({
+  queryKey: userQueryKeys.all,
+  queryFn: getUsers,
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+});
+
+// Optional: Prefetch teams as well
+export const teamsQuery = () => ({
+  queryKey: ['teams'],
+  queryFn: getTeams,
+  staleTime: 5 * 60 * 1000,
+});
+
+// Updated loader with queryClient
+export const usersLoader = (queryClient) => async () => {
+  // Prefetch users data into cache
+  const usersData = await queryClient.ensureQueryData(usersQuery());
+  
+  // Optional: Prefetch teams data in parallel
+  const teamsData = await queryClient.ensureQueryData(teamsQuery());
+  
+  // Return initial data (React Router needs this for Suspense)
   return {
-    users: getUsers() // Return the promise directly
+    users: usersData,
+    teams: teamsData,
   };
-}
+};
 
-// Helper functions
+// Helper functions (keep as is)
 export const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrator' },
   { value: 'project-manager', label: 'Project Manager' },

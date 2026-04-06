@@ -1,6 +1,7 @@
 // frontend/src/services/apiClient.js
+import { QueryClient } from '@tanstack/react-query';
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
-
+export const queryClient = new QueryClient();
 // List of auth endpoints that should NOT redirect on 401
 const AUTH_ENDPOINTS = [
   "/auth/login",

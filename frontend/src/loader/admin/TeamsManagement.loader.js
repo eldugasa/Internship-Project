@@ -2,16 +2,32 @@
 import { getTeams } from '../../services/teamsService';
 import { getUsers } from '../../services/usersService';
 
-// In React Router v7, just return the promises directly - no defer needed!
-export async function teamsLoader() {
+// Define Query Keys and Functions
+export const teamsQuery = () => ({
+  queryKey: ['teams'],
+  queryFn: getTeams,
+  staleTime: 5 * 60 * 1000, // 5 minutes
+  gcTime: 10 * 60 * 1000, // 10 minutes
+});
+
+export const usersQuery = () => ({
+  queryKey: ['users'],
+  queryFn: getUsers,
+  staleTime: 5 * 60 * 1000,
+  gcTime: 10 * 60 * 1000,
+});
+
+export const teamsLoader = (queryClient) => async () => {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const userRole = user.role || 'guest';
-  return {
-    role: userRole,
-    teams: getTeams(),  
-    users: getUsers()   
-  };
-}
+  
+  // Prefetch both teams and users into the cache
+  await Promise.all([
+    queryClient.ensureQueryData(teamsQuery()),
+    queryClient.ensureQueryData(usersQuery()),
+  ]);
+
+  return { role: user.role || 'guest' };
+};
 
 // Helper functions
 export const safeNumber = (value, defaultValue = 0) => {

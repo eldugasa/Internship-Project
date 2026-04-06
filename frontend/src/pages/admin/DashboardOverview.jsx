@@ -1,19 +1,32 @@
 // src/pages/admin/DashboardOverview.jsx
-import { useState, useEffect, useMemo, Suspense } from "react";
-import { useLoaderData, Await } from "react-router-dom";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
-  PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  LineChart, Line, AreaChart, Area
-} from 'recharts';
-import { 
-  dashboardLoader, 
-  DASHBOARD_COLORS, 
-  getStatusConfig, 
-  getCompletionPercentage 
-} from "../../loader/admin/DashboardOverview.loader"
-
-// Re-export the loader for the route
-export { dashboardLoader as loader };
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+} from "recharts";
+import {
+  DASHBOARD_COLORS,
+  getStatusConfig,
+  getCompletionPercentage,
+} from "../../loader/admin/DashboardOverview.loader";
+import { getProjects } from "../../services/projectsService";
+import { getUsers } from "../../services/usersService";
+import { getTeams } from "../../services/teamsService";
+import { getTasks } from "../../services/tasksService";
 
 // Skeleton loader component
 const DashboardSkeleton = () => (
@@ -35,7 +48,10 @@ const DashboardSkeleton = () => (
     </div>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {[...Array(4)].map((_, i) => (
-        <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div
+          key={i}
+          className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+        >
           <div className="h-6 w-48 bg-gray-200 rounded mb-4 animate-pulse"></div>
           <div className="h-64 bg-gray-100 rounded animate-pulse"></div>
         </div>
@@ -47,133 +63,197 @@ const DashboardSkeleton = () => (
 // Main Dashboard Content Component - Moved outside to prevent recreation
 const DashboardContent = ({ projects, users, teams, tasks }) => {
   const [filter, setFilter] = useState("all");
-  const [mobileView, setMobileView] = useState(false);
-
-  // Detect mobile view
-  useEffect(() => {
-    const checkMobile = () => {
-      setMobileView(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
 
   // Memoized stats calculation
   const stats = useMemo(() => {
     const projectManagers = users.filter(
-      u => u.role === 'project-manager' || u.role === 'project_manager'
+      (u) => u.role === "project-manager" || u.role === "project_manager",
     ).length;
 
-    const completedTasks = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
-    const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'todo').length;
-    const inProgressTasks = tasks.filter(t => t.status === 'in-progress' || t.status === 'in_progress').length;
+    const completedTasks = tasks.filter(
+      (t) => t.status === "completed" || t.status === "done",
+    ).length;
+    const pendingTasks = tasks.filter(
+      (t) => t.status === "pending" || t.status === "todo",
+    ).length;
+    const inProgressTasks = tasks.filter(
+      (t) => t.status === "in-progress" || t.status === "in_progress",
+    ).length;
+    const overdueProjects = projects.filter((p) => p.status === "overdue").length;
 
     return {
       totalUsers: users.length,
       totalProjects: projects.length,
       totalTeams: teams.length,
       totalProjectManagers: projectManagers,
-      activeProjects: projects.filter(p => p.status === 'active' || p.status === 'in_progress').length,
-      completedProjects: projects.filter(p => p.status === 'completed').length,
+      activeProjects: projects.filter(
+        (p) => p.status === "active" || p.status === "in_progress",
+      ).length,
+      completedProjects: projects.filter((p) => p.status === "completed")
+        .length,
       totalTasks: tasks.length,
       completedTasks,
       pendingTasks,
       inProgressTasks,
+      overdueProjects,
     };
   }, [projects, users, teams, tasks]);
 
   // Memoized project status data
   const projectStatusData = useMemo(() => {
     const statusCounts = {
-      planned: projects.filter(p => p.status === 'planned').length,
-      active: projects.filter(p => p.status === 'active' || p.status === 'in_progress').length,
-      completed: projects.filter(p => p.status === 'completed').length,
-      'on-hold': projects.filter(p => p.status === 'on-hold').length,
+      planned: projects.filter((p) => p.status === "planned").length,
+      active: projects.filter(
+        (p) => p.status === "active" || p.status === "in_progress",
+      ).length,
+      completed: projects.filter((p) => p.status === "completed").length,
+      "on-hold": projects.filter((p) => p.status === "on-hold").length,
     };
-    
+
     return [
-      { name: 'Planned', value: statusCounts.planned, color: DASHBOARD_COLORS.planned },
-      { name: 'Active', value: statusCounts.active, color: DASHBOARD_COLORS.active },
-      { name: 'Completed', value: statusCounts.completed, color: DASHBOARD_COLORS.completed },
-      { name: 'On Hold', value: statusCounts['on-hold'], color: DASHBOARD_COLORS['on-hold'] },
-    ].filter(item => item.value > 0);
+      {
+        name: "Planned",
+        value: statusCounts.planned,
+        color: DASHBOARD_COLORS.planned,
+      },
+      {
+        name: "Active",
+        value: statusCounts.active,
+        color: DASHBOARD_COLORS.active,
+      },
+      {
+        name: "Completed",
+        value: statusCounts.completed,
+        color: DASHBOARD_COLORS.completed,
+      },
+      {
+        name: "overdue",
+        value: statusCounts.overdue,
+        color: DASHBOARD_COLORS.overdue,
+      },
+      {
+        name: "On Hold",
+        value: statusCounts["on-hold"],
+        color: DASHBOARD_COLORS["on-hold"],
+      },
+    ].filter((item) => item.value > 0);
   }, [projects]);
 
   // Memoized task status data
   const taskStatusData = useMemo(() => {
-    const completedTasks = tasks.filter(t => t.status === 'completed' || t.status === 'done').length;
-    const pendingTasks = tasks.filter(t => t.status === 'pending' || t.status === 'todo').length;
-    const inProgressTasks = tasks.filter(t => t.status === 'in-progress' || t.status === 'in_progress').length;
-    
+    const completedTasks = tasks.filter(
+      (t) => t.status === "completed" || t.status === "done",
+    ).length;
+    const pendingTasks = tasks.filter(
+      (t) => t.status === "pending" || t.status === "todo",
+    ).length;
+    const inProgressTasks = tasks.filter(
+      (t) => t.status === "in-progress" || t.status === "in_progress",
+    ).length;
+
     return [
-      { name: 'Pending', value: pendingTasks, color: DASHBOARD_COLORS.pending },
-      { name: 'In Progress', value: inProgressTasks, color: DASHBOARD_COLORS.in_progress },
-      { name: 'Completed', value: completedTasks, color: DASHBOARD_COLORS.completed },
-    ].filter(item => item.value > 0);
+      { name: "Pending", value: pendingTasks, color: DASHBOARD_COLORS.pending },
+      {
+        name: "In Progress",
+        value: inProgressTasks,
+        color: DASHBOARD_COLORS.in_progress,
+      },
+      {
+        name: "Completed",
+        value: completedTasks,
+        color: DASHBOARD_COLORS.completed,
+      },
+    ].filter((item) => item.value > 0);
   }, [tasks]);
 
   // Memoized user role data
   const userRoleData = useMemo(() => {
-    const adminCount = users.filter(u => u.role === 'admin').length;
-    const pmCount = users.filter(u => u.role === 'project-manager' || u.role === 'project_manager').length;
-    const tmCount = users.filter(u => u.role === 'team-member' || u.role === 'team_member').length;
-    
+    const adminCount = users.filter((u) => u.role === "admin").length;
+    const pmCount = users.filter(
+      (u) => u.role === "project-manager" || u.role === "project_manager",
+    ).length;
+    const tmCount = users.filter(
+      (u) => u.role === "team-member" || u.role === "team_member",
+    ).length;
+
     return [
-      { name: 'Admins', value: adminCount, color: DASHBOARD_COLORS.admin },
-      { name: 'Project Managers', value: pmCount, color: DASHBOARD_COLORS['project-manager'] },
-      { name: 'Team Members', value: tmCount, color: DASHBOARD_COLORS['team-member'] },
-    ].filter(item => item.value > 0);
+      { name: "Admins", value: adminCount, color: DASHBOARD_COLORS.admin },
+      {
+        name: "Project Managers",
+        value: pmCount,
+        color: DASHBOARD_COLORS["project-manager"],
+      },
+      {
+        name: "Team Members",
+        value: tmCount,
+        color: DASHBOARD_COLORS["team-member"],
+      },
+    ].filter((item) => item.value > 0);
   }, [users]);
 
   // Memoized monthly activity
   const monthlyActivityData = useMemo(() => {
     const months = [];
     const now = new Date();
-    
+
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthName = date.toLocaleString('default', { month: 'short' });
+      const monthName = date.toLocaleString("default", { month: "short" });
       const year = date.getFullYear();
       const month = date.getMonth();
-      
-      const tasksInMonth = tasks.filter(task => {
+
+      const tasksInMonth = tasks.filter((task) => {
         const taskDate = new Date(task.createdAt);
         return taskDate.getMonth() === month && taskDate.getFullYear() === year;
       }).length;
-      
-      const projectsInMonth = projects.filter(project => {
-        const projectDate = new Date(project.createdAt || project.startDate || new Date());
-        return projectDate.getMonth() === month && projectDate.getFullYear() === year;
+
+      const projectsInMonth = projects.filter((project) => {
+        const projectDate = new Date(
+          project.createdAt || project.startDate || new Date(),
+        );
+        return (
+          projectDate.getMonth() === month && projectDate.getFullYear() === year
+        );
       }).length;
-      
+
       months.push({
         month: monthName,
         tasks: tasksInMonth,
         projects: projectsInMonth,
       });
     }
-    
+
     return months;
   }, [projects, tasks]);
 
   // Memoized team performance data
   const teamPerformanceData = useMemo(() => {
-    return teams.map(team => {
-      const teamProjects = projects.filter(p => p.teamId === team.id || p.team === team.name);
-      const teamProjectIds = teamProjects.map(p => p.id);
-      const teamTasks = tasks.filter(t => teamProjectIds.includes(t.projectId));
-      
-      const completedTeamTasks = teamTasks.filter(t => t.status === 'completed' || t.status === 'done').length;
-      const totalTeamTasks = teamTasks.length;
-      const completionRate = totalTeamTasks > 0 ? Math.round((completedTeamTasks / totalTeamTasks) * 100) : 0;
-      
-      return {
-        name: team.name,
-        progress: completionRate,
-        tasks: totalTeamTasks,
-      };
-    }).slice(0, 5);
+    return teams
+      .map((team) => {
+        const teamProjects = projects.filter(
+          (p) => p.teamId === team.id || p.team === team.name,
+        );
+        const teamProjectIds = teamProjects.map((p) => p.id);
+        const teamTasks = tasks.filter((t) =>
+          teamProjectIds.includes(t.projectId),
+        );
+
+        const completedTeamTasks = teamTasks.filter(
+          (t) => t.status === "completed" || t.status === "done",
+        ).length;
+        const totalTeamTasks = teamTasks.length;
+        const completionRate =
+          totalTeamTasks > 0
+            ? Math.round((completedTeamTasks / totalTeamTasks) * 100)
+            : 0;
+
+        return {
+          name: team.name,
+          progress: completionRate,
+          tasks: totalTeamTasks,
+        };
+      })
+      .slice(0, 5);
   }, [projects, teams, tasks]);
 
   // Memoized filtered projects (only recalculates when filter or projects change)
@@ -183,27 +263,84 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
   }, [projects, filter]);
 
   // Memoized stat cards
-  const statCards = useMemo(() => [
-    { title: "Total Users", value: stats.totalUsers, icon: "👥", bgColor: "bg-blue-50", textColor: "text-blue-600" },
-    { title: "Total Projects", value: stats.totalProjects, icon: "📊", bgColor: "bg-purple-50", textColor: "text-purple-600" },
-    { title: "Completed Projects", value: stats.completedProjects, icon: "🎉", bgColor: "bg-emerald-50", textColor: "text-emerald-600" },
-    { title: "Total Tasks", value: stats.totalTasks, icon: "✅", bgColor: "bg-green-50", textColor: "text-green-600" },
-    { title: "Active Projects", value: stats.activeProjects, icon: "🚀", bgColor: "bg-orange-50", textColor: "text-orange-600" },
-    { title: "Completed Tasks", value: stats.completedTasks, icon: "🎉", bgColor: "bg-emerald-50", textColor: "text-emerald-600" },
-    { title: "Project Managers", value: stats.totalProjectManagers, icon: "👔", bgColor: "bg-indigo-50", textColor: "text-indigo-600" }
-  ], [stats]);
+  const statCards = useMemo(
+    () => [
+      {
+        title: "Total Users",
+        value: stats.totalUsers,
+        icon: "👥",
+        bgColor: "bg-blue-50",
+        textColor: "text-blue-600",
+      },
+      {
+        title: "Total Projects",
+        value: stats.totalProjects,
+        icon: "📊",
+        bgColor: "bg-purple-50",
+        textColor: "text-purple-600",
+      },
+      {
+        title: "Completed Projects",
+        value: stats.completedProjects,
+        icon: "🎉",
+        bgColor: "bg-emerald-50",
+        textColor: "text-emerald-600",
+      },
+      {
+        title: "Total Tasks",
+        value: stats.totalTasks,
+        icon: "✅",
+        bgColor: "bg-green-50",
+        textColor: "text-green-600",
+      },
+     
+      {
+        title: "overdue Projects",
+        value: stats.overdueProjects,
+        icon: "⏰",
+        bgColor: "bg-red-50",
+        textColor: "text-red-600",
+      },
+      {
+        title: "Completed Tasks",
+        value: stats.completedTasks,
+        icon: "🎉",
+        bgColor: "bg-emerald-50",
+        textColor: "text-emerald-600",
+      },
+      {
+        title: "Project Managers",
+        value: stats.totalProjectManagers,
+        icon: "👔",
+        bgColor: "bg-indigo-50",
+        textColor: "text-indigo-600",
+      },
+    ],
+    [stats],
+  );
 
   return (
     <>
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
         {statCards.map((stat, index) => (
-          <div key={index} className={`${stat.bgColor} rounded-lg sm:rounded-xl p-2 sm:p-3 lg:p-4 shadow-sm hover:shadow-md transition-shadow`}>
+          <div
+    key={stat.title}  // Better than index
+    className={`${stat.bgColor} rounded-lg sm:rounded-xl p-2 sm:p-3 lg:p-4 shadow-sm hover:shadow-md transition-shadow`}
+  >
             <div className="flex items-center justify-between mb-1 sm:mb-2">
-              <span className="text-lg sm:text-xl lg:text-2xl">{stat.icon}</span>
-              <span className={`text-xl sm:text-2xl lg:text-3xl font-bold ${stat.textColor}`}>{stat.value}</span>
+              <span className="text-lg sm:text-xl lg:text-2xl">
+                {stat.icon}
+              </span>
+              <span
+                className={`text-xl sm:text-2xl lg:text-3xl font-bold ${stat.textColor}`}
+              >
+                {stat.value}
+              </span>
             </div>
-            <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">{stat.title}</p>
+            <p className="text-xs sm:text-sm font-medium text-gray-600 truncate">
+              {stat.title}
+            </p>
           </div>
         ))}
       </div>
@@ -212,14 +349,30 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {projectStatusData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Project Status Distribution</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              Project Status Distribution
+            </h2>
             <div className="h-64 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={projectStatusData} cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                    {projectStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                  <Pie
+                    data={projectStatusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ name, percent }) =>
+                      `${name} ${(percent * 100).toFixed(0)}%`
+                    }
+                  >
+                    {projectStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
                   </Pie>
-                  <Tooltip /><Legend />
+                  <Tooltip />
+                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -228,14 +381,23 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
 
         {taskStatusData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Task Status Overview</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              Task Status Overview
+            </h2>
             <div className="h-64 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={taskStatusData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <BarChart
+                  data={taskStatusData}
+                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                >
                   <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" /><YAxis /><Tooltip />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
                   <Bar dataKey="value">
-                    {taskStatusData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                    {taskStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -245,14 +407,28 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
 
         {userRoleData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">User Role Distribution</h2>
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              User Role Distribution
+            </h2>
             <div className="h-64 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
-                  <Pie data={userRoleData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
-                    {userRoleData.map((entry, index) => (<Cell key={`cell-${index}`} fill={entry.color} />))}
+                  <Pie
+                    data={userRoleData}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    dataKey="value"
+                    label={({ name, percent }) =>
+                      `${name} ${(percent * 100).toFixed(0)}%`
+                    }
+                  >
+                    {userRoleData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
                   </Pie>
-                  <Tooltip /><Legend />
+                  <Tooltip />
+                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -260,48 +436,127 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
         )}
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-          <h2 className="text-lg font-bold text-gray-900 mb-4">Monthly Activity (Last 6 Months)</h2>
+          <h2 className="text-lg font-bold text-gray-900 mb-4">
+            Monthly Activity (Last 6 Months)
+          </h2>
           <div className="h-64 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={monthlyActivityData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <LineChart
+                data={monthlyActivityData}
+                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
-                <YAxis yAxisId="left" /><YAxis yAxisId="right" orientation="right" />
-                <Tooltip /><Legend />
-                <Line yAxisId="left" type="monotone" dataKey="projects" stroke="#4DA5AD" strokeWidth={2} name="Projects" />
-                <Line yAxisId="right" type="monotone" dataKey="tasks" stroke="#F59E0B" strokeWidth={2} name="Tasks" />
+                <YAxis yAxisId="left" />
+                <YAxis yAxisId="right" orientation="right" />
+                <Tooltip />
+                <Legend />
+                <Line
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="projects"
+                  stroke="#4DA5AD"
+                  strokeWidth={2}
+                  name="Projects"
+                />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="tasks"
+                  stroke="#F59E0B"
+                  strokeWidth={2}
+                  name="Tasks"
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
-
-        {teamPerformanceData.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">Team Performance (Completion Rate)</h2>
-            <div className="h-64 w-full relative">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={teamPerformanceData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" /><YAxis /><Tooltip /><Legend />
-                  <Area type="monotone" dataKey="progress" stackId="1" stroke="#4DA5AD" fill="#4DA5AD" fillOpacity={0.3} name="Completion %" />
-                  <Area type="monotone" dataKey="tasks" stackId="2" stroke="#F59E0B" fill="#F59E0B" fillOpacity={0.3} name="Total Tasks" />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
+{teamPerformanceData.length > 0 && (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
+    <h2 className="text-lg font-bold text-gray-900 mb-4">
+      Team Performance (Completion Rate)
+    </h2>
+    <div className="h-80 w-full relative">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={teamPerformanceData}
+          margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
+        >
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis 
+            dataKey="name" 
+            angle={-45}
+            textAnchor="end"
+            height={60}
+            tick={{ fontSize: 12 }}
+            interval={0}
+          />
+          <YAxis 
+            domain={[0, 100]} 
+            label={{ value: 'Completion Rate (%)', angle: -90, position: 'insideLeft' , offset: -5, fontSize: 12, fill: '#555', bottom: 0}}
+          />
+          <Tooltip 
+            formatter={(value, name) => {
+              if (name === 'Completion Rate') return `${value}%`;
+              return value;
+            }}
+          />
+          <Legend />
+          <Bar 
+            dataKey="progress" 
+            name="Completion Rate"
+            fill="#4DA5AD" 
+            radius={[4, 4, 0, 0]}
+          >
+            {teamPerformanceData.map((entry, index) => (
+              <Cell 
+                key={`cell-${index}`} 
+                fill={entry.progress >= 80 ? '#10B981' : entry.progress >= 50 ? '#F59E0B' : '#EF4444'}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+    {/* Summary stats */}
+    <div className="mt-4 grid grid-cols-3 gap-4 text-center text-sm pt-4 border-t border-gray-100">
+      <div>
+        <div className="font-semibold text-gray-900">
+          {teamPerformanceData.filter(t => t.progress >= 80).length}
+        </div>
+        <div className="text-gray-500">High Performing Teams</div>
+      </div>
+      <div>
+        <div className="font-semibold text-gray-900">
+          {Math.round(teamPerformanceData.reduce((sum, t) => sum + t.progress, 0) / teamPerformanceData.length)}%
+        </div>
+        <div className="text-gray-500">Average Completion</div>
+      </div>
+      <div>
+        <div className="font-semibold text-gray-900">
+          {teamPerformanceData.reduce((sum, t) => sum + t.tasks, 0)}
+        </div>
+        <div className="text-gray-500">Total Tasks</div>
+      </div>
+    </div>
+  </div>
+)}
       </div>
 
       {/* Projects Overview Section */}
       <div className="bg-white rounded-lg sm:rounded-xl shadow-sm border border-gray-200 p-3 sm:p-4 lg:p-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
           <div>
-            <h2 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900">All Projects Overview</h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">View and manage project status across all teams</p>
+            <h2 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900">
+              All Projects Overview
+            </h2>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
+              View and manage project status across all teams
+            </p>
           </div>
-          <select 
-            value={filter} 
-            onChange={(e) => setFilter(e.target.value)} 
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
             className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#194f87]"
           >
             <option value="all">All Status</option>
@@ -313,19 +568,31 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
 
         {projects.length === 0 ? (
           <div className="text-center py-8 sm:py-12 bg-gray-50 rounded-lg">
-            <p className="text-sm sm:text-base text-gray-500">No projects found</p>
+            <p className="text-sm sm:text-base text-gray-500">
+              No projects found
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto -mx-3 sm:mx-0">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500">Project</th>
-                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 hidden sm:table-cell">Team</th>
-                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500">Progress</th>
-                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 hidden lg:table-cell">Status</th>
-                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 hidden xl:table-cell">Timeline</th>
-                 </tr>
+                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500">
+                    Project
+                  </th>
+                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 hidden sm:table-cell">
+                    Team
+                  </th>
+                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500">
+                    Progress
+                  </th>
+                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 hidden lg:table-cell">
+                    Status
+                  </th>
+                  <th className="px-3 sm:px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 hidden xl:table-cell">
+                    Timeline
+                  </th>
+                </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredProjects.map((project) => {
@@ -334,28 +601,48 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
                   return (
                     <tr key={project.id} className="hover:bg-gray-50">
                       <td className="px-3 sm:px-4 lg:px-6 py-4">
-                        <div className="font-medium text-gray-900 text-sm">{project.name}</div>
-                        {project.description && <div className="text-xs text-gray-500 truncate max-w-[120px]">{project.description}</div>}
-                        <div className="sm:hidden text-xs text-gray-500 mt-1">Team: {project.teamName || project.team || "N/A"}</div>
-                       </td>
+                        <div className="font-medium text-gray-900 text-sm">
+                          {project.name}
+                        </div>
+                        {project.description && (
+                          <div className="text-xs text-gray-500 truncate max-w-30">
+                            {project.description}
+                          </div>
+                        )}
+                        <div className="sm:hidden text-xs text-gray-500 mt-1">
+                          Team: {project.teamName || project.team || "N/A"}
+                        </div>
+                      </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-4 hidden sm:table-cell">
-                        <span className="px-2 py-1 text-xs bg-gray-100 rounded-full">{project.teamName || project.team || "N/A"}</span>
-                       </td>
+                        <span className="px-2 py-1 text-xs bg-gray-100 rounded-full">
+                          {project.teamName || project.team || "N/A"}
+                        </span>
+                      </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-4">
                         <div className="flex items-center gap-2">
                           <div className="w-12 sm:w-16 bg-gray-200 rounded-full h-1.5">
-                            <div className="bg-[#0f5841] h-1.5 rounded-full" style={{ width: `${completion}%` }}></div>
+                            <div
+                              className="bg-[#0f5841] h-1.5 rounded-full"
+                              style={{ width: `${completion}%` }}
+                            ></div>
                           </div>
-                          <span className="text-xs text-gray-600">{completion}%</span>
+                          <span className="text-xs text-gray-600">
+                            {completion}%
+                          </span>
                         </div>
-                       </td>
+                      </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-4 hidden lg:table-cell">
-                        <span className={`px-2 py-1 rounded-full text-xs ${statusConfig.color}`}>{statusConfig.icon} {statusConfig.label}</span>
-                       </td>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs ${statusConfig.color}`}
+                        >
+                          {statusConfig.icon} {statusConfig.label}
+                        </span>
+                      </td>
                       <td className="px-3 sm:px-4 lg:px-6 py-4 hidden xl:table-cell text-xs text-gray-500">
-                        {project.startDate} → {project.dueDate || project.endDate}
-                       </td>
-                     </tr>
+                        {project.startDate} →{" "}
+                        {project.dueDate || project.endDate}
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -368,26 +655,49 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
 };
 
 const DashboardOverview = () => {
-  const loaderData = useLoaderData();
+  const {
+    data: projects,
+    isLoading: projectsLoading,
+    error: projectsError,
+  } = useQuery({ queryKey: ["projects"], queryFn: getProjects });
+
+  const {
+    data: users,
+    isLoading: usersLoading,
+    error: usersError,
+  } = useQuery({ queryKey: ["users"], queryFn: getUsers });
+
+  const {
+    data: teams,
+    isLoading: teamsLoading,
+    error: teamsError,
+  } = useQuery({ queryKey: ["teams"], queryFn: getTeams });
+
+  const {
+    data: tasks,
+    isLoading: tasksLoading,
+    error: tasksError,
+  } = useQuery({ queryKey: ["tasks"], queryFn: getTasks });
+
+  const isLoading =
+    projectsLoading || usersLoading || teamsLoading || tasksLoading;
+  const error = projectsError || usersError || teamsError || tasksError;
+
+  if (isLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (error) {
+    return <div className="text-red-500 p-4">Error loading dashboard data</div>;
+  }
 
   return (
-    <Suspense fallback={<DashboardSkeleton />}>
-      <Await resolve={loaderData.projects} errorElement={<div className="text-red-500 p-4">Error loading projects</div>}>
-        {(projects) => (
-          <Await resolve={loaderData.users} errorElement={<div className="text-red-500 p-4">Error loading users</div>}>
-            {(users) => (
-              <Await resolve={loaderData.teams} errorElement={<div className="text-red-500 p-4">Error loading teams</div>}>
-                {(teams) => (
-                  <Await resolve={loaderData.tasks} errorElement={<div className="text-red-500 p-4">Error loading tasks</div>}>
-                    {(tasks) => <DashboardContent projects={projects} users={users} teams={teams} tasks={tasks} />}
-                  </Await>
-                )}
-              </Await>
-            )}
-          </Await>
-        )}
-      </Await>
-    </Suspense>
+    <DashboardContent
+      projects={projects}
+      users={users}
+      teams={teams}
+      tasks={tasks}
+    />
   );
 };
 

@@ -15,12 +15,9 @@ import ResetPassword from "./auth/ResetPassword";
 
 // Admin imports
 import AdminLayout from "./Component/admin/AdminLayout";
-import DashboardOverview, {
-  loader as dashboardLoader,
-} from "./pages/admin/DashboardOverview";
-import UsersManagement, {
-  loader as usersLoader,
-} from "./pages/admin/UsersManagement";
+import DashboardOverview from "./pages/admin/DashboardOverview";
+import UsersManagement from "./pages/admin/UsersManagement";
+import {usersLoader} from "./loader/admin/UsersManagement.loader";
 import TeamsManagement, {
   loader as teamsLoader,
 } from "./pages/projectManager/TeamsManagement";
@@ -72,6 +69,7 @@ import TeamMemberProgress from "./pages/teamMember/Progress";
 import TeamMemberReports from "./pages/teamMember/Reports";
 import TeamMemberProfile from "./pages/teamMember/Profile";
 import TeamMemberNotificationsPage from "./Component/teamMember/TeamMemberNotificationsPage";
+import { queryClient } from "./services/apiClient";
 
 // Create the router
 export const router = createBrowserRouter([
@@ -115,12 +113,11 @@ export const router = createBrowserRouter([
       {
         path: "dashboard",
         element: <DashboardOverview />,
-        loader: dashboardLoader,
       },
       {
         path: "users",
         element: <UsersManagement />,
-        loader: usersLoader,
+         loader: usersLoader(queryClient),
       },
       {
         path: "teams",
