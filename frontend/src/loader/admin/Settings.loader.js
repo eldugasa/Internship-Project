@@ -1,6 +1,6 @@
 // src/loader/manager/Settings.loader.js
-import { getCurrentUserProfile } from '../../services/usersService';
-import { apiClient, queryClient } from '../../services/apiClient';
+import { getCurrentUserProfile } from "../../services/usersService";
+import { apiClient, queryClient } from "../../services/apiClient";
 
 // Helper to get default preferences
 const getDefaultPrefs = () => ({
@@ -9,11 +9,11 @@ const getDefaultPrefs = () => ({
   projectUpdates: true,
   teamMentions: false,
   emailNotifications: true,
-  inAppNotifications: true
+  inAppNotifications: true,
 });
 
 export const userQuery = () => ({
-  queryKey: ['currentUser'],
+  queryKey: ["currentUser"],
   queryFn: getCurrentUserProfile,
   staleTime: 1000 * 60 * 5,
   cacheTime: 1000 * 60 * 10,
@@ -21,14 +21,14 @@ export const userQuery = () => ({
 
 const getNotificationPrefs = async () => {
   try {
-    return await apiClient('/notification-prefs');
+    return await apiClient("/notification-prefs");
   } catch {
     return getDefaultPrefs();
   }
 };
 
 export const notificationPrefsQuery = () => ({
-  queryKey: ['notificationPrefs'],
+  queryKey: ["notificationPrefs"],
   queryFn: getNotificationPrefs,
   staleTime: 1000 * 60 * 5,
   cacheTime: 1000 * 60 * 10,
