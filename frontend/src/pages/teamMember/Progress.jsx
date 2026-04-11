@@ -1,89 +1,258 @@
 // src/pages/teamMember/Progress.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { 
   TrendingUp, Target, Award, Clock, 
   CheckCircle, Download, AlertCircle,
-  BarChart3, PieChart, Zap, Calendar
+  BarChart3, PieChart, Zap, Calendar, Loader2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { getMyTasks } from '../../services/tasksService';
 
-const StatCard = ({ title, value, subtext, icon: Icon, colorClass }) => (
+// ============================================
+// 1. QUERY DEFINITIONS
+// ============================================
+
+const myTasksQuery = () => ({
+  queryKey: ['team-member', 'progress-tasks'],
+  queryFn: async ({ signal }) => {
+    const tasks = await getMyTasks({ signal });
+    return Array.isArray(tasks) ? tasks : [];
+  },
+  staleTime: 1000 * 60 * 3,
+  gcTime: 1000 * 60 * 10,
+});
+
+// ============================================
+// 2. HELPER COMPONENTS
+// ============================================
+
+const StatCard = ({ title, value, subtext, icon: Icon, colorClass, loading }) => (
   <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
     <div className="flex items-center justify-between">
       <div>
-        <div className="text-2xl font-bold text-gray-900">{value}</div>
-        <div className="text-sm text-gray-500">{title}</div>
+        {loading ? (
+          <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+        ) : (
+          <div className="text-2xl font-bold text-gray-900">{value}</div>
+        )}
+        <div className="text-sm text-gray-500 mt-1">{title}</div>
       </div>
       <div className={`p-3 rounded-lg ${colorClass}`}>
         <Icon className="w-6 h-6" />
       </div>
     </div>
     <div className="mt-3 pt-3 border-t border-gray-100">
-      <div className="text-xs text-gray-500">{subtext}</div>
+      {loading ? (
+        <div className="h-3 w-24 bg-gray-200 rounded animate-pulse"></div>
+      ) : (
+        <div className="text-xs text-gray-500">{subtext}</div>
+      )}
     </div>
   </div>
 );
 
-const ProgressRow = ({ label, current, total, percentage, unit = "tasks", color = "bg-[#4DA5AD]" }) => (
+const ProgressRow = ({ label, current, total, percentage, unit = "tasks", color = "bg-[#4DA5AD]", loading }) => (
   <div className="space-y-2">
     <div className="flex justify-between items-center text-sm">
-      <span className="font-medium text-gray-900">{label}</span>
-      <span className="text-gray-500">{current}/{total} {unit}</span>
+      {loading ? (
+        <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+      ) : (
+        <>
+          <span className="font-medium text-gray-900">{label}</span>
+          <span className="text-gray-500">{current}/{total} {unit}</span>
+        </>
+      )}
     </div>
     <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-      <div 
-        className={`${color} h-2.5 rounded-full transition-all duration-700 ease-out`} 
-        style={{ width: `${percentage}%` }}
-      />
+      {loading ? (
+        <div className="w-full h-2.5 bg-gray-200 rounded-full animate-pulse"></div>
+      ) : (
+        <div 
+          className={`${color} h-2.5 rounded-full transition-all duration-700 ease-out`} 
+          style={{ width: `${percentage}%` }}
+        />
+      )}
     </div>
   </div>
 );
 
-const MetricGroup = ({ title, items }) => (
+const MetricGroup = ({ title, items, loading }) => (
   <div className="space-y-3">
     <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">{title}</h3>
     <div className="space-y-2">
-      {items.map(i => (
-        <div key={i.label} className="flex justify-between text-sm border-b border-gray-50 pb-1">
-          <span className="text-gray-600">{i.label}</span>
-          <span className="font-semibold text-gray-900">{i.val}</span>
-        </div>
-      ))}
+      {loading ? (
+        <>
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="flex justify-between">
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-12 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          ))}
+        </>
+      ) : (
+        items.map(i => (
+          <div key={i.label} className="flex justify-between text-sm border-b border-gray-50 pb-1">
+            <span className="text-gray-600">{i.label}</span>
+            <span className="font-semibold text-gray-900">{i.val}</span>
+          </div>
+        ))
+      )}
     </div>
   </div>
 );
 
+// ============================================
+// 3. SKELETON COMPONENT
+// ============================================
+
+const ProgressSkeleton = () => (
+  <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    {/* Header Skeleton */}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <div className="h-8 w-32 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-4 w-48 bg-gray-200 rounded mt-2 animate-pulse"></div>
+      </div>
+      <div className="h-10 w-32 bg-gray-200 rounded animate-pulse"></div>
+    </div>
+
+    {/* Stats Cards Skeleton */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-24 bg-gray-200 rounded mt-1 animate-pulse"></div>
+            </div>
+            <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <div className="h-3 w-32 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Additional Stats Skeleton */}
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {[...Array(3)].map((_, i) => (
+        <div key={i} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-200 rounded-lg animate-pulse"></div>
+            <div>
+              <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-6 w-16 bg-gray-200 rounded mt-1 animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Project & Metrics Skeleton */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-6"></div>
+        <div className="space-y-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="space-y-3">
+              <div className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-2 w-full bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-6"></div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="space-y-3">
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+              <div className="space-y-2">
+                {[...Array(4)].map((_, j) => (
+                  <div key={j} className="flex justify-between">
+                    <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
+                    <div className="h-4 w-12 bg-gray-200 rounded animate-pulse"></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ============================================
+// 4. ERROR COMPONENT
+// ============================================
+
+const ProgressError = ({ error, onRetry }) => (
+  <div className="p-6 flex justify-center items-center h-64">
+    <div className="text-center">
+      <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+      <p className="text-gray-600 mb-4">{error?.message || 'Failed to load progress data'}</p>
+      <button 
+        onClick={onRetry}
+        className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93]"
+      >
+        Retry
+      </button>
+    </div>
+  </div>
+);
+
+// ============================================
+// 5. MAIN COMPONENT
+// ============================================
+
 const TeamMemberProgress = () => {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState([]);
   const [timePeriod, setTimePeriod] = useState('month');
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        // ✅ Use getMyTasks instead of axios
-        const userTasks = await getMyTasks();
-        setTasks(userTasks);
-      } catch (err) {
-        console.error('Failed to load tasks:', err);
-        setError(err.message || 'Failed to load tasks');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  // Fetch tasks using React Query
+  const { 
+    data: tasks = [], 
+    isLoading,
+    error,
+    refetch: refetchTasks
+  } = useQuery({
+    ...myTasksQuery(),
+    enabled: !!user,
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
 
-    if (user) {
-      fetchTasks();
-    }
-  }, [user]);
-
+  // Calculate all statistics based on tasks
   const { stats, projectBreakdown, timeStats, performanceMetrics } = useMemo(() => {
+    if (!tasks.length) {
+      return {
+        stats: {
+          efficiency: 0,
+          completedCount: 0,
+          inProgressCount: 0,
+          pendingCount: 0,
+          overdueCount: 0,
+          totalHours: 0,
+          utilization: 0,
+          avgTime: 0,
+          onTimeRate: 0,
+        },
+        projectBreakdown: [],
+        timeStats: {
+          thisWeek: 0,
+          thisMonth: 0,
+          weeklyAverage: 0,
+        },
+        performanceMetrics: {
+          completionRate: 0,
+          overdueRate: 0,
+          productivity: 0,
+        },
+      };
+    }
+
     const completed = tasks.filter(t => t.status === 'completed');
     const inProgress = tasks.filter(t => t.status === 'in-progress');
     const pending = tasks.filter(t => t.status === 'pending');
@@ -106,7 +275,7 @@ const TeamMemberProgress = () => {
     const completionTimes = completed.map(t => {
       const startDate = new Date(t.createdAt);
       const endDate = t.completedDate ? new Date(t.completedDate) : new Date(t.updatedAt);
-      return Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)); // in days
+      return Math.round((endDate - startDate) / (1000 * 60 * 60 * 24));
     }).filter(time => !isNaN(time));
     
     const avgCompletionTime = completionTimes.length > 0 
@@ -183,7 +352,12 @@ const TeamMemberProgress = () => {
   }, [tasks]);
 
   const exportData = () => {
-    const dataStr = JSON.stringify({ tasks, stats, generated: new Date() }, null, 2);
+    const dataStr = JSON.stringify({ 
+      tasks, 
+      stats, 
+      generated: new Date(),
+      period: timePeriod
+    }, null, 2);
     const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
     const exportFileDefaultName = `progress-report-${new Date().toISOString().split('T')[0]}.json`;
     
@@ -193,28 +367,24 @@ const TeamMemberProgress = () => {
     linkElement.click();
   };
 
-  if (isLoading) {
+  // Show loading state
+  if (isLoading && tasks.length === 0) {
+    return <ProgressSkeleton />;
+  }
+
+  // Show error state
+  if (error && tasks.length === 0) {
+    return <ProgressError error={error} onRetry={() => refetchTasks()} />;
+  }
+
+  // Check if user is logged in
+  if (!user) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4DA5AD] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your progress data...</p>
+          <Loader2 className="w-12 h-12 text-[#4DA5AD] animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading your profile...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <p className="text-red-500 mb-4">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] transition"
-        >
-          Retry
-        </button>
       </div>
     );
   }
@@ -238,13 +408,13 @@ const TeamMemberProgress = () => {
             <option value="year">This Year</option>
             <option value="all">All Time</option>
           </select>
-          {/* <button 
+          <button 
             onClick={exportData}
             className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm"
           >
             <Download className="w-4 h-4 mr-2" />
             Export Report
-          </button> */}
+          </button>
         </div>
       </header>
 
@@ -254,21 +424,25 @@ const TeamMemberProgress = () => {
           title="Efficiency Rate" value={`${stats.efficiency}%`} 
           subtext={`${stats.completedCount} of ${tasks.length} tasks completed`} 
           icon={TrendingUp} colorClass="bg-green-50 text-green-600" 
+          loading={isLoading}
         />
         <StatCard 
           title="Tasks Completed" value={stats.completedCount} 
           subtext={`${stats.totalHours} hours logged`} 
           icon={CheckCircle} colorClass="bg-blue-50 text-blue-600" 
+          loading={isLoading}
         />
         <StatCard 
           title="Avg. Completion" value={`${stats.avgTime} days`} 
           subtext="Per task average" 
           icon={Clock} colorClass="bg-orange-50 text-orange-600" 
+          loading={isLoading}
         />
         <StatCard 
           title="On-Time Rate" value={`${stats.onTimeRate}%`} 
           subtext={`${stats.overdueCount} overdue tasks`} 
           icon={Target} colorClass="bg-purple-50 text-purple-600" 
+          loading={isLoading}
         />
       </section>
 
@@ -332,6 +506,7 @@ const TeamMemberProgress = () => {
                     total={proj.total}
                     percentage={proj.percentage}
                     color="bg-[#4DA5AD]"
+                    loading={isLoading}
                   />
                   <div className="flex gap-4 text-xs text-gray-500">
                     <span>✅ {proj.completed} done</span>
@@ -353,18 +528,26 @@ const TeamMemberProgress = () => {
             Efficiency Metrics
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <MetricGroup title="Task Status" items={[
-              { label: "Completed", val: stats.completedCount },
-              { label: "In Progress", val: stats.inProgressCount },
-              { label: "Pending", val: stats.pendingCount },
-              { label: "Overdue", val: stats.overdueCount },
-            ]} />
-            <MetricGroup title="Performance" items={[
-              { label: "Efficiency Rate", val: `${stats.efficiency}%` },
-              { label: "On-Time Rate", val: `${stats.onTimeRate}%` },
-              { label: "Utilization", val: `${stats.utilization}%` },
-              { label: "Avg. Completion", val: `${stats.avgTime} days` },
-            ]} />
+            <MetricGroup 
+              title="Task Status" 
+              items={[
+                { label: "Completed", val: stats.completedCount },
+                { label: "In Progress", val: stats.inProgressCount },
+                { label: "Pending", val: stats.pendingCount },
+                { label: "Overdue", val: stats.overdueCount },
+              ]}
+              loading={isLoading}
+            />
+            <MetricGroup 
+              title="Performance" 
+              items={[
+                { label: "Efficiency Rate", val: `${stats.efficiency}%` },
+                { label: "On-Time Rate", val: `${stats.onTimeRate}%` },
+                { label: "Utilization", val: `${stats.utilization}%` },
+                { label: "Avg. Completion", val: `${stats.avgTime} days` },
+              ]}
+              loading={isLoading}
+            />
           </div>
           
           {/* Progress Overview */}
@@ -376,6 +559,7 @@ const TeamMemberProgress = () => {
               total={tasks.length}
               percentage={stats.efficiency}
               color="bg-green-500"
+              loading={isLoading}
             />
           </div>
         </div>
@@ -396,14 +580,14 @@ const TeamMemberProgress = () => {
             <div className="text-2xl font-bold text-blue-600">{stats.inProgressCount}</div>
             <div className="text-sm text-gray-600">In Progress</div>
             <div className="w-full bg-blue-200 rounded-full h-1.5 mt-2">
-              <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${(stats.inProgressCount / tasks.length) * 100}%` }}></div>
+              <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${tasks.length ? (stats.inProgressCount / tasks.length) * 100 : 0}%` }}></div>
             </div>
           </div>
           <div className="p-4 bg-yellow-50 rounded-lg">
             <div className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</div>
             <div className="text-sm text-gray-600">Pending</div>
             <div className="w-full bg-yellow-200 rounded-full h-1.5 mt-2">
-              <div className="bg-yellow-600 h-1.5 rounded-full" style={{ width: `${(stats.pendingCount / tasks.length) * 100}%` }}></div>
+              <div className="bg-yellow-600 h-1.5 rounded-full" style={{ width: `${tasks.length ? (stats.pendingCount / tasks.length) * 100 : 0}%` }}></div>
             </div>
           </div>
         </div>

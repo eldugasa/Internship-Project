@@ -1,7 +1,8 @@
 // src/pages/manager/Tasks.jsx
-import React, { useState, Suspense } from 'react';
-import { useNavigate, useLoaderData, Await, useLocation } from 'react-router-dom';
-import { Plus, Search, Filter, Eye, X, ChevronDown, ChevronUp } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { useNavigate, useLoaderData, useLocation } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Plus, Search, Filter, Eye, X, ChevronDown, ChevronUp, RefreshCw, Trash2, Edit, AlertCircle, Loader2 } from 'lucide-react';
 import { deleteTask } from '../../services/tasksService';
 import { 
   tasksLoader, 
@@ -9,136 +10,91 @@ import {
   getStatusColor, 
   getProjectName,
   calculateTaskStats,
-  filterTasks
+  filterTasks,
+  formatDate,
+  isTaskOverdue,
+  tasksQuery,
+  invalidateTasksQueries
 } from '../../loader/manager/Tasks.loader';
 
-// Re-export the loader for the route
 export { tasksLoader as loader };
 
-// Loading skeleton component
+// Loading skeleton
 const TasksSkeleton = () => (
   <div className="p-4 sm:p-6">
-    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-      <div>
-        <div className="h-8 w-48 bg-gray-200 rounded animate-pulse"></div>
-        <div className="h-4 w-64 bg-gray-200 rounded mt-2 animate-pulse"></div>
+    <div className="animate-pulse">
+      <div className="h-8 w-48 bg-gray-200 rounded mb-4"></div>
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-24 bg-gray-100 rounded-xl"></div>
+        ))}
       </div>
-      <div className="h-10 w-24 bg-gray-200 rounded-lg animate-pulse"></div>
-    </div>
-    
-    <div className="mb-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-        <div className="flex gap-2">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-10 w-20 bg-gray-200 rounded-lg animate-pulse"></div>
-          ))}
-        </div>
-        <div className="h-10 w-64 bg-gray-200 rounded-lg animate-pulse"></div>
-      </div>
-    </div>
-    
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              {[...Array(7)].map((_, i) => (
-                <th key={i} className="px-4 py-3">
-                  <div className="h-4 w-20 bg-gray-200 rounded animate-pulse"></div>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {[...Array(5)].map((_, i) => (
-              <tr key={i} className="border-t border-gray-200">
-                {[...Array(7)].map((_, j) => (
-                  <td key={j} className="px-4 py-4">
-                    <div className="h-8 w-full bg-gray-100 rounded animate-pulse"></div>
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <div className="h-64 bg-gray-100 rounded-xl"></div>
     </div>
   </div>
 );
 
 // Error component
-const TasksError = ({ error, onRetry }) => {
-  const errorMessage = error?.message || error || 'Unable to load tasks';
-  const isAuthError = errorMessage.toLowerCase().includes('auth') || errorMessage.toLowerCase().includes('login') || errorMessage.toLowerCase().includes('401');
-  
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md text-center">
-        <div className="text-5xl mb-4">{isAuthError ? '🔐' : '⚠️'}</div>
-        <h3 className="text-lg font-semibold text-red-800 mb-2">
-          {isAuthError ? 'Authentication Required' : 'Failed to Load Tasks'}
-        </h3>
-        <p className="text-red-600 mb-6">{errorMessage}</p>
-        <div className="flex gap-3 justify-center">
-          <button onClick={onRetry} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">
-            {isAuthError ? 'Go to Login' : 'Retry'}
-          </button>
-        </div>
-      </div>
+const TasksError = ({ error, onRetry }) => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="bg-red-50 border border-red-200 rounded-lg p-8 text-center">
+      <h3 className="text-lg font-semibold text-red-800 mb-2">Failed to Load Tasks</h3>
+      <p className="text-red-600 mb-4">{error?.message || 'Unable to load tasks'}</p>
+      <button onClick={onRetry} className="px-4 py-2 bg-red-600 text-white rounded-lg">Retry</button>
     </div>
-  );
-};
+  </div>
+);
 
 // Task Row Component
-const TaskRow = ({ task, projects, onView, onDelete, getPriorityColor, getStatusColor, getProjectName }) => {
+const TaskRow = ({ task, projects, onView,  onDelete }) => {
+  const overdue = isTaskOverdue(task);
+  
   return (
-    <tr className="hover:bg-gray-50">
-      <td className="px-4 py-4">
-        <div>
-          <div className="font-medium text-gray-900 text-sm">{task.title}</div>
-          <div className="text-xs text-gray-500 capitalize">{task.status}</div>
-        </div>
+    <tr className="hover:bg-gray-50 border-t border-gray-200">
+      <td className="px-4 py-3">
+        <div className="font-medium text-gray-900">{task.title}</div>
+        <div className="text-xs text-gray-500 capitalize">{task.status}</div>
       </td>
-      <td className="px-4 py-4 text-sm text-gray-900">{getProjectName(task.projectId, projects)}</td>
-      <td className="px-4 py-4">
+      <td className="px-4 py-3 text-sm">{getProjectName(task.projectId, projects)}</td>
+      <td className="px-4 py-3">
         <div className="flex items-center">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] rounded-full flex items-center justify-center text-white text-xs sm:text-sm font-medium mr-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-[#0f5841] to-[#194f87] rounded-full flex items-center justify-center text-white text-sm font-medium mr-2">
             {task.assigneeName?.charAt(0) || 'U'}
           </div>
           <span className="text-sm">{task.assigneeName || 'Unassigned'}</span>
         </div>
       </td>
-      <td className="px-4 py-4">
+      <td className="px-4 py-3">
         <span className={`px-2 py-1 rounded-full text-xs ${getPriorityColor(task.priority)}`}>
           {task.priority || 'medium'}
         </span>
       </td>
-      <td className="px-4 py-4 text-sm">
-        {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}
-        <div className={`text-xs ${
-          task.status === 'completed' ? 'text-green-600' :
-          task.dueDate && new Date(task.dueDate) < new Date() ? 'text-red-600' :
-          'text-gray-500'
-        }`}>
-          {task.status === 'completed' ? 'Completed' :
-           task.dueDate && new Date(task.dueDate) < new Date() ? 'Overdue' : 'Active'}
+      <td className="px-4 py-3">
+        <div className={`text-sm ${overdue ? 'text-red-600 font-bold' : 'text-gray-600'}`}>
+          {formatDate(task.dueDate)}
         </div>
-      </td>
-      <td className="px-4 py-4">
-        <div className="flex items-center">
-          <div className="w-20 sm:w-24 bg-gray-200 rounded-full h-2 mr-2">
-            <div className="bg-[#4DA5AD] h-2 rounded-full" style={{ width: `${task.progress || 0}%` }}></div>
+        {overdue && (
+          <div className="text-xs text-red-500 flex items-center gap-1 mt-0.5">
+            <AlertCircle className="w-3 h-3" /> Overdue
           </div>
-          <span className="text-xs sm:text-sm text-gray-600">{task.progress || 0}%</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div className="w-20 bg-gray-200 rounded-full h-2">
+            <div className="bg-[#0f5841] h-2 rounded-full" style={{ width: `${task.progress || 0}%` }} />
+          </div>
+          <span className="text-xs">{task.progress || 0}%</span>
         </div>
       </td>
-      <td className="px-4 py-4">
-        <div className="flex space-x-2">
-          <button onClick={() => onView(task)} className="text-[#4DA5AD] hover:text-[#3D8B93] p-1 hover:bg-blue-50 rounded" title="View Details">
+      <td className="px-4 py-3">
+        <div className="flex space-x-1">
+          <button onClick={() => onView(task)} className="p-1 text-[#0f5841] hover:bg-[#0f5841]/10 rounded" title="View">
             <Eye className="w-4 h-4" />
           </button>
-          <button onClick={() => onDelete(task.id)} className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded" title="Delete Task">
-            <span className="text-lg font-bold">&times;</span>
+         
+          <button onClick={() => onDelete(task.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </td>
@@ -146,72 +102,63 @@ const TaskRow = ({ task, projects, onView, onDelete, getPriorityColor, getStatus
   );
 };
 
-// Mobile Task Card Component
-const MobileTaskCard = ({ task, projects, onView, onDelete, getPriorityColor, getStatusColor, getProjectName }) => {
+// Mobile Task Card
+const MobileTaskCard = ({ task, projects, onView, onEdit, onDelete }) => {
+  const overdue = isTaskOverdue(task);
+  
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
       <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <h3 className="font-medium text-gray-900 text-sm mb-1">{task.title}</h3>
-          <div className="flex items-center gap-2 flex-wrap">
+        <div>
+          <h3 className="font-medium text-gray-900">{task.title}</h3>
+          <div className="flex gap-2 mt-1 flex-wrap">
             <span className={`px-2 py-0.5 rounded-full text-xs ${getStatusColor(task.status)}`}>
               {task.status || 'pending'}
             </span>
             <span className={`px-2 py-0.5 rounded-full text-xs ${getPriorityColor(task.priority)}`}>
               {task.priority || 'medium'}
             </span>
+            {overdue && (
+              <span className="px-2 py-0.5 rounded-full text-xs bg-red-100 text-red-600">
+                Overdue
+              </span>
+            )}
           </div>
         </div>
-        <div className="flex space-x-2">
-          <button onClick={() => onView(task)} className="text-[#4DA5AD] hover:text-[#3D8B93] p-1" title="View Details">
+        <div className="flex space-x-1">
+          <button onClick={() => onView(task)} className="p-1 text-[#0f5841]">
             <Eye className="w-4 h-4" />
           </button>
-          <button onClick={() => onDelete(task.id)} className="text-red-500 hover:text-red-700 p-1" title="Delete Task">
-            <span className="text-lg font-bold">&times;</span>
+          <button onClick={() => onEdit(task)} className="p-1 text-blue-600">
+            <Edit className="w-4 h-4" />
+          </button>
+          <button onClick={() => onDelete(task.id)} className="p-1 text-red-500">
+            <Trash2 className="w-4 h-4" />
           </button>
         </div>
       </div>
-
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] rounded-full flex items-center justify-center text-white text-sm font-medium mr-2">
-              {task.assigneeName?.charAt(0) || 'U'}
-            </div>
-            <div>
-              <div className="text-xs text-gray-500">Assignee</div>
-              <div className="text-sm font-medium">{task.assigneeName || 'Unassigned'}</div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-gray-500">Project</div>
-            <div className="text-sm font-medium text-[#4DA5AD]">{getProjectName(task.projectId, projects)}</div>
-          </div>
+      <div className="space-y-2 text-sm">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Project:</span>
+          <span className="font-medium">{getProjectName(task.projectId, projects)}</span>
         </div>
-
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs text-gray-500">Deadline</div>
-            <div className={`text-sm font-medium ${
-              task.status === 'completed' ? 'text-green-600' :
-              task.dueDate && new Date(task.dueDate) < new Date() ? 'text-red-600' :
-              'text-gray-900'
-            }`}>
-              {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A'}
-              <span className="ml-2 text-xs">
-                {task.status === 'completed' ? '✓' :
-                task.dueDate && new Date(task.dueDate) < new Date() ? 'Overdue' : 'Active'}
-              </span>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Assignee:</span>
+          <span>{task.assigneeName || 'Unassigned'}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Deadline:</span>
+          <span className={overdue ? 'text-red-600 font-bold' : 'text-gray-900'}>
+            {formatDate(task.dueDate)}
+          </span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-gray-500">Progress:</span>
+          <div className="flex items-center gap-2">
+            <div className="w-20 bg-gray-200 rounded-full h-1.5">
+              <div className="bg-[#0f5841] h-1.5 rounded-full" style={{ width: `${task.progress || 0}%` }} />
             </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs text-gray-500">Progress</div>
-            <div className="flex items-center">
-              <div className="w-16 bg-gray-200 rounded-full h-1.5 mr-2">
-                <div className="bg-[#4DA5AD] h-1.5 rounded-full" style={{ width: `${task.progress || 0}%` }}></div>
-              </div>
-              <span className="text-sm font-medium">{task.progress || 0}%</span>
-            </div>
+            <span>{task.progress || 0}%</span>
           </div>
         </div>
       </div>
@@ -219,55 +166,66 @@ const MobileTaskCard = ({ task, projects, onView, onDelete, getPriorityColor, ge
   );
 };
 
-// Empty State Component
+// Empty State
 const EmptyState = ({ searchQuery, onClearSearch, onCreateTask }) => (
-  <div className="text-center py-8 sm:py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+  <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+    <div className="text-4xl mb-4">{searchQuery ? '🔍' : '📝'}</div>
+    <h3 className="text-lg font-medium text-gray-900 mb-2">
+      {searchQuery ? 'No tasks found' : 'No tasks yet'}
+    </h3>
+    <p className="text-gray-500 mb-4">
+      {searchQuery ? `No tasks match "${searchQuery}"` : 'Create your first task to get started'}
+    </p>
     {searchQuery ? (
-      <>
-        <div className="text-gray-400 text-3xl sm:text-4xl mb-3 sm:mb-4">🔍</div>
-        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
-        <p className="text-sm sm:text-base text-gray-500">No tasks match "{searchQuery}"</p>
-        <button onClick={onClearSearch} className="mt-4 px-4 py-2 text-[#4DA5AD] hover:underline text-sm sm:text-base">
-          Clear search to see all tasks
-        </button>
-      </>
+      <button onClick={onClearSearch} className="text-[#0f5841] hover:underline">Clear search</button>
     ) : (
-      <>
-        <div className="text-gray-400 text-3xl sm:text-4xl mb-3 sm:mb-4">📝</div>
-        <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No tasks yet</h3>
-        <p className="text-sm sm:text-base text-gray-500 mb-4">Create your first task to get started</p>
-        <button onClick={onCreateTask} className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center mx-auto text-sm sm:text-base">
-          <Plus className="w-4 h-4 mr-2" />
-          Create First Task
-        </button>
-      </>
+      <button onClick={onCreateTask} className="px-4 py-2 bg-[#0f5841] text-white rounded-lg hover:bg-[#0a4030] inline-flex items-center gap-2">
+        <Plus className="w-4 h-4" /> Create Task
+      </button>
     )}
   </div>
 );
 
+// Main Tasks Component - FIXED: Removed Await wrapper
 const Tasks = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const loaderData = useLoaderData();
   
   const queryParams = new URLSearchParams(location.search);
-  const searchFromUrl = queryParams.get('q') || '';
-  
   const [filter, setFilter] = useState('all');
-  const [localSearch, setLocalSearch] = useState(searchFromUrl);
+  const [searchQuery, setSearchQuery] = useState(queryParams.get('q') || '');
   const [showMobileFilters, setShowMobileFilters] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Use loader data directly - no Await needed
+  const tasks = loaderData?.tasks || [];
+  const projects = loaderData?.projects || [];
+  
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const safeProjects = Array.isArray(projects) ? projects : [];
+
+  // Optional: Use React Query for real-time updates
+  const { data: freshTasks, isLoading, refetch, isFetching } = useQuery({
+    ...tasksQuery(),
+    initialData: safeTasks,
+    refetchInterval: 30000,
+    staleTime: 5000,
+  });
+
+  const displayTasks = freshTasks || safeTasks;
+  const isLoading_data = isLoading && safeTasks.length === 0;
 
   const handleSearchChange = (e) => {
     const value = e.target.value;
-    setLocalSearch(value);
+    setSearchQuery(value);
     const params = new URLSearchParams();
     if (value.trim()) params.set('q', value);
     navigate({ search: params.toString() }, { replace: true });
   };
 
   const clearSearch = () => {
-    setLocalSearch('');
+    setSearchQuery('');
     navigate({ search: '' }, { replace: true });
   };
 
@@ -275,214 +233,184 @@ const Tasks = () => {
     navigate(`/manager/tasks/${task.id}`);
   };
 
+ 
+
   const handleDeleteTask = async (id) => {
     if (!window.confirm('Are you sure you want to delete this task?')) return;
-    setActionLoading(true);
+    setDeletingId(id);
     try {
       await deleteTask(id);
-      window.location.reload();
+      await invalidateTasksQueries();
+      refetch();
     } catch (err) {
-      console.error('Failed to delete task:', err);
       alert(err.message || 'Failed to delete task');
     } finally {
-      setActionLoading(false);
+      setDeletingId(null);
     }
   };
 
-  const handleRetry = () => {
-    window.location.reload();
-  };
+  const filteredTasks = useMemo(() => {
+    return filterTasks(displayTasks, filter, searchQuery);
+  }, [displayTasks, filter, searchQuery]);
 
-  if (!loaderData) {
-    return <TasksError error="No data received from server" onRetry={handleRetry} />;
+  const stats = useMemo(() => calculateTaskStats(filteredTasks), [filteredTasks]);
+
+  if (isLoading_data) {
+    return <TasksSkeleton />;
   }
 
   return (
-    <Suspense fallback={<TasksSkeleton />}>
-      <Await 
-        resolve={Promise.all([loaderData.tasks, loaderData.projects])}
-        errorElement={<TasksError error="Failed to load tasks data" onRetry={handleRetry} />}
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Task Management</h1>
+          <p className="text-gray-600">Create and assign tasks to team members</p>
+        </div>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => refetch()} 
+            disabled={isFetching}
+            className="p-2 bg-white border rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-5 h-5 text-gray-600 ${isFetching ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={() => navigate('/manager/tasks/create')}
+            className="px-4 py-2 bg-[#0f5841] text-white rounded-lg hover:bg-[#0a4030] flex items-center gap-2"
+          >
+            <Plus className="w-4 h-4" /> New Task
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl p-4 border">
+          <div className="text-2xl font-bold">{stats.total}</div>
+          <div className="text-sm text-gray-500">Total Tasks</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 border">
+          <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+          <div className="text-sm text-gray-500">Completed</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 border">
+          <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
+          <div className="text-sm text-gray-500">Overdue</div>
+        </div>
+        <div className="bg-white rounded-xl p-4 border">
+          <div className="text-2xl font-bold text-orange-600">{stats.highPriority}</div>
+          <div className="text-sm text-gray-500">High Priority</div>
+        </div>
+      </div>
+
+      {/* Mobile Filter Toggle */}
+      <button
+        onClick={() => setShowMobileFilters(!showMobileFilters)}
+        className="sm:hidden flex items-center justify-between w-full px-4 py-2 bg-white border rounded-lg mb-4"
       >
-        {([tasks, projects]) => {
-          const safeTasks = Array.isArray(tasks) ? tasks : [];
-          const safeProjects = Array.isArray(projects) ? projects : [];
-          
-          const filteredTasks = filterTasks(safeTasks, filter, localSearch);
-          const stats = calculateTaskStats(filteredTasks);
-          const hasSearch = localSearch.trim().length > 0;
+        <span className="flex items-center gap-2"><Filter className="w-4 h-4" /> Filters</span>
+        {showMobileFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+      </button>
 
-          return (
-            <div className="p-4 sm:p-6">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
-                <div className="flex-1">
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Task Management</h1>
-                  <p className="text-sm sm:text-base text-gray-600">Create and assign tasks to team members</p>
-                  {hasSearch && filteredTasks.length > 0 && (
-                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                      Found {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} for "{localSearch}"
-                      <button onClick={clearSearch} className="ml-2 text-[#4DA5AD] hover:underline">
-                        Clear search
-                      </button>
-                    </p>
-                  )}
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => navigate('/manager/tasks/create')}
-                    disabled={actionLoading}
-                    className="px-3 py-2 sm:px-4 sm:py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center text-sm sm:text-base w-full sm:w-auto justify-center disabled:opacity-50"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    <span className="hidden sm:inline">New Task</span>
-                    <span className="sm:hidden">Add</span>
-                  </button>
-                </div>
-              </div>
+      {/* Filters */}
+      <div className={`${showMobileFilters ? 'block' : 'hidden'} sm:block mb-6`}>
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex gap-2 overflow-x-auto">
+            {['all', 'pending', 'in-progress', 'completed'].map(s => (
+              <button
+                key={s}
+                onClick={() => setFilter(s)}
+                className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap ${
+                  filter === s ? 'bg-[#0f5841] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              placeholder="Search tasks..."
+              className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f5841]"
+            />
+            {searchQuery && (
+              <button onClick={clearSearch} className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
-              {/* Mobile Filters Toggle */}
-              <div className="sm:hidden mb-4">
-                <button
-                  onClick={() => setShowMobileFilters(!showMobileFilters)}
-                  className="flex items-center justify-between w-full px-4 py-3 bg-white border border-gray-300 rounded-lg shadow-sm"
-                >
-                  <span className="flex items-center">
-                    <Filter className="w-4 h-4 mr-2" />
-                    Filters & Search
-                  </span>
-                  {showMobileFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                </button>
-              </div>
+      {/* Search results info */}
+      {searchQuery && filteredTasks.length > 0 && (
+        <p className="text-sm text-gray-500 mb-4">
+          Found {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} for "{searchQuery}"
+        </p>
+      )}
 
-              {/* Filters & Search */}
-              <div className={`${showMobileFilters ? 'block' : 'hidden'} sm:block mb-6`}>
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-                  <div className="order-2 sm:order-1">
-                    <div className="text-xs text-gray-500 mb-2 sm:hidden">Filter by Status</div>
-                    <div className="flex flex-wrap gap-2">
-                      {['all', 'pending', 'in-progress', 'completed'].map(status => (
-                        <button
-                          key={status}
-                          onClick={() => setFilter(status)}
-                          className={`px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg transition text-sm ${
-                            filter === status
-                              ? 'bg-[#4DA5AD] text-white'
-                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                          }`}
-                        >
-                          {status.charAt(0).toUpperCase() + status.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="order-1 sm:order-2 w-full sm:w-auto">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        value={localSearch}
-                        onChange={handleSearchChange}
-                        placeholder="Search tasks..."
-                        className="pl-10 pr-10 py-2.5 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent w-full text-sm sm:text-base"
-                      />
-                      {localSearch && (
-                        <button
-                          onClick={clearSearch}
-                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Mobile Summary */}
-              <div className="sm:hidden grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
-                  <div className="text-lg font-bold text-gray-900">{stats.total}</div>
-                  <div className="text-xs text-gray-500">Total Tasks</div>
-                </div>
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
-                  <div className="text-lg font-bold text-[#4DA5AD]">{stats.completed}</div>
-                  <div className="text-xs text-gray-500">Completed</div>
-                </div>
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
-                  <div className="text-lg font-bold text-[#FF6B6B]">{stats.overdue}</div>
-                  <div className="text-xs text-gray-500">Overdue</div>
-                </div>
-                <div className="bg-white p-3 rounded-xl shadow-sm border border-gray-200">
-                  <div className="text-lg font-bold text-[#FF922B]">{stats.highPriority}</div>
-                  <div className="text-xs text-gray-500">High Priority</div>
-                </div>
-              </div>
-
-              {/* Tasks Table / Cards */}
-              {filteredTasks.length > 0 ? (
-                <>
-                  {/* Desktop Table */}
-                  <div className="hidden sm:block bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full min-w-full">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Task</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assignee</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Deadline</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Progress</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {filteredTasks.map(task => (
-                            <TaskRow
-                              key={task.id}
-                              task={task}
-                              projects={safeProjects}
-                              onView={handleViewTask}
-                              onDelete={handleDeleteTask}
-                              getPriorityColor={getPriorityColor}
-                              getStatusColor={getStatusColor}
-                              getProjectName={getProjectName}
-                            />
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Mobile Cards */}
-                  <div className="sm:hidden space-y-4">
-                    {filteredTasks.map(task => (
-                      <MobileTaskCard
-                        key={task.id}
-                        task={task}
-                        projects={safeProjects}
-                        onView={handleViewTask}
-                        onDelete={handleDeleteTask}
-                        getPriorityColor={getPriorityColor}
-                        getStatusColor={getStatusColor}
-                        getProjectName={getProjectName}
-                      />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <EmptyState 
-                  searchQuery={hasSearch ? localSearch : ''} 
-                  onClearSearch={clearSearch}
-                  onCreateTask={() => navigate('/manager/tasks/create')}
-                />
-              )}
+      {/* Task List */}
+      {filteredTasks.length > 0 ? (
+        <>
+          {/* Desktop Table */}
+          <div className="hidden sm:block bg-white rounded-xl shadow-sm border overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Task</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Project</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Assignee</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Priority</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Deadline</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Progress</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTasks.map(task => (
+                    <TaskRow
+                      key={task.id}
+                      task={task}
+                      projects={safeProjects}
+                      onView={handleViewTask}
+                     
+                      onDelete={handleDeleteTask}
+                    />
+                  ))}
+                </tbody>
+              </table>
             </div>
-          );
-        }}
-      </Await>
-    </Suspense>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="sm:hidden space-y-4">
+            {filteredTasks.map(task => (
+              <MobileTaskCard
+                key={task.id}
+                task={task}
+                projects={safeProjects}
+                onView={handleViewTask}
+               
+                onDelete={handleDeleteTask}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <EmptyState 
+          searchQuery={searchQuery} 
+          onClearSearch={clearSearch}
+          onCreateTask={() => navigate('/manager/tasks/create')}
+        />
+      )}
+    </div>
   );
 };
 

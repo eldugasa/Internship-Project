@@ -1,6 +1,7 @@
 // src/pages/admin/Reports.jsx
-import React, { useState, Suspense } from "react";
-import { useLoaderData, Await } from "react-router-dom";
+import React, { useState } from "react";
+import { useLoaderData } from "react-router-dom";
+import { useQuery } from '@tanstack/react-query';
 import { 
   Download, Users, UsersRound, FolderKanban, 
   CheckSquare, TrendingUp, AlertCircle, Calendar,
@@ -8,10 +9,7 @@ import {
   BarChart3, Filter, ChevronDown, Printer,
   Share2, DownloadCloud
 } from "lucide-react";
-import { reportsLoader, calculateStats } from "../../loader/admin/Reports.loader";
-
-// Re-export the loader for the route
-export { reportsLoader as loader };
+import { calculateStats, usersQuery, projectsQuery, teamsQuery, tasksQuery } from "../../loader/admin/Reports.loader";
 
 // Loading skeleton component
 const ReportsSkeleton = () => (
@@ -52,7 +50,7 @@ const ReportsSkeleton = () => (
 
 // Error component
 const ReportsError = ({ error, onRetry }) => (
-  <div className="flex justify-center items-center min-h-[400px]">
+  <div className="flex justify-center items-center min-h-100">
     <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md text-center">
       <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
       <h3 className="text-lg font-semibold text-red-800 mb-2">Failed to Load Reports</h3>
@@ -115,6 +113,25 @@ const Reports = () => {
   const [selectedReport, setSelectedReport] = useState('overview');
   const [mobileView, setMobileView] = useState(false);
 
+  const { data: users = [], isLoading: usersLoading } = useQuery({
+    ...usersQuery(),
+    initialData: loaderData?.users,
+  });
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
+    ...projectsQuery(),
+    initialData: loaderData?.projects,
+  });
+  const { data: teams = [], isLoading: teamsLoading } = useQuery({
+    ...teamsQuery(),
+    initialData: loaderData?.teams,
+  });
+  const { data: tasks = [], isLoading: tasksLoading } = useQuery({
+    ...tasksQuery(),
+    initialData: loaderData?.tasks,
+  });
+
+  const isLoading = usersLoading || projectsLoading || teamsLoading || tasksLoading;
+
   // Detect mobile view
   React.useEffect(() => {
     const checkMobile = () => {
@@ -125,9 +142,9 @@ const Reports = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const handleRetry = () => {
-    window.location.reload();
-  };
+  if (isLoading) {
+    return <ReportsSkeleton />;
+  }
 
   const exportReport = (format, stats, users) => {
     if (!stats) return;
@@ -224,22 +241,14 @@ const Reports = () => {
     },
   ];
 
-  return (
-    <Suspense fallback={<ReportsSkeleton />}>
-      <Await 
-        resolve={Promise.all([loaderData.users, loaderData.projects, loaderData.teams, loaderData.tasks])}
-        errorElement={<ReportsError error={{ message: 'Failed to load reports data' }} onRetry={handleRetry} />}
-      >
-        {([users, projects, teams, tasks]) => {
-          const safeUsers = Array.isArray(users) ? users : [];
-          const safeProjects = Array.isArray(projects) ? projects : [];
-          const safeTeams = Array.isArray(teams) ? teams : [];
-          const safeTasks = Array.isArray(tasks) ? tasks : [];
-          
-          const stats = calculateStats(safeUsers, safeProjects, safeTeams, safeTasks);
+  const safeUsers = Array.isArray(users) ? users : [];
+  const safeProjects = Array.isArray(projects) ? projects : [];
+  const safeTeams = Array.isArray(teams) ? teams : [];
+  const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const stats = calculateStats(safeUsers, safeProjects, safeTeams, safeTasks);
 
-          return (
-            <div className="space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+  return (
+    <div className="space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
               {/* Header */}
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 <div>
@@ -547,10 +556,6 @@ const Reports = () => {
               </p>
             </div>
           );
-        }}
-      </Await>
-    </Suspense>
-  );
 };
 
 export default Reports;

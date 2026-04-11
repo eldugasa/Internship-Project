@@ -3,6 +3,35 @@ import { getUsers } from "../../services/usersService";
 import { getProjects } from "../../services/projectsService";
 import { getTeams } from "../../services/teamsService";
 import { getTasks } from "../../services/tasksService";
+import { queryClient } from "../../services/apiClient";
+
+export const usersQuery = () => ({
+  queryKey: ['users'],
+  queryFn: getUsers,
+  staleTime: 1000 * 60 * 5,
+  cacheTime: 1000 * 60 * 10,
+});
+
+export const projectsQuery = () => ({
+  queryKey: ['projects'],
+  queryFn: getProjects,
+  staleTime: 1000 * 60 * 5,
+  cacheTime: 1000 * 60 * 10,
+});
+
+export const teamsQuery = () => ({
+  queryKey: ['teams'],
+  queryFn: getTeams,
+  staleTime: 1000 * 60 * 5,
+  cacheTime: 1000 * 60 * 10,
+});
+
+export const tasksQuery = () => ({
+  queryKey: ['tasks'],
+  queryFn: getTasks,
+  staleTime: 1000 * 60 * 5,
+  cacheTime: 1000 * 60 * 10,
+});
 
 // Calculate stats from data
 export const calculateStats = (users, projects, teams, tasks) => {
@@ -76,12 +105,19 @@ export const calculateStats = (users, projects, teams, tasks) => {
   };
 };
 
-// ✅ React Router v7 - Return promises directly
-export function reportsLoader() {
+// Prefetch queries into React Query cache and return resolved data
+export async function reportsLoader() {
+  const [usersData, projectsData, teamsData, tasksData] = await Promise.all([
+    queryClient.ensureQueryData(usersQuery()),
+    queryClient.ensureQueryData(projectsQuery()),
+    queryClient.ensureQueryData(teamsQuery()),
+    queryClient.ensureQueryData(tasksQuery()),
+  ]);
+
   return {
-    users: getUsers(),
-    projects: getProjects(),
-    teams: getTeams(),
-    tasks: getTasks()
+    users: usersData,
+    projects: projectsData,
+    teams: teamsData,
+    tasks: tasksData,
   };
 }

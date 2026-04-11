@@ -1,12 +1,10 @@
 // src/pages/settings/SettingsPage.jsx
-import React, { useState, Suspense } from "react";
-import { useLoaderData, Await, useNavigate } from "react-router-dom";
+import React, { useState } from "react";
+import { useLoaderData, useNavigate } from "react-router-dom";
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from "../../services/apiClient";
 import { User, Lock, X, Save, LogOut, Bell, BellOff, RotateCcw, Eye, EyeOff } from 'lucide-react';
-import { settingsLoader } from "../../loader/admin/Settings.loader"
-
-// Re-export the loader for the route
-export { settingsLoader as loader };
+import { userQuery, notificationPrefsQuery } from "../../loader/admin/Settings.loader"
 
 // Loading skeleton component
 const SettingsSkeleton = () => (
@@ -61,7 +59,7 @@ const SettingsSkeleton = () => (
 
 // Error component
 const SettingsError = ({ error, onRetry }) => (
-  <div className="flex justify-center items-center min-h-[400px]">
+  <div className="flex justify-center items-center min-h-100">
     <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md text-center">
       <div className="text-5xl mb-4">⚠️</div>
       <h3 className="text-lg font-semibold text-red-800 mb-2">Failed to Load Settings</h3>
@@ -79,7 +77,21 @@ const SettingsError = ({ error, onRetry }) => (
 const SettingsPage = () => {
   const loaderData = useLoaderData();
   const navigate = useNavigate();
-  
+  const [userData, setUserData] = useState({});
+  const [notificationPrefs, setNotificationPrefs] = useState({});
+
+  const { data: user = {}, isLoading: userLoading } = useQuery({
+    ...userQuery(),
+    initialData: loaderData?.user,
+  });
+
+  const { data: notifications = {}, isLoading: notificationsLoading } = useQuery({
+    ...notificationPrefsQuery(),
+    initialData: loaderData?.notifications,
+  });
+
+  const isLoading = userLoading || notificationsLoading;
+
   const [showEditProfile, setShowEditProfile] = useState(false);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [name, setName] = useState("");
@@ -98,9 +110,19 @@ const SettingsPage = () => {
   const [passwordUpdating, setPasswordUpdating] = useState(false);
   const [prefsSaving, setPrefsSaving] = useState(false);
 
-  const handleRetry = () => {
-    window.location.reload();
-  };
+  React.useEffect(() => {
+    if (user && Object.keys(user).length > 0) {
+      setUserData(user);
+      setName(user.name || '');
+      setEmail(user.email || '');
+    }
+  }, [user]);
+
+  React.useEffect(() => {
+    if (notifications && Object.keys(notifications).length > 0) {
+      setNotificationPrefs(notifications);
+    }
+  }, [notifications]);
 
   // Logout function
   const logout = () => {
@@ -110,7 +132,7 @@ const SettingsPage = () => {
   };
 
   // Update Profile
-  const handleUpdateProfile = async (user, setUser) => {
+  const handleUpdateProfile = async () => {
     if (!name.trim() || !email.trim()) {
       alert('Name and email are required');
       return;
@@ -129,11 +151,11 @@ const SettingsPage = () => {
         body: JSON.stringify({ name, email }),
       });
 
-      if (email !== user.email) {
+      if (email !== userData.email) {
         alert('Email updated! Please login again with your new email.');
         logout();
       } else {
-        setUser(updatedUser);
+        setUserData(updatedUser);
         setShowEditProfile(false);
         alert('Profile updated successfully!');
       }
@@ -227,11 +249,11 @@ const SettingsPage = () => {
   };
 
   // Toggle notification with backend save
-  const toggleNotification = async (key, notifications, setNotifications) => {
+  const toggleNotification = async (key) => {
     try {
       setPrefsSaving(true);
-      const updated = { ...notifications, [key]: !notifications[key] };
-      setNotifications(updated);
+      const updated = { ...notificationPrefs, [key]: !notificationPrefs[key] };
+      setNotificationPrefs(updated);
       
       await apiClient('/notification-prefs', {
         method: 'PUT',
@@ -240,20 +262,20 @@ const SettingsPage = () => {
     } catch (error) {
       console.error('Error saving notification preferences:', error);
       alert('Failed to save notification preferences');
-      setNotifications(notifications);
+      setNotificationPrefs(notificationPrefs);
     } finally {
       setPrefsSaving(false);
     }
   };
 
   // Reset to default preferences
-  const resetToDefault = async (setNotifications) => {
+  const resetToDefault = async () => {
     try {
       setPrefsSaving(true);
       const response = await apiClient('/notification-prefs/reset', {
         method: 'POST'
       });
-      setNotifications(response.prefs);
+      setNotificationPrefs(response.prefs);
       alert('Notification preferences reset to default');
     } catch (error) {
       console.error('Error resetting preferences:', error);
@@ -263,26 +285,15 @@ const SettingsPage = () => {
     }
   };
 
+  if (isLoading) {
+    return <SettingsSkeleton />;
+  }
+
+  const safeUser = userData || {};
+  const safeNotifications = notificationPrefs || {};
+
   return (
-    <Suspense fallback={<SettingsSkeleton />}>
-      <Await 
-        resolve={Promise.all([loaderData.user, loaderData.notifications])}
-        errorElement={<SettingsError error={{ message: 'Failed to load settings' }} onRetry={handleRetry} />}
-      >
-        {([user, notifications]) => {
-          // Initialize form values when user loads
-          React.useEffect(() => {
-            if (user) {
-              setName(user.name);
-              setEmail(user.email);
-            }
-          }, [user]);
-
-          const safeUser = user || {};
-          const safeNotifications = notifications || {};
-
-          return (
-            <div className="p-6 max-w-4xl mx-auto">
+    <div className="p-6 max-w-4xl mx-auto">
               <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
 
               {/* Profile Summary Card */}
@@ -290,7 +301,7 @@ const SettingsPage = () => {
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
                   <h2 className="text-lg font-semibold text-gray-900 mb-4">Profile Information</h2>
                   <div className="flex items-center space-x-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-[#4DA5AD] to-[#2D4A6B] rounded-full flex items-center justify-center text-white text-2xl font-bold">
+                    <div className="w-16 h-16 bg-linear-to-br from-[#4DA5AD] to-[#2D4A6B] rounded-full flex items-center justify-center text-white text-2xl font-bold">
                       {safeUser.name?.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -339,7 +350,7 @@ const SettingsPage = () => {
                     Notification Preferences
                   </h2>
                   <button
-                    onClick={() => resetToDefault(setNotifications)}
+                    onClick={resetToDefault}
                     disabled={prefsSaving}
                     className="flex items-center gap-2 px-3 py-1 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
                   >
@@ -371,7 +382,7 @@ const SettingsPage = () => {
                           )}
                         </div>
                         <button
-                          onClick={() => toggleNotification(key, safeNotifications, setNotifications)}
+                          onClick={() => toggleNotification(key)}
                           disabled={prefsSaving}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#194f87] focus:ring-offset-2 ${
                             prefsSaving ? 'opacity-50 cursor-not-allowed' : ''
@@ -397,7 +408,7 @@ const SettingsPage = () => {
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <span className="text-gray-700">Email Notifications</span>
                         <button
-                          onClick={() => toggleNotification('emailNotifications', safeNotifications, setNotifications)}
+                          onClick={() => toggleNotification('emailNotifications')}
                           disabled={prefsSaving}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                             prefsSaving ? 'opacity-50 cursor-not-allowed' : ''
@@ -416,7 +427,7 @@ const SettingsPage = () => {
                       <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <span className="text-gray-700">In-App Notifications</span>
                         <button
-                          onClick={() => toggleNotification('inAppNotifications', safeNotifications, setNotifications)}
+                          onClick={() => toggleNotification('inAppNotifications')}
                           disabled={prefsSaving}
                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                             prefsSaving ? 'opacity-50 cursor-not-allowed' : ''
@@ -483,10 +494,7 @@ const SettingsPage = () => {
                         Cancel
                       </button>
                       <button
-                        onClick={() => handleUpdateProfile(safeUser, (updatedUser) => {
-                          // Update local user reference
-                          Object.assign(safeUser, updatedUser);
-                        })}
+                        onClick={handleUpdateProfile}
                         disabled={profileUpdating}
                         className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center gap-2 disabled:opacity-50"
                       >
@@ -638,10 +646,6 @@ const SettingsPage = () => {
               )}
             </div>
           );
-        }}
-      </Await>
-    </Suspense>
-  );
 };
 
 export default SettingsPage;

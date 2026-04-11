@@ -1,6 +1,6 @@
 // src/services/tasksService.js
 import { apiClient } from './apiClient';
-
+ 
 // Status mapping helper
 const statusMap = {
   'PENDING': 'pending',
@@ -9,7 +9,15 @@ const statusMap = {
   'BLOCKED': 'blocked',
   'REVIEW': 'review'
 };
-
+ 
+const reverseStatusMap = {
+  'pending': 'PENDING',
+  'in-progress': 'IN_PROGRESS',
+  'completed': 'COMPLETED',
+  'blocked': 'BLOCKED',
+  'review': 'REVIEW'
+};
+ 
 // Priority mapping
 const priorityMap = {
   'LOW': 'low',
@@ -17,11 +25,15 @@ const priorityMap = {
   'HIGH': 'high',
   'CRITICAL': 'critical'
 };
-
+ 
+const reversePriorityMap = {
+  'low': 'LOW',
+  'medium': 'MEDIUM',
+  'high': 'HIGH',
+  'critical': 'CRITICAL'
+};
+ 
 const normalizeTask = (task) => {
-  // Log to see what we're getting
-
-  
   return {
     ...task,
     id: task.id,
@@ -31,227 +43,202 @@ const normalizeTask = (task) => {
     priority: priorityMap[task.priority] || task.priority?.toLowerCase() || 'medium',
     progress: task.progress || 0,
     
-    // Assignee fields - handle both nested and direct formats
-    assigneeId: task.assigneeId,
+    assigneeId: task.assigneeId || task.assignedTo,
     assignee: task.assignee || null,
     assigneeName: task.assignee?.name || task.assigneeName || 'Unassigned',
     
-    // Project fields
     projectId: task.projectId,
     project: task.project || null,
     projectName: task.project?.name || task.projectName || 'Unknown Project',
     
-    // Date fields - handle properly
     dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : null,
-    rawDueDate: task.dueDate, // Keep original for editing
+    rawDueDate: task.dueDate,
     
-    // Other fields
     estimatedHours: task.estimatedHours || 0,
     actualHours: task.actualHours || 0,
     tags: task.tags || [],
     comments: task.comments || [],
     
-    // Timestamps
     createdAt: task.createdAt ? new Date(task.createdAt).toLocaleDateString() : null,
     updatedAt: task.updatedAt ? new Date(task.updatedAt).toLocaleDateString() : null
   };
 };
-
+ 
 // Get all tasks
-export const getTasks = async () => {
-  const tasks = await apiClient('/tasks');
+export const getTasks = async ({ signal } = {}) => {
+  const tasks = await apiClient('/tasks', { signal });
   return tasks.map(normalizeTask);
 };
-
-export const getTaskById = async (id) => {
-  const response = await apiClient(`/tasks/${id}`);
-  console.log('getTaskById response:', response);
-  // The response might be the task directly or nested
+ 
+// Get task by ID
+export const getTaskById = async (id, { signal } = {}) => {
+  const response = await apiClient(`/tasks/${id}`, { signal });
   const taskData = response.task || response;
   return normalizeTask(taskData);
 };
-
+ 
 // Get tasks by project
-export const getTasksByProject = async (projectId) => {
-  const tasks = await apiClient(`/tasks/project/${projectId}`);
+export const getTasksByProject = async (projectId, { signal } = {}) => {
+  const tasks = await apiClient(`/tasks/project/${projectId}`, { signal });
   return tasks.map(normalizeTask);
 };
-export const createTask = async (taskData) => {
-  console.log('createTask received:', taskData);
-  
+ 
+// Create task
+export const createTask = async (taskData, { signal } = {}) => {
   const payload = {
     title: taskData.title,
     description: taskData.description || '',
     projectId: parseInt(taskData.projectId),
     assignedTo: parseInt(taskData.assigneeId || taskData.assignedTo),
     dueDate: taskData.dueDate,
-    priority: taskData.priority?.toUpperCase() || 'MEDIUM',
+    priority: reversePriorityMap[taskData.priority] || 'MEDIUM',
     estimatedHours: taskData.estimatedHours ? parseFloat(taskData.estimatedHours) : null
   };
-
-  console.log('Sending payload:', payload);
-
+ 
   const response = await apiClient('/tasks', {
     method: 'POST',
-    body: JSON.stringify(payload)
+    body: JSON.stringify(payload),
+    signal
   });
   
-  
-   taskData = response.task || response;
-  return normalizeTask(taskData);
+  const taskResponse = response.task || response;
+  return normalizeTask(taskResponse);
 };
-
-// Get tasks assigned to current user (for Team Members)
-export const getMyTasks = async () => {
+ 
+// Get tasks assigned to current user
+export const getMyTasks = async ({ signal } = {}) => {
   try {
-    const tasks = await apiClient('/tasks/my-tasks');
+    const tasks = await apiClient('/tasks/my-tasks', { signal });
     return tasks.map(normalizeTask);
   } catch (error) {
+    if (error.name === 'AbortError') {
+      return [];
+    }
     console.error('Error fetching my tasks:', error);
     return [];
   }
 };
-
-// Update the existing getTasksByUser to use the new endpoint
-export const getTasksByUser = async (userId) => {
+ 
+// Get tasks by user
+export const getTasksByUser = async (userId, { signal } = {}) => {
+  const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
   
-  if (userId === JSON.parse(localStorage.getItem('user'))?.id) {
-    return getMyTasks();
+  if (userId === currentUser?.id) {
+    return getMyTasks({ signal });
   }
-  const tasks = await getTasks();
+  
+  const tasks = await getTasks({ signal });
   return tasks.filter(t => t.assigneeId === userId);
 };
-
-export const updateTask = async (id, taskData) => {
-  const backendStatus = {
-    'pending': 'PENDING',
-    'in-progress': 'IN_PROGRESS',
-    'completed': 'COMPLETED',
-    'blocked': 'BLOCKED',
-    'review': 'REVIEW'
-  }[taskData.status] || 'PENDING';
-
-  const backendPriority = {
-    'low': 'LOW',
-    'medium': 'MEDIUM',
-    'high': 'HIGH',
-    'critical': 'CRITICAL'
-  }[taskData.priority] || 'MEDIUM';
-
+ 
+// Update task
+export const updateTask = async (id, taskData, { signal } = {}) => {
+  const backendStatus = reverseStatusMap[taskData.status] || 'PENDING';
+  const backendPriority = reversePriorityMap[taskData.priority] || 'MEDIUM';
+ 
   const response = await apiClient(`/tasks/${id}`, {
     method: 'PUT',
     body: JSON.stringify({
       ...taskData,
       status: backendStatus,
       priority: backendPriority
-    })
+    }),
+    signal
   });
   
+  const taskResponse = response.task || response;
+  return normalizeTask(taskResponse);
+};
+ 
+// Update task status
+export const updateTaskStatus = async (taskId, status, progress, { signal } = {}) => {
+  const backendStatus = reverseStatusMap[status] || 'PENDING';
+ 
+  const payload = { status: backendStatus };
   
-   taskData = response.task || response;
+  if (progress !== undefined) {
+    payload.progress = progress;
+  }
+ 
+  const response = await apiClient(`/tasks/${taskId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+    signal
+  });
+  
+  const taskData = response.task || response;
   return normalizeTask(taskData);
 };
-
-// Update task status
-
-export const updateTaskStatus = async (taskId, status, progress) => {
-  try {
-   
-    
-    const backendStatus = {
-      'pending': 'PENDING',
-      'in-progress': 'IN_PROGRESS',
-      'completed': 'COMPLETED',
-      'blocked': 'BLOCKED',
-      'review': 'REVIEW'
-    }[status] || 'PENDING';
-
-    const payload = { 
-      status: backendStatus
-    };
-    
-    if (progress !== undefined) {
-      payload.progress = progress;
-    }
-
-    console.log('Sending payload to backend:', payload);
-
-    const response = await apiClient(`/tasks/${taskId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify(payload)
-    });
-    
  
-    const taskData = response.task || response;
-    return normalizeTask(taskData);
-  } catch (error) {
-    console.error('Error in updateTaskStatus:', error);
-    throw error;
-  }
-};
-
 // Update task progress
-export const updateTaskProgress = async (taskId, progress) => {
+export const updateTaskProgress = async (taskId, progress, { signal } = {}) => {
   const task = await apiClient(`/tasks/${taskId}/progress`, {
     method: 'PUT',
-    body: JSON.stringify({ progress })
+    body: JSON.stringify({ progress }),
+    signal
   });
   return normalizeTask(task);
 };
-
+ 
 // Delete task
-export const deleteTask = async (taskId) => {
+export const deleteTask = async (taskId, { signal } = {}) => {
   return apiClient(`/tasks/${taskId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    signal
   });
 };
-
+ 
 // Assign task to user
-export const assignTask = async (taskId, userId) => {
+export const assignTask = async (taskId, userId, { signal } = {}) => {
   const task = await apiClient(`/tasks/${taskId}/assign`, {
     method: 'PUT',
-    body: JSON.stringify({ userId })
+    body: JSON.stringify({ userId }),
+    signal
   });
   return normalizeTask(task);
 };
-
-
-export const getTaskComments = async (taskId) => {
+ 
+// Get task comments
+export const getTaskComments = async (taskId, { signal } = {}) => {
   try {
-    const comments = await apiClient(`/tasks/${taskId}/comments`);
+    const comments = await apiClient(`/tasks/${taskId}/comments`, { signal });
     return comments;
   } catch (error) {
+    if (error.name === 'AbortError') {
+      return [];
+    }
     console.error('Error fetching comments:', error);
     return [];
   }
 };
-
-
-
-export const addTaskComment = async (taskId, commentData) => {
+ 
+// Add task comment
+export const addTaskComment = async (taskId, commentData, { signal } = {}) => {
   const response = await apiClient(`/tasks/${taskId}/comments`, {
     method: 'POST',
-    body: JSON.stringify(commentData)
+    body: JSON.stringify(commentData),
+    signal
   });
-  return response.comment; // Return only the comment object
+  return response.comment || response;
 };
-export const deleteTaskComment = async (taskId, commentId) => {
+ 
+// Delete task comment
+export const deleteTaskComment = async (taskId, commentId, { signal } = {}) => {
   return await apiClient(`/tasks/${taskId}/comments/${commentId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    signal
   });
 };
-
-
-
+ 
 // Get tasks by team
-export const getTasksByTeam = async (teamId) => {
-  const tasks = await getTasks();
+export const getTasksByTeam = async (teamId, { signal } = {}) => {
+  const tasks = await getTasks({ signal });
   return tasks.filter(t => t.teamId === teamId);
 };
-
+ 
 // Get task statistics
-export const getTaskStats = async (projectId) => {
-  const tasks = projectId ? await getTasksByProject(projectId) : await getTasks();
+export const getTaskStats = async (projectId, { signal } = {}) => {
+  const tasks = projectId ? await getTasksByProject(projectId, { signal }) : await getTasks({ signal });
   
   return {
     total: tasks.length,
@@ -265,6 +252,9 @@ export const getTaskStats = async (projectId) => {
       medium: tasks.filter(t => t.priority === 'medium').length,
       high: tasks.filter(t => t.priority === 'high').length,
       critical: tasks.filter(t => t.priority === 'critical').length
-    }
+    },
+    completionRate: tasks.length > 0
+      ? Math.round((tasks.filter(t => t.status === 'completed').length / tasks.length) * 100)
+      : 0
   };
 };

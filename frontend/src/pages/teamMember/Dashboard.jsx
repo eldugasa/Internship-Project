@@ -1,65 +1,55 @@
 // src/pages/teamMember/Dashboard.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
-import { getMyTasks } from '../../services/tasksService';
-import { updateTaskStatus } from '../../services/tasksService';
+import { getMyTasks, updateTaskStatus } from '../../services/tasksService';
 import { 
   CheckSquare, Clock, AlertCircle, TrendingUp, 
   Calendar, FileText, ChevronRight,
   PlayCircle, CheckCircle, Users, Target,
   Award, Zap, CalendarDays, BellRing,
-  BarChart3, Filter, Search, User, Eye
+  BarChart3, Filter, Search, User, Eye, Loader2
 } from 'lucide-react';
 
-const TeamMemberDashboard = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
+// ============================================
+// 1. QUERY DEFINITIONS
+// ============================================
 
-  const [employee, setEmployee] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [filteredTasks, setFilteredTasks] = useState([]);
-  const [stats, setStats] = useState({});
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [isLoading, setIsLoading] = useState(true);
-  const [updatingTaskId, setUpdatingTaskId] = useState(null);
+export const myTasksQuery = () => ({
+  queryKey: ['team-member', 'my-tasks'],
+  queryFn: async ({ signal }) => {
+    const tasks = await getMyTasks({ signal });
+    return Array.isArray(tasks) ? tasks : [];
+  },
+  staleTime: 1000 * 60 * 3, // 3 minutes
+  gcTime: 1000 * 60 * 10,
+});
 
-  // ============= DATE HELPER FUNCTIONS =============
-  const parseDate = (dateStr) => {
-    if (!dateStr) return null;
-    
-    try {
-      // Handle DD/MM/YYYY format (European)
-      if (typeof dateStr === 'string' && dateStr.includes('/')) {
-        const [day, month, year] = dateStr.split('/');
-        return new Date(`${year}-${month}-${day}`);
-      }
-      return new Date(dateStr);
-    } catch {
-      return null;
+// ============================================
+// 2. HELPER FUNCTIONS
+// ============================================
+
+const parseDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    if (typeof dateStr === 'string' && dateStr.includes('/')) {
+      const [day, month, year] = dateStr.split('/');
+      return new Date(`${year}-${month}-${day}`);
     }
-  };
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+};
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return 'No deadline';
-    
-    try {
-      // Handle DD/MM/YYYY format
-      if (typeof dateStr === 'string' && dateStr.includes('/')) {
-        const [day, month, year] = dateStr.split('/');
-        const date = new Date(`${year}-${month}-${day}`);
-        
-        if (!isNaN(date.getTime())) {
-          return date.toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-          });
-        }
-      }
-      
-      const date = new Date(dateStr);
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'No deadline';
+  try {
+    if (typeof dateStr === 'string' && dateStr.includes('/')) {
+      const [day, month, year] = dateStr.split('/');
+      const date = new Date(`${year}-${month}-${day}`);
       if (!isNaN(date.getTime())) {
         return date.toLocaleDateString('en-US', {
           month: 'short',
@@ -67,69 +57,246 @@ const TeamMemberDashboard = () => {
           year: 'numeric'
         });
       }
+    }
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+    return dateStr;
+  } catch {
+    return dateStr;
+  }
+};
+
+const isOverdue = (dateStr, status) => {
+  if (status === 'completed' || !dateStr) return false;
+  const dueDate = parseDate(dateStr);
+  if (!dueDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+  return dueDate < today;
+};
+
+const isInNextWeek = (dateStr, status) => {
+  if (status === 'completed' || !dateStr) return false;
+  const dueDate = parseDate(dateStr);
+  if (!dueDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const nextWeek = new Date();
+  nextWeek.setDate(nextWeek.getDate() + 7);
+  nextWeek.setHours(23, 59, 59, 999);
+  dueDate.setHours(0, 0, 0, 0);
+  return dueDate >= today && dueDate <= nextWeek;
+};
+
+const isUrgent = (dateStr, priority, status) => {
+  if (status === 'completed' || priority !== 'high' || !dateStr) return false;
+  const dueDate = parseDate(dateStr);
+  if (!dueDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const threeDays = new Date();
+  threeDays.setDate(threeDays.getDate() + 3);
+  threeDays.setHours(23, 59, 59, 999);
+  dueDate.setHours(0, 0, 0, 0);
+  return dueDate >= today && dueDate <= threeDays;
+};
+
+const calculateStats = (tasks, efficiency = 95) => {
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
+  const pendingTasks = tasks.filter(t => t.status === 'pending').length;
+  const overdueTasks = tasks.filter(t => isOverdue(t.dueDate, t.status)).length;
+  const totalHours = tasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
+  const estimatedHours = tasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+
+  return {
+    totalTasks: tasks.length,
+    completedTasks,
+    inProgressTasks,
+    pendingTasks,
+    overdueTasks,
+    efficiency,
+    completionRate: tasks.length > 0 
+      ? Math.round((completedTasks / tasks.length) * 100) 
+      : 0,
+    totalHours,
+    estimatedHours,
+    utilization: estimatedHours > 0 
+      ? Math.round((totalHours / estimatedHours) * 100) 
+      : 0
+  };
+};
+
+// ============================================
+// 3. LOADER (React Router v7)
+// ============================================
+
+export async function teamMemberDashboardLoader() {
+  console.log('🔄 Loading team member dashboard...');
+  
+  try {
+    const tasks = await getMyTasks();
+    return { tasks: Array.isArray(tasks) ? tasks : [] };
+  } catch (error) {
+    console.error('Error loading dashboard:', error);
+    return { tasks: [], error: error.message };
+  }
+}
+
+// ============================================
+// 4. SKELETON COMPONENT (Shows immediately)
+// ============================================
+
+const DashboardSkeleton = () => (
+  <div className="space-y-6 p-6">
+    {/* Welcome Banner Skeleton */}
+    <div className="bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-2xl p-6 lg:p-8">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between">
+        <div className="mb-6 lg:mb-0">
+          <div className="h-8 w-64 bg-white/20 rounded animate-pulse mb-2"></div>
+          <div className="flex items-center space-x-4">
+            <div className="h-4 w-32 bg-white/20 rounded animate-pulse"></div>
+            <div className="h-4 w-32 bg-white/20 rounded animate-pulse"></div>
+          </div>
+        </div>
+        <div className="flex items-center">
+          <div className="w-16 h-16 bg-white/20 rounded-full mr-4 animate-pulse"></div>
+          <div>
+            <div className="h-4 w-24 bg-white/20 rounded animate-pulse mb-1"></div>
+            <div className="h-8 w-32 bg-white/20 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Filters Skeleton */}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex gap-2">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="h-10 w-20 bg-gray-200 rounded-lg animate-pulse"></div>
+        ))}
+      </div>
+      <div className="h-10 w-64 bg-gray-200 rounded-lg animate-pulse"></div>
+    </div>
+
+    {/* Stats Cards Skeleton */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="h-8 w-16 bg-gray-200 rounded animate-pulse mb-1"></div>
+              <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div className="w-12 h-12 bg-gray-200 rounded-lg animate-pulse"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+
+    {/* Main Content Skeleton */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="lg:col-span-2">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="h-6 w-32 bg-gray-200 rounded animate-pulse mb-6"></div>
+          <div className="space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="border border-gray-200 rounded-lg p-4">
+                <div className="h-5 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
+                <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mb-3"></div>
+                <div className="h-2 w-full bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          <div className="h-6 w-40 bg-gray-200 rounded animate-pulse mb-4"></div>
+          <div className="space-y-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="h-16 bg-gray-100 rounded animate-pulse"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ============================================
+// 5. MAIN COMPONENT
+// ============================================
+
+const TeamMemberDashboard = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [updatingTaskId, setUpdatingTaskId] = useState(null);
+
+  // Use React Query for tasks
+  const { 
+    data: tasks = [], 
+    isLoading,
+    error,
+    refetch: refetchTasks
+  } = useQuery({
+    ...myTasksQuery(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
+
+  // Mutation for updating task status
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ taskId, status, progress }) => 
+      updateTaskStatus(taskId, status, progress),
+    onMutate: async ({ taskId, progress, status }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: ['team-member', 'my-tasks'] });
       
-      return dateStr;
-    } catch {
-      return dateStr;
-    }
-  };
+      // Snapshot the previous value
+      const previousTasks = queryClient.getQueryData(['team-member', 'my-tasks']);
+      
+      // Optimistically update
+      queryClient.setQueryData(['team-member', 'my-tasks'], (old) => {
+        if (!old) return old;
+        return old.map(task => 
+          task.id === taskId 
+            ? { ...task, progress, status, actualHours: (task.actualHours || 0) + 1 }
+            : task
+        );
+      });
+      
+      return { previousTasks };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousTasks) {
+        queryClient.setQueryData(['team-member', 'my-tasks'], context.previousTasks);
+      }
+      console.error('Error updating task:', err);
+      alert('Failed to update task progress');
+    },
+    onSettled: () => {
+      // Refetch after mutation
+      queryClient.invalidateQueries({ queryKey: ['team-member', 'my-tasks'] });
+      setUpdatingTaskId(null);
+    },
+  });
 
-  const isOverdue = (dateStr, status) => {
-    if (status === 'completed' || !dateStr) return false;
-    
-    const dueDate = parseDate(dateStr);
-    if (!dueDate) return false;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    dueDate.setHours(0, 0, 0, 0);
-    
-    return dueDate < today;
-  };
-
-  const isInNextWeek = (dateStr, status) => {
-    if (status === 'completed' || !dateStr) return false;
-    
-    const dueDate = parseDate(dateStr);
-    if (!dueDate) return false;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const nextWeek = new Date();
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    nextWeek.setHours(23, 59, 59, 999);
-    
-    dueDate.setHours(0, 0, 0, 0);
-    return dueDate >= today && dueDate <= nextWeek;
-  };
-
-  const isUrgent = (dateStr, priority, status) => {
-    if (status === 'completed' || priority !== 'high' || !dateStr) return false;
-    
-    const dueDate = parseDate(dateStr);
-    if (!dueDate) return false;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const threeDays = new Date();
-    threeDays.setDate(threeDays.getDate() + 3);
-    threeDays.setHours(23, 59, 59, 999);
-    
-    dueDate.setHours(0, 0, 0, 0);
-    return dueDate >= today && dueDate <= threeDays;
-  };
-  // =================================================
-
-  // Load user and tasks
-  useEffect(() => {
-    if (!user) {
-      setIsLoading(false);
-      return;
-    }
-
-    const currentEmployee = {
+  // Employee data from auth context
+  const employee = useMemo(() => {
+    if (!user) return null;
+    return {
       id: user.id,
       name: user.name,
       role: user.role,
@@ -140,27 +307,13 @@ const TeamMemberDashboard = () => {
       joinDate: user.joinDate,
       efficiency: 95
     };
-    
-    setEmployee(currentEmployee);
-
-    const fetchTasks = async () => {
-      try {
-        const employeeTasks = await getMyTasks();
-        setTasks(employeeTasks);
-        setFilteredTasks(employeeTasks);
-        calculateStats(employeeTasks, currentEmployee.efficiency);
-      } catch (err) {
-        console.error('Error fetching tasks:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchTasks();
   }, [user]);
 
-  // Filtering
-  useEffect(() => {
+  // Calculate stats
+  const stats = useMemo(() => calculateStats(tasks, employee?.efficiency || 95), [tasks, employee]);
+
+  // Filter tasks
+  const filteredTasks = useMemo(() => {
     let result = tasks;
 
     if (statusFilter !== 'all') {
@@ -175,106 +328,24 @@ const TeamMemberDashboard = () => {
       );
     }
 
-    setFilteredTasks(result);
-  }, [searchQuery, statusFilter, tasks]);
+    return result;
+  }, [tasks, searchQuery, statusFilter]);
 
-  // Stats Calculator
-// Stats Calculator
-const calculateStats = (employeeTasks, efficiency) => {
-  const completedTasks = employeeTasks.filter(t => t.status === 'completed').length;
-  const inProgressTasks = employeeTasks.filter(t => t.status === 'in-progress').length;
-  const pendingTasks = employeeTasks.filter(t => t.status === 'pending').length;
-  
-  // ✅ Use the isOverdue helper function
-  const overdueTasks = employeeTasks.filter(t => isOverdue(t.dueDate, t.status)).length;
-  
-  const totalHours = employeeTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
-  const estimatedHours = employeeTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
-
-  // Add debug logging
-  console.log('Overdue tasks count:', overdueTasks);
-  console.log('Tasks with overdue status:', employeeTasks.map(t => ({
-    title: t.title,
-    dueDate: t.dueDate,
-    status: t.status,
-    isOverdue: isOverdue(t.dueDate, t.status)
-  })));
-
-  setStats({
-    totalTasks: employeeTasks.length,
-    completedTasks,
-    inProgressTasks,
-    pendingTasks,
-    overdueTasks,
-    efficiency,
-    completionRate: employeeTasks.length > 0 
-      ? Math.round((completedTasks / employeeTasks.length) * 100) 
-      : 0,
-    totalHours,
-    estimatedHours,
-    utilization: estimatedHours > 0 
-      ? Math.round((totalHours / estimatedHours) * 100) 
-      : 0
-  });
-};
-
-  // Handle Task Progress Update
-  const handleUpdateProgress = async (taskId, progress) => {
-    const status = progress === 100 ? 'completed' : 'in-progress';
-    
-    setUpdatingTaskId(taskId);
-    
-    try {
-      // Optimistic update
-      const updatedTasks = tasks.map(task => 
-        task.id === taskId 
-          ? { ...task, progress, status, actualHours: (task.actualHours || 0) + 1 } 
-          : task
-      );
-      setTasks(updatedTasks);
-      calculateStats(updatedTasks, stats.efficiency);
-
-      await updateTaskStatus(taskId, status, progress);
-    } catch (err) {
-      console.error('Error updating task:', err);
-      alert('Failed to update task progress');
-      
-      // Revert on error
-      const originalTasks = await getMyTasks();
-      setTasks(originalTasks);
-      calculateStats(originalTasks, stats.efficiency);
-    } finally {
-      setUpdatingTaskId(null);
-    }
-  };
-
-  const handleStartTask = (taskId) => {
-    handleUpdateProgress(taskId, 0);
-  };
-
-  // Helper Functions using our date helpers
-  const getUrgentTasks = () => {
-    return filteredTasks
-      .filter(task => isUrgent(task.dueDate, task.priority, task.status))
-      .slice(0, 3);
-  };
-
-  const getTodayTasks = () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    return filteredTasks.filter(task => {
-      const dueDate = parseDate(task.dueDate);
-      if (!dueDate) return false;
-      dueDate.setHours(0, 0, 0, 0);
-      return dueDate.getTime() === today.getTime();
-    });
-  };
-
+  // Helper functions using filtered tasks
   const getUpcomingDeadlines = () => {
     return filteredTasks
       .filter(task => isInNextWeek(task.dueDate, task.status))
       .slice(0, 3);
+  };
+
+  const handleUpdateProgress = async (taskId, progress) => {
+    const status = progress === 100 ? 'completed' : 'in-progress';
+    setUpdatingTaskId(taskId);
+    updateTaskMutation.mutate({ taskId, status, progress });
+  };
+
+  const handleStartTask = (taskId) => {
+    handleUpdateProgress(taskId, 0);
   };
 
   const getStatusColor = (status) => {
@@ -295,22 +366,43 @@ const calculateStats = (employeeTasks, efficiency) => {
     }
   };
 
-  // Safe Loading
-  if (isLoading || !employee) {
+  // Show skeleton immediately while loading
+  if (isLoading && tasks.length === 0) {
+    return <DashboardSkeleton />;
+  }
+
+  // Show error state
+  if (error && tasks.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4DA5AD] mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your dashboard...</p>
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600">Failed to load dashboard</p>
+          <button 
+            onClick={() => refetchTasks()}
+            className="mt-4 px-4 py-2 bg-[#4DA5AD] text-white rounded-lg"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );
   }
 
-  // Dashboard JSX (keep all your existing JSX exactly as before)
+  if (!employee) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-[#4DA5AD] animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6 p-6">
-      {/* Welcome Banner - same as before */}
+    <div className="space-y-6 p-6 max-w-7xl mx-auto">
+      {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-2xl p-6 lg:p-8 text-white shadow-lg">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between">
           <div className="mb-6 lg:mb-0">
@@ -339,7 +431,7 @@ const calculateStats = (employeeTasks, efficiency) => {
         </div>
       </div>
 
-      {/* Filters and Search - same as before */}
+      {/* Filters and Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex flex-wrap gap-2">
           {['all', 'pending', 'in-progress', 'completed'].map(status => (
@@ -369,7 +461,7 @@ const calculateStats = (employeeTasks, efficiency) => {
         </div>
       </div>
 
-      {/* Quick Stats - same as before */}
+      {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200">
           <div className="flex items-center justify-between">
@@ -424,7 +516,6 @@ const calculateStats = (employeeTasks, efficiency) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Tasks */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Task List */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-gray-900">My Tasks ({filteredTasks.length})</h2>
@@ -466,7 +557,7 @@ const calculateStats = (employeeTasks, efficiency) => {
                         </div>
                       </div>
 
-                      {/* Action Buttons - FIXED overdue check */}
+                      {/* Action Buttons */}
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
                           Due: {formatDate(task.dueDate)}
@@ -482,7 +573,7 @@ const calculateStats = (employeeTasks, efficiency) => {
                               disabled={isUpdating}
                               className="px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 disabled:opacity-50"
                             >
-                              {isUpdating ? '...' : 'Start'}
+                              {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Start'}
                             </button>
                           )}
                           
@@ -520,7 +611,7 @@ const calculateStats = (employeeTasks, efficiency) => {
 
         {/* Right Column - Stats & Info */}
         <div className="space-y-6">
-          {/* Upcoming Deadlines - FIXED */}
+          {/* Upcoming Deadlines */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">Upcoming Deadlines</h2>
             <div className="space-y-3">

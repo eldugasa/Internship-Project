@@ -1,12 +1,12 @@
 // src/services/teamsService.js
 import { apiClient } from './apiClient';
-
+ 
 // Helper to safely get a number from any value
 const safeNumber = (value, defaultValue = 0) => {
   const num = parseInt(value);
   return isNaN(num) ? defaultValue : Math.max(0, num);
 };
-
+ 
 // Helper to safely get a string from any value
 const safeString = (value, defaultValue = '') => {
   if (value === null || value === undefined) return defaultValue;
@@ -14,10 +14,9 @@ const safeString = (value, defaultValue = '') => {
   if (typeof value === 'object') return defaultValue;
   return String(value);
 };
-
+ 
 // Helper to normalize team data - NO AUTO-ASSIGNMENT
 const normalizeTeam = (team) => {
-  // Safely extract member count
   let memberCount = 0;
   if (team.memberCount !== undefined) {
     memberCount = safeNumber(team.memberCount);
@@ -27,7 +26,6 @@ const normalizeTeam = (team) => {
     memberCount = team.users.length;
   }
   
-  // Safely extract project count
   let projectCount = 0;
   if (team.projectCount !== undefined) {
     projectCount = safeNumber(team.projectCount);
@@ -35,7 +33,6 @@ const normalizeTeam = (team) => {
     projectCount = team.projects.length;
   }
   
-  // Safely extract lead name - ONLY from explicit lead fields
   let leadName = 'Unassigned';
   
   if (team.leadName && typeof team.leadName === 'string' && team.leadName !== 'Unassigned') {
@@ -45,7 +42,6 @@ const normalizeTeam = (team) => {
   } else if (team.lead && typeof team.lead === 'object' && team.lead.name) {
     leadName = safeString(team.lead.name, 'Unassigned');
   }
-  // ❌ REMOVED: No auto-assignment from members
   
   return {
     id: safeNumber(team.id),
@@ -60,23 +56,23 @@ const normalizeTeam = (team) => {
     projects: Array.isArray(team.projects) ? team.projects : []
   };
 };
-
+ 
 // Get all teams
-export const getTeams = async () => {
-  const response = await apiClient('/teams');
+export const getTeams = async ({ signal } = {}) => {
+  const response = await apiClient('/teams', { signal });
   const teams = Array.isArray(response) ? response : (response.teams || []);
   return teams.map(normalizeTeam);
 };
-
+ 
 // Get team by ID
-export const getTeamById = async (teamId) => {
-  const response = await apiClient(`/teams/${teamId}`);
+export const getTeamById = async (teamId, { signal } = {}) => {
+  const response = await apiClient(`/teams/${teamId}`, { signal });
   const team = response.team || response;
   return normalizeTeam(team);
 };
-
+ 
 // Create new team
-export const createTeam = async (teamData) => {
+export const createTeam = async (teamData, { signal } = {}) => {
   try {
     const payload = {
       name: teamData.name,
@@ -86,10 +82,11 @@ export const createTeam = async (teamData) => {
         memberIds: teamData.selectedMembers.map(id => safeNumber(id)) 
       })
     };
-
+ 
     const response = await apiClient('/teams', {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
+      signal
     });
     
     const createdTeam = response.team || response;
@@ -104,46 +101,50 @@ export const createTeam = async (teamData) => {
     throw error;
   }
 };
-
+ 
 // Update team
-export const updateTeam = async (teamId, teamData) => {
+export const updateTeam = async (teamId, teamData, { signal } = {}) => {
   const response = await apiClient(`/teams/${teamId}`, {
     method: 'PUT',
-    body: JSON.stringify(teamData)
+    body: JSON.stringify(teamData),
+    signal
   });
   const team = response.team || response;
   return normalizeTeam(team);
 };
-
+ 
 // Delete team
-export const deleteTeam = async (teamId) => {
+export const deleteTeam = async (teamId, { signal } = {}) => {
   return apiClient(`/teams/${teamId}`, {
-    method: 'DELETE'
+    method: 'DELETE',
+    signal
   });
 };
-
+ 
 // Add member to team
-export const addMemberToTeam = async (teamId, userId) => {
+export const addMemberToTeam = async (teamId, userId, { signal } = {}) => {
   const response = await apiClient(`/teams/${teamId}/add-member`, {
     method: 'PUT',
-    body: JSON.stringify({ userId: safeNumber(userId) })
+    body: JSON.stringify({ userId: safeNumber(userId) }),
+    signal
   });
   const team = response.team || response;
   return normalizeTeam(team);
 };
-
+ 
 // Remove member from team
-export const removeMemberFromTeam = async (teamId, userId) => {
+export const removeMemberFromTeam = async (teamId, userId, { signal } = {}) => {
   const response = await apiClient(`/teams/${teamId}/remove-member`, {
     method: 'PUT',
-    body: JSON.stringify({ userId: safeNumber(userId) })
+    body: JSON.stringify({ userId: safeNumber(userId) }),
+    signal
   });
   const team = response.team || response;
   return normalizeTeam(team);
 };
-
+ 
 // Get team members
-export const getTeamMembers = async (teamId) => {
-  const team = await getTeamById(teamId);
+export const getTeamMembers = async (teamId, { signal } = {}) => {
+  const team = await getTeamById(teamId, { signal });
   return team.members || [];
 };

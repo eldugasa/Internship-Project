@@ -83,7 +83,11 @@ const UsersError = ({ error, onRetry }) => (
   <div className="p-6 flex items-center justify-center min-h-[400px]">
     <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md text-center">
       <h3 className="text-lg font-semibold text-red-800 mb-2">Failed to Load Users</h3>
-      <p className="text-red-600 mb-4">{error || 'Unable to load user data'}</p>
+      <p className="text-red-600 mb-4">
+        {error && error.includes('prisma.user.findMany') 
+          ? 'Database connection failed. Please check your internet connection or try again later.' 
+          : 'Unable to load user data. Please try again.'}
+      </p>
       <button
         onClick={onRetry}
         className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"

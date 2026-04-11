@@ -1,6 +1,7 @@
 // src/components/teamMember/NotificationBell.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
   CheckCircle,
@@ -8,69 +9,189 @@ import {
   Clock,
   MessageSquare,
   UserPlus,
-  UserMinus, // Add this import
+  UserMinus,
   Loader2,
   Trash2,
   X
 } from 'lucide-react';
-import { 
-  getNotifications, 
-  getUnreadCount, 
-  markAsRead, 
+import {
+  getNotifications,
+  getUnreadCount,
+  markAsRead,
   markAllAsRead,
   deleteNotification
 } from '../../services/notificationService';
 
+// ============================================
+// 1. QUERY DEFINITIONS
+// ============================================
+
+const notificationsQuery = (page = 1, limit = 5) => ({
+  queryKey: ['notifications', page, limit],
+  queryFn: async ({ signal }) => {
+    const response = await getNotifications(page, limit, false, { signal });
+    const notificationsData = response.notifications || [];
+    // Remove duplicates by ID
+    return notificationsData.filter(
+      (notification, index, self) =>
+        index === self.findIndex(n => n.id === notification.id)
+    );
+  },
+  staleTime: 1000 * 60 * 1, // 1 minute
+  gcTime: 1000 * 60 * 5,
+});
+
+const unreadCountQuery = () => ({
+  queryKey: ['notifications', 'unread-count'],
+  queryFn: async ({ signal }) => {
+    const response = await getUnreadCount({ signal });
+    return response.count || 0;
+  },
+  staleTime: 1000 * 30, // 30 seconds
+  gcTime: 1000 * 60 * 5,
+  refetchInterval: 30000, // Refetch every 30 seconds
+});
+
+// ============================================
+// 2. COMPONENT
+// ============================================
+
 const NotificationBell = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [showNotifications, setShowNotifications] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
   // Fetch notifications
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await getNotifications(1, 5);
-      
-      // Remove duplicates by ID
-      const notificationsData = response.notifications || [];
-      const uniqueNotifications = notificationsData.filter(
-        (notification, index, self) => 
-          index === self.findIndex(n => n.id === notification.id)
-      );
-      
-      setNotifications(uniqueNotifications);
-    } catch (err) {
-      console.error('Error fetching notifications:', err);
-      setError(err.message || 'Failed to load notifications');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const {
+    data: notifications = [],
+    isLoading,
+    error,
+    refetch: refetchNotifications
+  } = useQuery({
+    ...notificationsQuery(),
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
 
   // Fetch unread count
-  const fetchUnreadCount = async () => {
-    try {
-      const response = await getUnreadCount();
-      setUnreadCount(response.count);
-    } catch (err) {
-      console.error('Error fetching unread count:', err);
-    }
-  };
+  const {
+    data: unreadCount = 0,
+    refetch: refetchUnreadCount
+  } = useQuery({
+    ...unreadCountQuery(),
+  });
 
-  // Initial fetch and polling
-  useEffect(() => {
-    fetchNotifications();
-    fetchUnreadCount();
-    
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // Mark as read mutation
+  const markAsReadMutation = useMutation({
+    mutationFn: async (notificationId) => {
+      await markAsRead(notificationId);
+      return notificationId;
+    },
+    onMutate: async (notificationId) => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+
+      const previousNotifications = queryClient.getQueryData(['notifications', 1, 5]);
+
+      queryClient.setQueryData(['notifications', 1, 5], (old) => {
+        if (!old) return old;
+        return old.map(notif =>
+          notif.id === notificationId ? { ...notif, read: true } : notif
+        );
+      });
+
+      // Optimistically update unread count
+      queryClient.setQueryData(['notifications', 'unread-count'], (old) =>
+        Math.max(0, (old || 0) - 1)
+      );
+
+      return { previousNotifications };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(['notifications', 1, 5], context.previousNotifications);
+      }
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      console.error('Error marking notification as read:', err);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+  });
+
+  // Mark all as read mutation
+  const markAllAsReadMutation = useMutation({
+    mutationFn: async () => {
+      await markAllAsRead();
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+
+      const previousNotifications = queryClient.getQueryData(['notifications', 1, 5]);
+
+      queryClient.setQueryData(['notifications', 1, 5], (old) => {
+        if (!old) return old;
+        return old.map(notif => ({ ...notif, read: true }));
+      });
+
+      queryClient.setQueryData(['notifications', 'unread-count'], 0);
+
+      return { previousNotifications };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(['notifications', 1, 5], context.previousNotifications);
+      }
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      console.error('Error marking all as read:', err);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+  });
+
+  // Delete notification mutation
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (notificationId) => {
+      await deleteNotification(notificationId);
+      return notificationId;
+    },
+    onMutate: async (notificationId) => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+
+      const previousNotifications = queryClient.getQueryData(['notifications', 1, 5]);
+      const deletedNotification = previousNotifications?.find(n => n.id === notificationId);
+
+      queryClient.setQueryData(['notifications', 1, 5], (old) => {
+        if (!old) return old;
+        return old.filter(notif => notif.id !== notificationId);
+      });
+
+      if (deletedNotification && !deletedNotification.read) {
+        queryClient.setQueryData(['notifications', 'unread-count'], (old) =>
+          Math.max(0, (old || 0) - 1)
+        );
+      }
+
+      return { previousNotifications, deletedNotification };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousNotifications) {
+        queryClient.setQueryData(['notifications', 1, 5], context.previousNotifications);
+      }
+      if (context?.deletedNotification && !context.deletedNotification.read) {
+        queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      }
+      console.error('Error deleting notification:', err);
+      alert('Failed to delete notification');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      setDeletingId(null);
+    },
+  });
 
   // Close notifications when clicking outside
   useEffect(() => {
@@ -83,140 +204,93 @@ const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showNotifications]);
 
-  // Mark notification as read
-  const handleMarkAsRead = async (id) => {
-    try {
-      await markAsRead(id);
-      setNotifications(prev =>
-        prev.map(notif =>
-          notif.id === id ? { ...notif, read: true } : notif
-        )
-      );
-      setUnreadCount(prev => Math.max(0, prev - 1));
-    } catch (err) {
-      console.error('Error marking notification as read:', err);
-    }
+  const handleMarkAsRead = (id) => {
+    markAsReadMutation.mutate(id);
   };
 
-  // Mark all as read
-  const handleMarkAllAsRead = async () => {
-    try {
-      await markAllAsRead();
-      setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
-      setUnreadCount(0);
-    } catch (err) {
-      console.error('Error marking all as read:', err);
-    }
+  const handleMarkAllAsRead = () => {
+    markAllAsReadMutation.mutate();
   };
 
-  // Delete single notification
-  const handleDeleteNotification = async (e, notificationId) => {
+  const handleDeleteNotification = (e, notificationId) => {
     e.stopPropagation();
     if (!window.confirm('Delete this notification?')) return;
-    
     setDeletingId(notificationId);
-    try {
-      await deleteNotification(notificationId);
-      setNotifications(prev => prev.filter(n => n.id !== notificationId));
-      
-      const deletedNotif = notifications.find(n => n.id === notificationId);
-      if (deletedNotif && !deletedNotif.read) {
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      }
-    } catch (err) {
-      console.error('Error deleting notification:', err);
-      alert('Failed to delete notification');
-    } finally {
-      setDeletingId(null);
-    }
+    deleteNotificationMutation.mutate(notificationId);
   };
 
-  // Handle notification click
   const handleNotificationClick = (notification) => {
     // Mark as read
     handleMarkAsRead(notification.id);
-    
+
     // Close dropdown
     setShowNotifications(false);
-    
-    // Log for debugging
-    console.log('Notification clicked:', notification);
-    
-    // Navigate based on notification type and data
+
+    // If a team-member receives a link to a project or team,
+    // they do not have a dedicated page for it, so route to dashboard.
     if (notification.link) {
-      // If link is provided directly, use it
-      console.log('Using provided link:', notification.link);
-      navigate(notification.link);
-    } else {
-      // Generate link based on notification type
-      let path = '/team-member/dashboard';
-      
-      // Check for IDs in different possible locations
-      const taskId = notification.taskId || notification.task?.id || notification.data?.taskId;
-      const teamId = notification.teamId || notification.team?.id || notification.data?.teamId;
-      const projectId = notification.projectId || notification.project?.id || notification.data?.projectId;
-      
-      switch(notification.type) {
-        case 'task_assigned':
-        case 'task_assigned_to_me':
-        case 'task_completed':
-        case 'task_completed_by_me':
-        case 'task_overdue':
-        case 'task_overdue_for_me':
-        case 'deadline_approaching':
-        case 'comment_added':
-          // Task related - go to task details if taskId exists
-          if (taskId) {
-            path = `/team-member/tasks/${taskId}`;
-          } else {
-            path = '/team-member/tasks';
-          }
-          break;
-          
-        case 'added_to_team':
-        case 'member_joined': // Add this
-          // Team related - go to team page if teamId exists
-          if (teamId) {
-            path = `/team-member/teams/${teamId}`;
-          } else {
-            path = '/team-member/teams';
-          }
-          break;
-          
-        case 'member_removed': // Add this
-          // Team removal - go to teams list
-          path = '/team-member/teams';
-          break;
-          
-        case 'project_created':
-        case 'project_updated':
-          // Project related
-          if (projectId) {
-            path = `/team-member/projects/${projectId}`;
-          } else {
-            path = '/team-member/projects';
-          }
-          break;
-          
-        default:
-          // Default fallback
-          path = '/team-member/dashboard';
+      if (notification.link.includes('/teams') || notification.link.includes('/projects')) {
+        navigate('/team-member/dashboard');
+      } else {
+        // Fix legacy broken links in the database from comments that start with /tasks/
+        let finalLink = notification.link;
+        if (finalLink.startsWith('/tasks/')) {
+          finalLink = `/team-member${finalLink}`;
+        }
+        navigate(finalLink);
       }
-      
-      console.log('Navigating to generated path:', path);
-      navigate(path);
+      return;
     }
+
+    // Safely parse notification.data in case it was cast to a string by the DB
+    let parsedData = notification.data || {};
+    if (typeof parsedData === 'string') {
+      try { parsedData = JSON.parse(parsedData); } catch (e) {}
+    }
+
+    // Fallback if no link
+    let path = '/team-member/dashboard';
+
+    const taskId = notification.taskId || notification.task?.id || parsedData?.taskId;
+
+    switch (notification.type) {
+      case 'task_assigned':
+      case 'task_assigned_to_me':
+      case 'task_completed':
+      case 'task_completed_by_me':
+      case 'task_overdue':
+      case 'task_overdue_for_me':
+      case 'deadline_approaching':
+      case 'comment_added':
+        if (taskId) {
+          path = `/team-member/tasks/${taskId}`;
+        } else {
+          path = '/team-member/tasks';
+        }
+        break;
+
+      case 'added_to_team':
+      case 'member_joined':
+      case 'member_removed':
+      case 'project_created':
+      case 'project_updated':
+        path = '/team-member/dashboard';
+        break;
+
+      default:
+        path = '/team-member/dashboard';
+    }
+
+    navigate(path);
   };
 
-  // Navigate to full notifications page
   const handleViewAllClick = () => {
     setShowNotifications(false);
-    navigate('/team-member/notifications', { replace: true });
+    navigate('/team-member/notifications');
   };
 
-  // Get icon based on notification type - UPDATED with member events
   const getNotificationIcon = (type) => {
-    switch(type) {
+    switch (type) {
       case 'task_assigned':
       case 'task_assigned_to_me':
         return { icon: CheckCircle, color: 'text-green-500', bg: 'bg-green-50' };
@@ -231,9 +305,9 @@ const NotificationBell = () => {
       case 'comment_added':
         return { icon: MessageSquare, color: 'text-blue-500', bg: 'bg-blue-50' };
       case 'added_to_team':
-      case 'member_joined': // Add this
+      case 'member_joined':
         return { icon: UserPlus, color: 'text-green-500', bg: 'bg-green-50' };
-      case 'member_removed': // Add this
+      case 'member_removed':
         return { icon: UserMinus, color: 'text-red-500', bg: 'bg-red-50' };
       default:
         return { icon: Bell, color: 'text-gray-500', bg: 'bg-gray-50' };
@@ -260,7 +334,14 @@ const NotificationBell = () => {
           <div className="p-4 border-b border-gray-200 flex justify-between items-center">
             <h3 className="font-semibold text-gray-900">Notifications</h3>
             {unreadCount > 0 && (
-              <button onClick={handleMarkAllAsRead} className="text-xs text-[#194f87] hover:underline">
+              <button
+                onClick={handleMarkAllAsRead}
+                disabled={markAllAsReadMutation.isPending}
+                className="text-xs text-[#194f87] hover:underline disabled:opacity-50"
+              >
+                {markAllAsReadMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
+                ) : null}
                 Mark all as read
               </button>
             )}
@@ -268,32 +349,36 @@ const NotificationBell = () => {
 
           {/* Notifications List */}
           <div className="max-h-96 overflow-y-auto">
-            {loading ? (
+            {isLoading ? (
               <div className="p-8 flex justify-center">
                 <Loader2 className="w-6 h-6 animate-spin text-[#194f87]" />
               </div>
             ) : error ? (
               <div className="p-8 text-center text-red-500">
-                <p className="mb-2">{error}</p>
-                <button onClick={fetchNotifications} className="text-xs text-[#194f87] hover:underline">
+                <p className="mb-2">{error?.message || 'Failed to load notifications'}</p>
+                <button
+                  onClick={() => refetchNotifications()}
+                  className="text-xs text-[#194f87] hover:underline"
+                >
                   Retry
                 </button>
               </div>
             ) : notifications.length > 0 ? (
               notifications.map((notification) => {
                 const { icon: Icon, color, bg } = getNotificationIcon(notification.type);
+                const isDeleting = deletingId === notification.id;
+
                 return (
                   <div
                     key={notification.id}
-                    className={`group relative p-4 border-b border-gray-100 hover:bg-gray-50 transition ${
-                      !notification.read ? 'bg-blue-50/30' : ''
-                    }`}
+                    className={`group relative p-4 border-b border-gray-100 hover:bg-gray-50 transition ${!notification.read ? 'bg-blue-50/30' : ''
+                      }`}
                   >
                     <div className="flex gap-3">
                       <div className={`flex-shrink-0 w-8 h-8 rounded-lg ${bg} flex items-center justify-center`}>
                         <Icon className={`w-4 h-4 ${color}`} />
                       </div>
-                      <div 
+                      <div
                         className="flex-1 cursor-pointer"
                         onClick={() => handleNotificationClick(notification)}
                       >
@@ -318,15 +403,15 @@ const NotificationBell = () => {
                           </span>
                         </div>
                       </div>
-                      
+
                       {/* Delete button */}
                       <button
                         onClick={(e) => handleDeleteNotification(e, notification.id)}
-                        disabled={deletingId === notification.id}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full"
+                        disabled={isDeleting}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full disabled:opacity-50"
                         title="Delete notification"
                       >
-                        {deletingId === notification.id ? (
+                        {isDeleting ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
                           <X className="w-3.5 h-3.5" />
@@ -347,7 +432,7 @@ const NotificationBell = () => {
 
           {/* Footer */}
           <div className="p-3 border-t border-gray-200 text-center">
-            <button 
+            <button
               onClick={handleViewAllClick}
               className="text-sm text-[#194f87] hover:underline font-medium"
             >

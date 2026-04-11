@@ -29,7 +29,7 @@ const ProjectCard = ({ project, compact = false }) => {
           <h3 className="font-bold text-gray-900">{project.name}</h3>
           <div className="flex items-center gap-2 mt-2">
             <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
-              {project.team}
+              {project.team || project.teamName}
             </span>
             <span className={`px-3 py-1 rounded-full text-xs font-medium ${
               project.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -54,7 +54,7 @@ const ProjectCard = ({ project, compact = false }) => {
       </div>
       
       <div className="text-sm text-gray-600">
-        Manager: {project.manager} • Due: {project.dueDate}
+        Manager: {project.managerName || project.manager} • Due: {project.dueDate}
       </div>
     </div>
   );

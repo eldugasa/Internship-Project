@@ -2,21 +2,69 @@
 import { getProjects } from '../../services/projectsService';
 import { getTasks } from '../../services/tasksService';
 import { getTeams } from '../../services/teamsService';
+import { queryClient } from '../../services/apiClient';
+
+// ============================================
+// 1. QUERY DEFINITIONS
+// ============================================
+
+export const progressProjectsQuery = () => ({
+  queryKey: ['progress', 'projects'],
+  queryFn: async ({ signal }) => {
+    const projects = await getProjects({ signal });
+    return Array.isArray(projects) ? projects : [];
+  },
+  staleTime: 1000 * 60 * 3,
+  gcTime: 1000 * 60 * 10,
+});
+
+export const progressTasksQuery = () => ({
+  queryKey: ['progress', 'tasks'],
+  queryFn: async ({ signal }) => {
+    const tasks = await getTasks({ signal });
+    return Array.isArray(tasks) ? tasks : [];
+  },
+  staleTime: 1000 * 60 * 3,
+  gcTime: 1000 * 60 * 10,
+});
+
+export const progressTeamsQuery = () => ({
+  queryKey: ['progress', 'teams'],
+  queryFn: async ({ signal }) => {
+    const teams = await getTeams({ signal });
+    return Array.isArray(teams) ? teams : [];
+  },
+  staleTime: 1000 * 60 * 5,
+  gcTime: 1000 * 60 * 10,
+});
+
+// ============================================
+// 2. HELPER FUNCTIONS
+// ============================================
+
+const parseDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    if (typeof dateStr === 'string' && dateStr.includes('/')) {
+      const [day, month, year] = dateStr.split('/');
+      return new Date(`${year}-${month}-${day}`);
+    }
+    return new Date(dateStr);
+  } catch {
+    return null;
+  }
+};
 
 // Calculate overall stats
 export const calculateStats = (projects, tasks, teams) => {
   const totalProjects = projects.length;
   const activeProjects = projects.filter(p => 
-    p.status === 'active' || p.status === 'in_progress'
+    p.status === 'active' || p.status === 'in_progress' || p.status === 'in-progress'
   ).length;
-  const completedProjects = projects.filter(p => 
-    p.status === 'completed'
-  ).length;
+  const completedProjects = projects.filter(p => p.status === 'completed').length;
   
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => 
-    t.status === 'completed' || t.status === 'done'
-  ).length;
+  const completedTasks = tasks.filter(t => t.status === 'completed').length;
   
   const overdueTasks = tasks.filter(t => 
     t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'
@@ -46,19 +94,23 @@ export const calculateProjectTimeline = (projects, tasks) => {
     
     if (endDate) {
       const today = new Date();
-      const deadline = new Date(endDate);
-      const diffTime = deadline - today;
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      if (diffDays < 0) {
-        daysRemaining = `${Math.abs(diffDays)} days overdue`;
-        overdue = true;
-      } else if (diffDays === 0) {
-        daysRemaining = 'Due today';
-      } else if (diffDays === 1) {
-        daysRemaining = '1 day left';
-      } else {
-        daysRemaining = `${diffDays} days left`;
+      today.setHours(0, 0, 0, 0);
+      const deadline = parseDate(endDate);
+      if (deadline) {
+        deadline.setHours(0, 0, 0, 0);
+        const diffTime = deadline - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays < 0) {
+          daysRemaining = `${Math.abs(diffDays)} days overdue`;
+          overdue = true;
+        } else if (diffDays === 0) {
+          daysRemaining = 'Due today';
+        } else if (diffDays === 1) {
+          daysRemaining = '1 day left';
+        } else {
+          daysRemaining = `${diffDays} days left`;
+        }
       }
     }
 
@@ -78,9 +130,9 @@ export const calculateProjectTimeline = (projects, tasks) => {
       progress,
       daysRemaining,
       overdue,
-      teamName: project.teamName,
+      teamName: project.teamName || project.team?.name || 'Unassigned',
       startDate: project.startDate,
-      endDate: project.endDate || project.dueDate,
+      endDate,
       tasks: {
         total: totalTasks,
         completed: completedTasks
@@ -104,7 +156,7 @@ export const calculateTeamPerformance = (teams, projects, tasks) => {
     
     const totalTasks = teamTasks.length;
     const completedTasks = teamTasks.filter(t => t.status === 'completed').length;
-    const inProgressTasks = teamTasks.filter(t => t.status === 'in-progress').length;
+    const inProgressTasks = teamTasks.filter(t => t.status === 'in-progress' || t.status === 'in_progress').length;
     const overdueTasks = teamTasks.filter(t => 
       t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'
     ).length;
@@ -114,7 +166,7 @@ export const calculateTeamPerformance = (teams, projects, tasks) => {
     return {
       teamId: team.id,
       teamName: team.name,
-      memberCount: team.memberCount || team.users?.length || 0,
+      memberCount: team.memberCount || team.members?.length || 0,
       projects: teamProjects.length,
       totalTasks,
       completedTasks,
@@ -124,7 +176,7 @@ export const calculateTeamPerformance = (teams, projects, tasks) => {
     };
   });
 
-  return performance;
+  return performance.sort((a, b) => b.performance - a.performance);
 };
 
 // Calculate member workload
@@ -132,12 +184,15 @@ export const calculateMemberWorkload = (tasks, teams, projects) => {
   const assigneeMap = new Map();
   
   tasks.forEach(task => {
-    if (task.assigneeId && task.assigneeName) {
-      if (!assigneeMap.has(task.assigneeId)) {
-        assigneeMap.set(task.assigneeId, {
-          id: task.assigneeId,
-          name: task.assigneeName,
-          avatar: task.assigneeName?.charAt(0).toUpperCase() || 'U',
+    const assigneeId = task.assigneeId || task.assignedTo;
+    const assigneeName = task.assigneeName || task.assignee?.name;
+    
+    if (assigneeId && assigneeName) {
+      if (!assigneeMap.has(assigneeId)) {
+        assigneeMap.set(assigneeId, {
+          id: assigneeId,
+          name: assigneeName,
+          avatar: assigneeName?.charAt(0).toUpperCase() || 'U',
           role: 'Team Member',
           team: task.teamName || 'Unassigned',
           activeTasks: 0,
@@ -149,14 +204,14 @@ export const calculateMemberWorkload = (tasks, teams, projects) => {
         });
       }
       
-      const member = assigneeMap.get(task.assigneeId);
+      const member = assigneeMap.get(assigneeId);
       member.totalTasks++;
       member.totalHours += task.actualHours || 0;
       member.estimatedHours += task.estimatedHours || 0;
       
       if (task.status === 'completed') {
         member.completedTasks++;
-      } else if (task.status === 'in-progress' || task.status === 'pending') {
+      } else if (task.status === 'in-progress' || task.status === 'in_progress' || task.status === 'pending') {
         member.activeTasks++;
       }
       
@@ -168,19 +223,43 @@ export const calculateMemberWorkload = (tasks, teams, projects) => {
 
   const workload = Array.from(assigneeMap.values()).map(member => ({
     ...member,
-    efficiency: member.estimatedHours > 0 
-      ? Math.round((member.totalHours / member.estimatedHours) * 100) 
-      : 100
+    efficiency: member.totalTasks > 0 
+      ? Math.round((member.completedTasks / member.totalTasks) * 100)
+      : 0
   }));
 
   return workload.sort((a, b) => (b.activeTasks + b.overdueTasks) - (a.activeTasks + a.overdueTasks));
 };
 
-// Main loader - Return promises directly for instant navigation
-export function progressLoader() {
-  return {
-    projects: getProjects(),
-    tasks: getTasks(),
-    teams: getTeams()
-  };
+// ============================================
+// 3. LOADER (React Router)
+// ============================================
+
+export async function progressLoader() {
+  console.log('🔄 Loading progress data...');
+  
+  try {
+    const [projects, tasks, teams] = await Promise.all([
+      queryClient.ensureQueryData(progressProjectsQuery()),
+      queryClient.ensureQueryData(progressTasksQuery()),
+      queryClient.ensureQueryData(progressTeamsQuery())
+    ]);
+    
+    console.log(`📦 Loaded: ${projects.length} projects, ${tasks.length} tasks, ${teams.length} teams`);
+    
+    return {
+      projects,
+      tasks,
+      teams
+    };
+  } catch (error) {
+    console.error('❌ Error loading progress data:', error);
+    return {
+      projects: [],
+      tasks: [],
+      teams: []
+    };
+  }
 }
+
+export default progressLoader;

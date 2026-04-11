@@ -27,13 +27,13 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // Normalize allowed roles
   const normalizedAllowedRoles = allowedRoles?.map(role => normalizeRole(role));
 
-  // If allowedRoles is provided, enforce it
+  
   if (normalizedAllowedRoles && !normalizedAllowedRoles.includes(userRole)) {
-    // 🚫 Don’t redirect into another protected route (loop risk)
+   
     return <Navigate to="/login" replace />;
   }
 
-  // ✅ Render nested routes correctly
+  //  Render nested routes correctly
   return children ? children : <Outlet />;
 };
 

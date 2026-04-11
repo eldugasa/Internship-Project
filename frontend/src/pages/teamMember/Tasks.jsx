@@ -1,22 +1,171 @@
 // src/pages/teamMember/Tasks.jsx
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Search, Filter, Eye, Clock, Flag, Calendar,
   PlayCircle, CheckCircle, MoreVertical, ChevronDown,
-  SortAsc, SortDesc, Download
+  SortAsc, SortDesc, Download, Loader2, AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getMyTasks } from '../../services/tasksService';
-import { updateTask } from '../../services/tasksService';
+import { getMyTasks, updateTask } from '../../services/tasksService';
+
+// ============================================
+// 1. QUERY DEFINITIONS
+// ============================================
+
+export const myTasksQuery = () => ({
+  queryKey: ['team-member', 'tasks'],
+  queryFn: async ({ signal }) => {
+    const tasks = await getMyTasks({ signal });
+    return Array.isArray(tasks) ? tasks : [];
+  },
+  staleTime: 1000 * 60 * 3,
+  gcTime: 1000 * 60 * 10,
+});
+
+// ============================================
+// 2. HELPER FUNCTIONS
+// ============================================
+
+const parseDate = (dateStr) => {
+  if (!dateStr) return null;
+  try {
+    if (typeof dateStr === 'string' && dateStr.includes('/')) {
+      const [day, month, year] = dateStr.split('/');
+      return new Date(`${year}-${month}-${day}`);
+    }
+    const date = new Date(dateStr);
+    return isNaN(date.getTime()) ? null : date;
+  } catch {
+    return null;
+  }
+};
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return 'No deadline';
+  return dateStr;
+};
+
+const isOverdue = (task) => {
+  const dueDate = task.dueDate || task.deadline;
+  if (!dueDate || task.status === 'completed') return false;
+  const parsedDate = parseDate(dueDate);
+  if (!parsedDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  parsedDate.setHours(0, 0, 0, 0);
+  return parsedDate < today;
+};
+
+const getStatusColor = (status) => {
+  switch (status) {
+    case 'completed': return 'bg-green-100 text-green-800';
+    case 'in-progress': return 'bg-blue-100 text-blue-800';
+    case 'pending': return 'bg-yellow-100 text-yellow-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
+
+const getPriorityColor = (priority) => {
+  switch (priority) {
+    case 'high': return 'bg-red-100 text-red-800';
+    case 'medium': return 'bg-yellow-100 text-yellow-800';
+    case 'low': return 'bg-green-100 text-green-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
+
+const getPriorityIcon = (priority) => {
+  switch (priority) {
+    case 'high': return <Flag className="w-3 h-3 text-red-500" />;
+    case 'medium': return <Flag className="w-3 h-3 text-yellow-500" />;
+    case 'low': return <Flag className="w-3 h-3 text-green-500" />;
+    default: return <Flag className="w-3 h-3 text-gray-500" />;
+  }
+};
+
+// Extract unique projects from tasks
+const extractProjects = (tasks) => {
+  const uniqueProjects = [];
+  const projectIds = new Set();
+  
+  tasks.forEach(task => {
+    if (task.projectId && !projectIds.has(task.projectId)) {
+      projectIds.add(task.projectId);
+      uniqueProjects.push({
+        id: task.projectId,
+        name: task.projectName || task.project || 'Unknown Project'
+      });
+    }
+  });
+  
+  return uniqueProjects;
+};
+
+// ============================================
+// 3. SKELETON COMPONENT
+// ============================================
+
+const TasksSkeleton = () => (
+  <div className="space-y-6 p-6">
+    {/* Header Skeleton */}
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <div className="h-8 w-32 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-4 w-48 bg-gray-200 rounded mt-2 animate-pulse"></div>
+      </div>
+      <div className="h-10 w-24 bg-gray-200 rounded-lg animate-pulse"></div>
+    </div>
+
+    {/* Filters Skeleton */}
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="flex-1 h-10 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-10 w-24 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-10 w-48 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+    </div>
+
+    {/* Tasks Grid Skeleton */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+          <div className="flex justify-between items-start mb-4">
+            <div className="flex-1">
+              <div className="h-6 w-48 bg-gray-200 rounded animate-pulse mb-2"></div>
+              <div className="h-4 w-32 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+            <div className="w-8 h-8 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="flex gap-2 mb-4">
+            <div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse"></div>
+            <div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse"></div>
+          </div>
+          <div className="mb-4">
+            <div className="h-4 w-full bg-gray-200 rounded animate-pulse mb-2"></div>
+            <div className="h-2 w-full bg-gray-200 rounded animate-pulse"></div>
+          </div>
+          <div className="flex justify-between">
+            <div className="h-8 w-24 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-8 w-20 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// ============================================
+// 4. MAIN COMPONENT
+// ============================================
 
 const TeamMemberTasks = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
-  const [tasks, setTasks] = useState([]);
-  const [filteredTasks, setFilteredTasks] = useState([]);
+  // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -24,67 +173,76 @@ const TeamMemberTasks = () => {
   const [sortBy, setSortBy] = useState('deadline');
   const [sortOrder, setSortOrder] = useState('asc');
   const [showFilters, setShowFilters] = useState(false);
-  const [projects, setProjects] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
 
-  // Fetch tasks from backend
-  useEffect(() => {
-    if (!user) return setIsLoading(false);
+  // React Query for tasks
+  const { 
+    data: tasks = [], 
+    isLoading,
+    error,
+    refetch: refetchTasks
+  } = useQuery({
+    ...myTasksQuery(),
+    enabled: !!user,
+    refetchInterval: 30000,
+  });
 
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        
-        // ✅ Get only tasks assigned to current user
-        const userTasks = await getMyTasks();
-        setTasks(userTasks);
-        setFilteredTasks(userTasks);
+  // Extract unique projects from tasks
+  const projects = useMemo(() => extractProjects(tasks), [tasks]);
 
-        
-        const uniqueProjects = [];
-        const projectIds = new Set();
-        
-        userTasks.forEach(task => {
-          if (task.projectId && !projectIds.has(task.projectId)) {
-            projectIds.add(task.projectId);
-            uniqueProjects.push({
-              id: task.projectId,
-              name: task.projectName || task.project || 'Unknown Project'
-            });
-          }
-        });
-        
-        setProjects(uniqueProjects);
-      } catch (err) {
-        console.error('Error fetching tasks:', err);
-        alert('Failed to load tasks. Please try again.');
-      } finally {
-        setIsLoading(false);
+  // Update task mutation with optimistic update
+  const updateTaskMutation = useMutation({
+    mutationFn: ({ taskId, progress, status }) => 
+      updateTask(taskId, { progress, status }),
+    onMutate: async ({ taskId, progress, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['team-member', 'tasks'] });
+      
+      const previousTasks = queryClient.getQueryData(['team-member', 'tasks']);
+      
+      queryClient.setQueryData(['team-member', 'tasks'], (old) => {
+        if (!old) return old;
+        return old.map(task =>
+          task.id === taskId 
+            ? { ...task, progress, status, actualHours: (task.actualHours || 0) + 1 }
+            : task
+        );
+      });
+      
+      return { previousTasks };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousTasks) {
+        queryClient.setQueryData(['team-member', 'tasks'], context.previousTasks);
       }
-    };
+      console.error('Error updating task:', err);
+      alert('Failed to update task progress');
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['team-member', 'tasks'] });
+      setUpdatingTaskId(null);
+    },
+  });
 
-    fetchData();
-  }, [user]);
-
-  // Filter & sort tasks
-  useEffect(() => {
+  // Filter and sort tasks
+  const filteredTasks = useMemo(() => {
     let result = [...tasks];
 
-    // Apply filters
+    // Apply status filter
     if (statusFilter !== 'all') {
       result = result.filter(t => t.status === statusFilter);
     }
     
+    // Apply priority filter
     if (priorityFilter !== 'all') {
       result = result.filter(t => t.priority === priorityFilter);
     }
     
+    // Apply project filter
     if (projectFilter !== 'all') {
       result = result.filter(t => t.projectId === parseInt(projectFilter));
     }
 
-    // Apply search
+    // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       result = result.filter(task => 
@@ -101,13 +259,17 @@ const TeamMemberTasks = () => {
         case 'title':
           comparison = a.title.localeCompare(b.title);
           break;
-        case 'priority':
+        case 'priority': {
           const priorityOrder = { high: 3, medium: 2, low: 1 };
           comparison = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
           break;
-        case 'deadline':
-          comparison = new Date(a.dueDate || a.deadline) - new Date(b.dueDate || b.deadline);
+        }
+        case 'deadline': {
+          const dateA = new Date(a.dueDate || a.deadline);
+          const dateB = new Date(b.dueDate || b.deadline);
+          comparison = dateA - dateB;
           break;
+        }
         case 'progress':
           comparison = (b.progress || 0) - (a.progress || 0);
           break;
@@ -117,44 +279,14 @@ const TeamMemberTasks = () => {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
-    setFilteredTasks(result);
+    return result;
   }, [tasks, statusFilter, priorityFilter, projectFilter, searchQuery, sortBy, sortOrder]);
 
-  // Update progress on backend
-  const handleUpdateProgress = async (taskId, progress) => {
+  // Handlers
+  const handleUpdateProgress = (taskId, progress) => {
     const status = progress === 100 ? 'completed' : 'in-progress';
-    
     setUpdatingTaskId(taskId);
-    
-    try {
-      // Optimistic update
-      setTasks(prevTasks => 
-        prevTasks.map(t =>
-          t.id === taskId 
-            ? { ...t, progress, status, actualHours: (t.actualHours || 0) + 1 } 
-            : t
-        )
-      );
-
-      await updateTask(taskId, { 
-        progress, 
-        status
-      });
-    } catch (err) {
-      console.error('Error updating task progress:', err);
-      alert('Failed to update task progress');
-      
-      // Revert on error
-      setTasks(prevTasks => 
-        prevTasks.map(t =>
-          t.id === taskId 
-            ? { ...t, progress: t.progress, status: t.status } 
-            : t
-        )
-      );
-    } finally {
-      setUpdatingTaskId(null);
-    }
+    updateTaskMutation.mutate({ taskId, progress, status });
   };
 
   const handleStartTask = (taskId) => {
@@ -162,47 +294,8 @@ const TeamMemberTasks = () => {
   };
 
   const handleViewTask = (task) => {
-    navigate(`/team-member/tasks/${task.id}`, { 
-      state: { task, refresh: Date.now() } 
-    });
+    navigate(`/team-member/tasks/${task.id}`);
   };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800';
-      case 'in-progress': return 'bg-blue-100 text-blue-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityIcon = (priority) => {
-    switch (priority) {
-      case 'high': return <Flag className="w-3 h-3 text-red-500" />;
-      case 'medium': return <Flag className="w-3 h-3 text-yellow-500" />;
-      case 'low': return <Flag className="w-3 h-3 text-green-500" />;
-      default: return <Flag className="w-3 h-3 text-gray-500" />;
-    }
-  };
-
-  const isOverdue = (task) => {
-    const dueDate = task.dueDate || task.deadline;
-    return dueDate && new Date(dueDate) < new Date() && task.status !== 'completed';
-  };
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return 'No deadline';
-  return dateStr; // Returns "24/02/2026" as is
-};
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -211,16 +304,76 @@ const formatDate = (dateStr) => {
     setProjectFilter('all');
   };
 
-  if (isLoading) {
+  const handleExport = () => {
+    if (filteredTasks.length === 0) {
+      alert('No tasks to export');
+      return;
+    }
+
+    const csvData = filteredTasks.map(task => ({
+      'Task Title': task.title,
+      'Project': task.projectName || 'Unknown',
+      'Status': task.status,
+      'Priority': task.priority,
+      'Due Date': task.dueDate || task.deadline || 'N/A',
+      'Progress': `${task.progress || 0}%`,
+      'Hours': `${task.actualHours || 0}/${task.estimatedHours || 0}`
+    }));
+
+    const headers = Object.keys(csvData[0]);
+    const csv = [
+      headers.join(','),
+      ...csvData.map(row => headers.map(h => `"${row[h] || ''}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `my-tasks-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Show loading state
+  if (isLoading && tasks.length === 0) {
+    return <TasksSkeleton />;
+  }
+
+  // Show error state
+  if (error && tasks.length === 0) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4DA5AD]"></div>
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <p className="text-gray-600 mb-4">Failed to load tasks</p>
+          <button 
+            onClick={() => refetchTasks()}
+            className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93]"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
 
+  // Check if user is logged in
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-[#4DA5AD] animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading your profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all';
+
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -229,8 +382,9 @@ const formatDate = (dateStr) => {
         </div>
         <div className="flex items-center space-x-3">
           <button 
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center transition-colors"
-            onClick={() => window.print()}
+            onClick={handleExport}
+            disabled={filteredTasks.length === 0}
+            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download className="w-4 h-4 mr-2" /> Export
           </button>
@@ -249,6 +403,14 @@ const formatDate = (dateStr) => {
               placeholder="Search tasks by title, description, or project..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <span className="text-lg">×</span>
+              </button>
+            )}
           </div>
 
           <button
@@ -324,17 +486,24 @@ const formatDate = (dateStr) => {
                   <option key={project.id} value={project.id}>{project.name}</option>
                 ))}
               </select>
-              {projects.length === 0 && tasks.length > 0 && (
-                <p className="text-xs text-gray-500 mt-1">Projects will appear once tasks are loaded</p>
-              )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Task Count */}
-      <div className="text-sm text-gray-600">
-        Showing {filteredTasks.length} of {tasks.length} tasks
+      {/* Task Count & Active Filters */}
+      <div className="flex justify-between items-center flex-wrap gap-2">
+        <div className="text-sm text-gray-600">
+          Showing {filteredTasks.length} of {tasks.length} tasks
+        </div>
+        {hasActiveFilters && (
+          <button 
+            onClick={clearFilters}
+            className="text-sm text-[#4DA5AD] hover:underline"
+          >
+            Clear all filters
+          </button>
+        )}
       </div>
 
       {/* Tasks Grid */}
@@ -342,8 +511,8 @@ const formatDate = (dateStr) => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {filteredTasks.map(task => {
             const isTaskUpdating = updatingTaskId === task.id;
-            // Inside your filteredTasks.map, add this temporarily:
-console.log('Task due date:', task.dueDate || task.deadline);
+            const overdue = isOverdue(task);
+            
             return (
               <div 
                 key={task.id} 
@@ -375,7 +544,7 @@ console.log('Task due date:', task.dueDate || task.deadline);
                   <button 
                     onClick={() => handleViewTask(task)} 
                     className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
-                    title="More options"
+                    title="View details"
                   >
                     <MoreVertical className="w-5 h-5" />
                   </button>
@@ -389,7 +558,7 @@ console.log('Task due date:', task.dueDate || task.deadline);
                     {getPriorityIcon(task.priority)}
                     <span className="ml-1 capitalize">{task.priority}</span>
                   </span>
-                  {isOverdue(task) && (
+                  {overdue && (
                     <span className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
                       Overdue
                     </span>
@@ -430,28 +599,41 @@ console.log('Task due date:', task.dueDate || task.deadline);
                       <button 
                         onClick={() => handleStartTask(task.id)} 
                         disabled={isTaskUpdating}
-                        className="px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 flex items-center transition-colors disabled:opacity-50"
                       >
                         {isTaskUpdating ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-700 border-t-transparent mr-1"></div>
+                          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
                         ) : (
                           <PlayCircle className="w-4 h-4 mr-1" />
                         )}
                         Start
                       </button>
                     )}
+                    {task.status === 'in-progress' && task.progress !== 100 && (
+                      <div className="flex gap-1">
+                        {[25, 50, 75, 100].map(percent => (
+                          <button
+                            key={percent}
+                            onClick={() => handleUpdateProgress(task.id, percent)}
+                            disabled={isTaskUpdating}
+                            className={`px-2 py-1 text-xs rounded ${
+                              task.progress === percent 
+                                ? 'bg-[#4DA5AD] text-white' 
+                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            } disabled:opacity-50`}
+                          >
+                            {percent}%
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {task.progress === 100 && (
                       <button 
-                        onClick={() => handleUpdateProgress(task.id, 100)} 
-                        disabled={isTaskUpdating}
-                        className="px-3 py-1.5 bg-green-100 text-green-700 text-sm rounded-lg hover:bg-green-200 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled
+                        className="px-3 py-1.5 bg-green-100 text-green-700 text-sm rounded-lg flex items-center"
                       >
-                        {task.progress === 100 ? (
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                        ) : (
-                          <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-700 border-t-transparent mr-1"></div>
-                        )}
-                        Complete
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Completed
                       </button>
                     )}
                   </div>
@@ -465,11 +647,11 @@ console.log('Task due date:', task.dueDate || task.deadline);
           <div className="text-gray-400 text-4xl mb-4">📝</div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No tasks found</h3>
           <p className="text-gray-500">
-            {searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all' 
+            {hasActiveFilters 
               ? 'No tasks match your filters' 
               : 'You have no assigned tasks yet'}
           </p>
-          {(searchQuery || statusFilter !== 'all' || priorityFilter !== 'all' || projectFilter !== 'all') && (
+          {hasActiveFilters && (
             <button 
               onClick={clearFilters} 
               className="mt-4 px-4 py-2 text-[#4DA5AD] hover:underline"
