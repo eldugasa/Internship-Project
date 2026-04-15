@@ -346,7 +346,7 @@ const TaskDetails = () => {
           </div>
           
           {/* Task Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
             <div className="p-4 bg-gray-50 rounded-lg">
               <div className="flex items-center text-sm text-gray-500 mb-1">
                 <User className="w-4 h-4 mr-2" />
@@ -354,6 +354,16 @@ const TaskDetails = () => {
               </div>
               <div className="font-medium text-gray-900">
                 {task.assignee?.name || task.assigneeName || 'Unassigned'}
+              </div>
+            </div>
+
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center text-sm text-gray-500 mb-1">
+                <User className="w-4 h-4 mr-2" />
+                QA Tester
+              </div>
+              <div className="font-medium text-gray-900">
+                {task.qaTester?.name || task.qaTesterName || 'Unassigned'}
               </div>
             </div>
             

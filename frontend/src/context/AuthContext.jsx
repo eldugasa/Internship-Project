@@ -80,6 +80,9 @@ export const AuthProvider = ({ children }) => {
       case 'project-manager':
       case 'project_manager':
         return '/manager/dashboard';
+      case 'qa-tester':
+      case 'qa_tester':
+        return '/qa-tester/dashboard';
       case 'team-member':
       case 'team_member':
         return '/team-member/dashboard';
@@ -118,6 +121,11 @@ export const AuthProvider = ({ children }) => {
     return role === 'team-member' || role === 'team_member';
   };
 
+  const isQATester = () => {
+    const role = user?.role?.toLowerCase();
+    return role === 'qa-tester' || role === 'qa_tester';
+  };
+
   const value = {
     user,
     loading,
@@ -129,6 +137,7 @@ export const AuthProvider = ({ children }) => {
     hasRole,
     isAdmin,
     isProjectManager,
+    isQATester,
     isTeamMember,
     isAuthenticated: !!user
   };

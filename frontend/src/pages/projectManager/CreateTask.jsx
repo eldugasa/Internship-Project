@@ -5,6 +5,7 @@ import { useActionState } from 'react';
 import { X, Save, Users, AlertCircle } from 'lucide-react';
 import { getProjects } from '../../services/projectsService';
 import { getProjectMembers } from '../../services/projectsService';
+import { getUsers } from '../../services/usersService';
 import { createTask } from '../../services/tasksService';
 
 // Validation functions
@@ -26,27 +27,39 @@ const CreateTask = () => {
 
   const [projects, setProjects] = useState([]);
   const [availableMembers, setAvailableMembers] = useState([]);
+  const [availableQaTesters, setAvailableQaTesters] = useState([]);
   const [fetchingProjects, setFetchingProjects] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState(projectIdFromUrl || '');
+  const qaTesters = availableQaTesters.filter(
+    (member) => ['qa-tester', 'qa_tester'].includes(member.role?.toLowerCase())
+  );
+  const teamMembers = availableMembers.filter(
+    (member) => !['qa-tester', 'qa_tester'].includes(member.role?.toLowerCase())
+  );
 
   // Get today's date in YYYY-MM-DD format for min attribute
   const today = new Date().toISOString().split('T')[0];
 
   // Fetch projects
   useEffect(() => {
-    const fetchProjects = async () => {
+    const fetchInitialData = async () => {
       try {
         setFetchingProjects(true);
-        const data = await getProjects();
-        setProjects(data);
+        const [projectsData, usersData] = await Promise.all([
+          getProjects(),
+          getUsers()
+        ]);
+        setProjects(projectsData);
+        setAvailableQaTesters(usersData);
       } catch (error) {
-        console.error('Error fetching projects:', error);
-        alert('Failed to fetch projects');
+        console.error('Error fetching task form data:', error);
+        alert('Failed to fetch projects and QA testers');
       } finally {
         setFetchingProjects(false);
       }
     };
-    fetchProjects();
+
+    fetchInitialData();
   }, []);
 
   // Fetch team members when project changes
@@ -74,6 +87,7 @@ const CreateTask = () => {
     const description = formData.get("description");
     const projectId = formData.get("projectId");
     const assigneeId = formData.get("assigneeId");
+    const qaTesterId = formData.get("qaTesterId");
     const dueDate = formData.get("dueDate");
     const priority = formData.get("priority") || 'MEDIUM';
     const estimatedHours = formData.get("estimatedHours");
@@ -115,6 +129,7 @@ const CreateTask = () => {
           description,
           projectId,
           assigneeId,
+          qaTesterId,
           dueDate,
           priority,
           estimatedHours
@@ -130,6 +145,7 @@ const CreateTask = () => {
         description,
         projectId: parseInt(projectId),
         assignedTo: parseInt(assigneeId),
+        qaTesterId: qaTesterId ? parseInt(qaTesterId) : null,
         dueDate: new Date(dueDate).toISOString(),
         priority: priority?.toUpperCase() || 'MEDIUM',
         estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null
@@ -154,6 +170,7 @@ const CreateTask = () => {
           description,
           projectId,
           assigneeId,
+          qaTesterId,
           dueDate,
           priority,
           estimatedHours
@@ -170,6 +187,7 @@ const CreateTask = () => {
       description: '',
       projectId: projectIdFromUrl || '',
       assigneeId: '',
+      qaTesterId: '',
       dueDate: '',
       priority: 'MEDIUM',
       estimatedHours: ''
@@ -199,7 +217,7 @@ const CreateTask = () => {
     );
   }
 
-  const selectedProject = projects.find(p => p.id === parseInt(formState.enteredValues?.projectId));
+  const selectedProject = projects.find(p => p.id === parseInt(selectedProjectId || formState.enteredValues?.projectId));
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -255,13 +273,14 @@ const CreateTask = () => {
               />
             </div>
 
-            {/* Project & Assignee */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Project, Assignee & QA Tester */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Project *</label>
                 <select
                   name="projectId"
-                  defaultValue={formState.enteredValues?.projectId}
+                  defaultValue={selectedProjectId || formState.enteredValues?.projectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                 >
                   <option value="">Select project</option>
@@ -275,12 +294,12 @@ const CreateTask = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Assign To *</label>
-                {!formState.enteredValues?.projectId ? (
+                {!selectedProjectId ? (
                   <div className="p-3 bg-gray-50 rounded-lg text-center">
                     <Users className="w-6 h-6 text-gray-400 mx-auto mb-2" />
                     <p className="text-sm text-gray-500">Select a project first</p>
                   </div>
-                ) : availableMembers.length === 0 ? (
+                ) : teamMembers.length === 0 ? (
                   <div className="p-3 bg-gray-50 rounded-lg text-center">
                     <p className="text-sm text-gray-500">No team members available</p>
                   </div>
@@ -291,9 +310,31 @@ const CreateTask = () => {
                     className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
                   >
                     <option value="">Select team member</option>
-                    {availableMembers.map(m => (
+                    {teamMembers.map(m => (
                       <option key={m.id} value={m.id}>
                         {m.name} ({m.role || 'Team Member'})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">QA Tester</label>
+                {qaTesters.length === 0 ? (
+                  <div className="p-3 bg-gray-50 rounded-lg text-center">
+                    <p className="text-sm text-gray-500">No QA testers available</p>
+                  </div>
+                ) : (
+                  <select
+                    name="qaTesterId"
+                    defaultValue={formState.enteredValues?.qaTesterId}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                  >
+                    <option value="">Select QA tester</option>
+                    {qaTesters.map((tester) => (
+                      <option key={tester.id} value={tester.id}>
+                        {tester.name} ({tester.role || 'QA Tester'})
                       </option>
                     ))}
                   </select>

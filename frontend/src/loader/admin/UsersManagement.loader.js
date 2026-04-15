@@ -43,6 +43,7 @@ export const usersLoader = (queryClient) => async () => {
 export const ROLE_OPTIONS = [
   { value: 'admin', label: 'Administrator' },
   { value: 'project-manager', label: 'Project Manager' },
+  { value: 'qa-tester', label: 'QA Tester' },
   { value: 'team-member', label: 'Team Member' },
 ];
 
@@ -54,6 +55,8 @@ export const getRoleColor = (role) => {
       return 'bg-purple-100 text-purple-800';
     case 'project-manager':
       return 'bg-blue-100 text-blue-800';
+    case 'qa-tester':
+      return 'bg-amber-100 text-amber-800';
     case 'team-member':
       return 'bg-green-100 text-green-800';
     default:

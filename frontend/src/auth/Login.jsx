@@ -36,12 +36,13 @@ const SignIn = () => {
     setIsLoading(true);
     
     try {
-      const user = await login(form.email, form.password);
+      const trimmedEmail = form.email.trim();
+      const user = await login(trimmedEmail, form.password);
  
 
       // Remember me functionality
       if (form.rememberMe) {
-        localStorage.setItem('rememberedEmail', form.email);
+        localStorage.setItem('rememberedEmail', trimmedEmail);
       } else {
         localStorage.removeItem('rememberedEmail');
       }
@@ -61,6 +62,9 @@ const SignIn = () => {
             break;
           case 'project-manager':
             navigate('/manager/dashboard');
+            break;
+          case 'qa-tester':
+            navigate('/qa-tester/dashboard');
             break;
           case 'team-member':
             navigate('/team-member/dashboard');

@@ -1,6 +1,10 @@
 // src/controllers/user.controller.js
 import { prisma } from "../config/db.js";
 import bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
+
+const normalizeRole = (role = "TEAM_MEMBER") =>
+  role.toString().trim().toUpperCase().replace(/-/g, "_");
 
 // ------------------ ADMIN ROUTES ------------------
 
@@ -25,9 +29,13 @@ export const updateUserRole = async (req, res) => {
     const { id } = req.params;
     const { role } = req.body;
 
+    if (!role) {
+      return res.status(400).json({ message: "Role is required" });
+    }
+
     const user = await prisma.user.update({
       where: { id: parseInt(id) },
-      data: { role },
+      data: { role: normalizeRole(role) },
       include: {
         team: { select: { id: true, name: true } }
       }
@@ -43,27 +51,61 @@ export const updateUserRole = async (req, res) => {
 // CREATE user (example for POST)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, role, phone, location } = req.body; // ✅ Added phone/location
+    const { name, email, password, role, phone, location, skill } = req.body; 
+
+    const trimmedName = name?.trim();
+    const normalizedEmail = email?.trim().toLowerCase();
+    const normalizedRole = normalizeRole(role);
+
+    if (!trimmedName || !normalizedEmail || !password) {
+      return res.status(400).json({
+        message: "Name, email, and password are required",
+      });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return res.status(400).json({ message: "Please provide a valid email address" });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (existingUser) {
+      return res.status(409).json({ message: "Email already in use" });
+    }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.create({
       data: { 
-        name, 
-        email, 
+        name: trimmedName, 
+        email: normalizedEmail, 
         password: hashedPassword, 
-        role,
-        phone: phone || null,        // ✅ NEW
-        location: location || null    // ✅ NEW
+        role: normalizedRole,
+        phone: phone || null,        
+        location: location || null,
+        skill: skill || null
       },
       include: {
         team: { select: { id: true, name: true } }
       }
     });
 
-    res.json(user);
+    res.status(201).json(user);
   } catch (error) {
     console.error(error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return res.status(409).json({ message: "Email already in use" });
+      }
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -89,8 +131,9 @@ export const getMe = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      phone: user.phone || null,        // ✅ NEW
-      location: user.location || null,   // ✅ NEW
+      phone: user.phone || null,        
+      location: user.location || null,
+      skill: user.skill || null,
       team: user.team,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt
@@ -104,7 +147,7 @@ export const getMe = async (req, res) => {
 // Update current user's profile
 export const updateCurrentUser = async (req, res) => {
   try {
-    const { name, email, phone, location } = req.body; // ✅ Added phone/location
+    const { name, email, phone, location, skill } = req.body; 
 
     const user = await prisma.user.findUnique({
       where: { id: req.user.id }
@@ -119,8 +162,9 @@ export const updateCurrentUser = async (req, res) => {
       data: {
         name: name || user.name,
         email: email || user.email,
-        phone: phone !== undefined ? phone : user.phone,        // ✅ NEW
-        location: location !== undefined ? location : user.location // ✅ NEW
+        phone: phone !== undefined ? phone : user.phone,        
+        location: location !== undefined ? location : user.location,
+        skill: skill !== undefined ? skill : user.skill
       },
       include: {
         team: { select: { id: true, name: true } }
@@ -132,8 +176,9 @@ export const updateCurrentUser = async (req, res) => {
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
-      phone: updatedUser.phone || null,        // ✅ NEW
-      location: updatedUser.location || null,   // ✅ NEW
+      phone: updatedUser.phone || null,        
+      location: updatedUser.location || null,
+      skill: updatedUser.skill || null,
       team: updatedUser.team,
       createdAt: updatedUser.createdAt,
       updatedAt: updatedUser.updatedAt

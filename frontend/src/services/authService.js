@@ -8,9 +8,10 @@ const normalizeRole = (role = "") => {
 };
  
 export const loginApi = async (email, password, { signal } = {}) => {
+  const normalizedEmail = email.trim().toLowerCase();
   const data = await apiClient("/auth/login", {
     method: "POST",
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: normalizedEmail, password }),
     signal,
   });
  

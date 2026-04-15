@@ -9,11 +9,20 @@ import {
 const getTaskById = async (req, res) => {
   try {
     const { id } = req.params;
+    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
 
     const task = await prisma.task.findUnique({
       where: { id: parseInt(id) },
       include: {
         assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        qaTester: {
           select: {
             id: true,
             name: true,
@@ -44,9 +53,10 @@ const getTaskById = async (req, res) => {
     }
 
     if (
-      req.user.role !== "ADMIN" &&
-      req.user.role !== "PROJECT_MANAGER" &&
-      task.assigneeId !== req.user.id
+      normalizedRole !== "ADMIN" &&
+      normalizedRole !== "PROJECT_MANAGER" &&
+      task.assigneeId !== req.user.id &&
+      task.qaTesterId !== req.user.id
     ) {
       return res
         .status(403)
@@ -65,6 +75,8 @@ const getTaskById = async (req, res) => {
       actualHours: task.actualHours,
       assigneeId: task.assigneeId,
       assignee: task.assignee,
+      qaTesterId: task.qaTesterId,
+      qaTester: task.qaTester,
       projectId: task.projectId,
       project: task.project,
       comments: task.comments,
@@ -85,6 +97,7 @@ const createTask = async (req, res) => {
       description,
       projectId,
       assignedTo,
+      qaTesterId,
       dueDate,
       priority,
       estimatedHours,
@@ -97,6 +110,17 @@ const createTask = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: "Assigned user not found" });
+    }
+
+    let qaTester = null;
+    if (qaTesterId) {
+      qaTester = await prisma.user.findUnique({
+        where: { id: Number(qaTesterId) },
+      });
+
+      if (!qaTester) {
+        return res.status(404).json({ message: "QA tester not found" });
+      }
     }
 
     // Get project details to find the manager
@@ -119,12 +143,16 @@ const createTask = async (req, res) => {
         priority: priority || "MEDIUM",
         projectId: Number(projectId),
         assigneeId: Number(assignedTo),
+        qaTesterId: qaTesterId ? Number(qaTesterId) : null,
         dueDate: dueDate ? new Date(dueDate) : null,
         estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
       },
       include: {
         assignee: {
           select: { id: true, name: true, email: true },
+        },
+        qaTester: {
+          select: { id: true, name: true, email: true, role: true },
         },
       },
     });
@@ -152,6 +180,17 @@ const createTask = async (req, res) => {
         data: { taskId: task.id, projectId: task.projectId },
         link: `/team-member/tasks/${task.id}`,
       });
+
+      if (task.qaTesterId) {
+        await createNotification({
+          userId: task.qaTesterId,
+          type: NOTIFICATION_TYPES.TASK_ASSIGNED_TO_ME,
+          title: "Task Assigned for QA",
+          message: `You have been assigned to test "${task.title}" in project "${project.name}"`,
+          data: { taskId: task.id, projectId: task.projectId },
+          link: `/qa-tester/tasks/${task.id}`,
+        });
+      }
     } catch (notifErr) {
       console.error("Error creating notifications:", notifErr);
       // Don't fail the task creation if notifications fail
@@ -179,6 +218,9 @@ const getTasksByProject = async (req, res) => {
         assignee: {
           select: { id: true, name: true, email: true, role: true },
         },
+        qaTester: {
+          select: { id: true, name: true, email: true, role: true },
+        },
         project: {
           select: { id: true, name: true },
         },
@@ -194,12 +236,23 @@ const getTasksByProject = async (req, res) => {
 // Get tasks assigned to the current user (for Team Members)
 const getMyTasks = async (req, res) => {
   try {
+    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const isQaTester = normalizedRole === "QA_TESTER";
+
     const tasks = await prisma.task.findMany({
       where: {
-        assigneeId: req.user.id,
+        ...(isQaTester ? { qaTesterId: req.user.id } : { assigneeId: req.user.id }),
       },
       include: {
         assignee: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+          },
+        },
+        qaTester: {
           select: {
             id: true,
             name: true,
@@ -234,6 +287,8 @@ const getMyTasks = async (req, res) => {
       projectName: task.project?.name || "Unknown Project",
       assigneeId: task.assigneeId,
       assigneeName: task.assignee?.name || "Unassigned",
+      qaTesterId: task.qaTesterId,
+      qaTesterName: task.qaTester?.name || "Unassigned",
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
     }));
@@ -250,6 +305,7 @@ const updateTaskStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, progress } = req.body;
+    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
 
     const task = await prisma.task.findUnique({
       where: { id: Number(id) },
@@ -260,6 +316,9 @@ const updateTaskStatus = async (req, res) => {
         assignee: {
           select: { name: true },
         },
+        qaTester: {
+          select: { id: true, name: true },
+        },
       },
     });
 
@@ -268,10 +327,16 @@ const updateTaskStatus = async (req, res) => {
     }
 
     // TEAM_MEMBER can only update their own tasks
-    if (req.user.role === "TEAM_MEMBER" && task.assigneeId !== req.user.id) {
+    if (normalizedRole === "TEAM_MEMBER" && task.assigneeId !== req.user.id) {
       return res
         .status(403)
         .json({ message: "Forbidden: You can only update your own tasks" });
+    }
+
+    if (normalizedRole === "QA_TESTER" && task.qaTesterId !== req.user.id) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: You can only update QA tasks assigned to you" });
     }
 
     // Prepare update data
@@ -301,6 +366,17 @@ const updateTaskStatus = async (req, res) => {
             link: `/manager/tasks/${task.id}`,
           });
         }
+
+        if (task.assigneeId && normalizedRole === "QA_TESTER") {
+          await createNotification({
+            userId: task.assigneeId,
+            type: NOTIFICATION_TYPES.TASK_COMPLETED,
+            title: "QA Status Updated",
+            message: `QA updated "${task.title}" to ${status}`,
+            data: { taskId: task.id, projectId: task.projectId },
+            link: `/team-member/tasks/${task.id}`,
+          });
+        }
       } catch (notifErr) {
         console.error("Error creating completion notification:", notifErr);
       }
@@ -324,6 +400,9 @@ const getAllTasks = async (req, res) => {
         assignee: {
           select: { id: true, name: true, email: true, role: true },
         },
+        qaTester: {
+          select: { id: true, name: true, email: true, role: true },
+        },
         project: {
           select: { id: true, name: true },
         },
@@ -341,6 +420,7 @@ const updateTaskProgress = async (req, res) => {
   try {
     const { id } = req.params;
     const { progress } = req.body;
+    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
 
     const task = await prisma.task.findUnique({
       where: { id: parseInt(id) },
@@ -351,6 +431,9 @@ const updateTaskProgress = async (req, res) => {
         assignee: {
           select: { name: true },
         },
+        qaTester: {
+          select: { id: true, name: true },
+        },
       },
     });
 
@@ -359,9 +442,10 @@ const updateTaskProgress = async (req, res) => {
     }
 
     if (
-      req.user.role !== "ADMIN" &&
-      req.user.role !== "PROJECT_MANAGER" &&
-      task.assigneeId !== req.user.id
+      normalizedRole !== "ADMIN" &&
+      normalizedRole !== "PROJECT_MANAGER" &&
+      task.assigneeId !== req.user.id &&
+      task.qaTesterId !== req.user.id
     ) {
       return res
         .status(403)
@@ -479,6 +563,7 @@ const addTaskComment = async (req, res) => {
       include: {
         project: { select: { managerId: true } },
         assignee: { select: { id: true } },
+        qaTester: { select: { id: true } },
       },
     });
 
@@ -504,6 +589,9 @@ const addTaskComment = async (req, res) => {
     }
     if (task.assigneeId && task.assigneeId !== req.user.id) {
       notifyUsers.push(task.assigneeId);
+    }
+    if (task.qaTesterId && task.qaTesterId !== req.user.id) {
+      notifyUsers.push(task.qaTesterId);
     }
 
     // Send notifications
@@ -581,6 +669,7 @@ const updateTask = async (req, res) => {
       title,
       description,
       assigneeId,
+      qaTesterId,
       priority,
       dueDate,
       estimatedHours,
@@ -607,6 +696,9 @@ const updateTask = async (req, res) => {
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (assigneeId !== undefined) updateData.assigneeId = parseInt(assigneeId);
+    if (qaTesterId !== undefined) {
+      updateData.qaTesterId = qaTesterId ? parseInt(qaTesterId) : null;
+    }
     if (priority !== undefined) updateData.priority = priority;
     if (dueDate !== undefined) updateData.dueDate = new Date(dueDate);
     if (estimatedHours !== undefined)
@@ -621,6 +713,7 @@ const updateTask = async (req, res) => {
       data: updateData,
       include: {
         assignee: { select: { id: true, name: true, email: true } },
+        qaTester: { select: { id: true, name: true, email: true, role: true } },
         project: { select: { id: true, name: true } },
       },
     });

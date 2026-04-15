@@ -7,7 +7,11 @@ const statusMap = {
   'IN_PROGRESS': 'in-progress',
   'COMPLETED': 'completed',
   'BLOCKED': 'blocked',
-  'REVIEW': 'review'
+  'REVIEW': 'review',
+  'IN_TEST': 'in-test',
+  'PASSED': 'passed',
+  'FAILED': 'failed',
+  'PENDING_RETEST': 'pending-retest'
 };
  
 const reverseStatusMap = {
@@ -15,7 +19,11 @@ const reverseStatusMap = {
   'in-progress': 'IN_PROGRESS',
   'completed': 'COMPLETED',
   'blocked': 'BLOCKED',
-  'review': 'REVIEW'
+  'review': 'REVIEW',
+  'in-test': 'IN_TEST',
+  'passed': 'PASSED',
+  'failed': 'FAILED',
+  'pending-retest': 'PENDING_RETEST'
 };
  
 // Priority mapping
@@ -46,6 +54,9 @@ const normalizeTask = (task) => {
     assigneeId: task.assigneeId || task.assignedTo,
     assignee: task.assignee || null,
     assigneeName: task.assignee?.name || task.assigneeName || 'Unassigned',
+    qaTesterId: task.qaTesterId || null,
+    qaTester: task.qaTester || null,
+    qaTesterName: task.qaTester?.name || task.qaTesterName || 'Unassigned',
     
     projectId: task.projectId,
     project: task.project || null,
@@ -90,6 +101,7 @@ export const createTask = async (taskData, { signal } = {}) => {
     description: taskData.description || '',
     projectId: parseInt(taskData.projectId),
     assignedTo: parseInt(taskData.assigneeId || taskData.assignedTo),
+    qaTesterId: taskData.qaTesterId ? parseInt(taskData.qaTesterId) : null,
     dueDate: taskData.dueDate,
     priority: reversePriorityMap[taskData.priority] || 'MEDIUM',
     estimatedHours: taskData.estimatedHours ? parseFloat(taskData.estimatedHours) : null
@@ -140,6 +152,8 @@ export const updateTask = async (id, taskData, { signal } = {}) => {
     method: 'PUT',
     body: JSON.stringify({
       ...taskData,
+      assigneeId: taskData.assigneeId || taskData.assignedTo,
+      qaTesterId: taskData.qaTesterId ?? null,
       status: backendStatus,
       priority: backendPriority
     }),

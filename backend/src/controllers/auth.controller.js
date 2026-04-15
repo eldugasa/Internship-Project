@@ -5,12 +5,15 @@ import { createNotification, createBulkNotifications, NOTIFICATION_TYPES } from 
 import jwt from 'jsonwebtoken';
 import { sendPasswordResetEmail, sendWelcomeEmail } from '../utils/email.js'; // ✅ Add email imports
 
+const normalizeEmail = (email = "") => email.toString().trim().toLowerCase();
+
 const register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
     const existingUser = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
     if (existingUser) {
@@ -22,7 +25,7 @@ const register = async (req, res) => {
     const user = await prisma.user.create({
       data: {
         name,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         role
       }
@@ -76,9 +79,10 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
     if (!user) {
@@ -112,14 +116,15 @@ const login = async (req, res) => {
 const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
+    const normalizedEmail = normalizeEmail(email);
 
-    if (!email) {
+    if (!normalizedEmail) {
       return res.status(400).json({ message: "Email is required" });
     }
 
     // Find user by email
     const user = await prisma.user.findUnique({
-      where: { email }
+      where: { email: normalizedEmail }
     });
 
     if (!user) {

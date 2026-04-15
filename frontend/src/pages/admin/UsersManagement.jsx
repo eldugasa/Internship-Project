@@ -722,6 +722,9 @@ const UsersManagement = () => {
           <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
             PMs: {users.filter((u) => u.role === "project-manager").length}
           </span>
+          <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-full text-xs">
+            QA Testers: {users.filter((u) => u.role === "qa-tester").length}
+          </span>
           <span className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs">
             Members: {users.filter((u) => u.role === "team-member").length}
           </span>

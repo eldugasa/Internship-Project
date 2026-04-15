@@ -6,9 +6,13 @@ const root = path.join(new URL(import.meta.url).pathname, '..', '..')
 // normalize path for Windows
 const projectRoot = process.platform === 'win32' ? root.replace(/^\//, '') : root
 const prismaBin = path.join(projectRoot, 'node_modules', '.bin', 'prisma')
+const schemaPath = path.join(projectRoot, 'prisma', 'schema.prisma')
 
 function runPrisma() {
-  const res = spawnSync(prismaBin, ['generate'], { stdio: 'inherit' })
+  const res = spawnSync(prismaBin, ['generate', '--schema', schemaPath], {
+    cwd: projectRoot,
+    stdio: 'inherit'
+  })
   return res
 }
 

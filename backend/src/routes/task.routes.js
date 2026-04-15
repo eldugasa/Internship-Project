@@ -34,20 +34,20 @@ router.get("/",
 );
 
 // GET /api/tasks/project/:projectId - Get tasks by project (All roles)
-router.get("/project/:projectId", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"), 
+router.get("/project/:projectId",
+  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   getTasksByProject
 );
 
 // GET /api/tasks/my-tasks - Get tasks for current user (Team Member)
 router.get("/my-tasks",
-  authorize("TEAM_MEMBER", "team-member", "team_member"),
+  authorize("TEAM_MEMBER", "QA_TESTER", "team-member", "team_member", "qa-tester", "qa_tester"),
   getMyTasks
 );
 
 
 router.get("/:id", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"),
+  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   getTaskById
 );
 
@@ -58,8 +58,8 @@ router.put("/:id",
 );
 
 // PUT /api/tasks/:id/status - Update task status
-router.put("/:id/status", 
-  authorize("TEAM_MEMBER", "PROJECT_MANAGER", "project-manager", "project_manager"), 
+router.put("/:id/status",
+  authorize("TEAM_MEMBER", "QA_TESTER", "PROJECT_MANAGER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   updateTaskStatus
 );
 
@@ -68,7 +68,7 @@ router.put("/:id/status",
 // GET /api/tasks/my-tasks - Get tasks for current user (Team Member)
 router.get("/my-tasks", 
   authenticate,
-  authorize("TEAM_MEMBER", "team-member", "team_member"),
+  authorize("TEAM_MEMBER", "QA_TESTER", "team-member", "team_member", "qa-tester", "qa_tester"),
   getMyTasks
 );
 
@@ -88,7 +88,7 @@ router.delete("/:id",
 
 //  GET /api/tasks/:id/comments - Get all comments
 router.get("/:id/comments", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"),
+  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -111,12 +111,12 @@ router.get("/:id/comments",
 
 //  Add a comment
 router.post("/:id/comments", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"),
+  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   addTaskComment
 );
 
 router.delete("/:id/comments/:commentId", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "project-manager", "project_manager"),
+  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   deleteComment // Use the controller function created above
 );
 

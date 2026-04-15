@@ -70,6 +70,15 @@ import TeamMemberProfile from "./pages/teamMember/Profile";
 import TeamMemberNotificationsPage from "./Component/teamMember/TeamMemberNotificationsPage";
 import { queryClient } from "./services/apiClient";
 
+// QA Tester imports
+import QATesterLayout from "./Component/qaTester/QATesterLayout";
+import QATesterDashboard from "./pages/qaTester/Dashboard";
+import QATesterTasks from "./pages/qaTester/Tasks";
+import QATesterTaskDetails from "./pages/qaTester/TaskDetails";
+import QATesterProjects from "./pages/qaTester/Projects";
+import QATesterProfile from "./pages/qaTester/Profile";
+import QATesterNotificationsPage from "./Component/qaTester/QATesterNotificationsPage";
+
 // Create the router
 export const router = createBrowserRouter([
   // Public routes
@@ -262,6 +271,7 @@ export const router = createBrowserRouter([
 
   // Team Member routes
 // Team Member routes
+// Team Member routes
 {
   path: "/team-member",
   element: (
@@ -314,6 +324,57 @@ export const router = createBrowserRouter([
     },
   ],
 },
+
+  // QA Tester routes
+  {
+    path: "/qa-tester",
+    element: (
+      <ProtectedRoute allowedRoles={["qa-tester", "qa_tester", "admin"]}>
+        <QATesterLayout />
+      </ProtectedRoute>
+    ),
+    errorElement: <ErrorPage />,
+    children: [
+      {
+        index: true,
+        element: <Navigate to="dashboard" replace />,
+      },
+      {
+        path: "dashboard",
+        element: <QATesterDashboard />,
+      },
+      {
+        path: "tasks",
+        children: [
+          {
+            index: true,
+            element: <QATesterTasks />,
+          },
+          {
+            path: ":id",
+            element: <QATesterTaskDetails />,
+          },
+        ],
+      },
+      {
+        path: "projects",
+        element: <QATesterProjects />,
+      },
+      {
+        path: "profile",
+        element: <QATesterProfile />,
+      },
+      {
+        path: "notifications",
+        element: <QATesterNotificationsPage />,
+      },
+      {
+        path: "*",
+        element: <Navigate to="dashboard" replace />,
+      },
+    ],
+  },
+
 
   // Dashboard redirect (for backward compatibility)
   {

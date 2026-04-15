@@ -271,10 +271,6 @@ export const getProjectById = async (req, res) => {
 
     if (!project) return res.status(404).json({ message: "Project not found" });
 
-    if (role === "PROJECT_MANAGER" && project.managerId !== req.user.id) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-
     res.json(project);
   } catch (err) {
     console.error("Error fetching project:", err);
