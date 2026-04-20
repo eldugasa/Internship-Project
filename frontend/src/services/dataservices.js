@@ -511,13 +511,19 @@ static initializeData() {
     const taskIndex = tasks.findIndex(t => t.id === taskId);
     
     if (taskIndex !== -1) {
-      const status = progress === 100 ? 'completed' : 'in-progress';
+      const currentTask = tasks[taskIndex];
+      const status =
+        progress === 100
+          ? 'completed'
+          : progress > 0 || currentTask.status === 'in-progress'
+            ? 'in-progress'
+            : 'pending';
       tasks[taskIndex] = {
-        ...tasks[taskIndex],
+        ...currentTask,
         progress: progress,
         status: status,
         updatedAt: new Date().toISOString().split('T')[0],
-        actualHours: (tasks[taskIndex].actualHours || 0) + 1
+        actualHours: (currentTask.actualHours || 0) + 1
       };
       
       this.saveTasks(tasks);

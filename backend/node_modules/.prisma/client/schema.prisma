@@ -70,6 +70,7 @@ model Task {
   description    String?
   status         String    @default("PENDING")
   progress       Int       @default(0)
+  previousProgress Int     @default(0)
   dueDate        DateTime?
   priority       String    @default("MEDIUM")
   estimatedHours Float?

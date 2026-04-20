@@ -1,5 +1,5 @@
 // src/pages/admin/DashboardOverview.jsx
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   PieChart,
@@ -63,23 +63,65 @@ const DashboardSkeleton = () => (
 // Main Dashboard Content Component - Moved outside to prevent recreation
 const DashboardContent = ({ projects, users, teams, tasks }) => {
   const [filter, setFilter] = useState("all");
+  const [viewportWidth, setViewportWidth] = useState(() =>
+    typeof window !== "undefined" ? window.innerWidth : 1280,
+  );
+  const [userRoleChartWidth, setUserRoleChartWidth] = useState(0);
+  const userRoleChartRef = useRef(null);
+  const isMobile = viewportWidth < 640;
+  const isLargeScreen = viewportWidth > 1024;
+
+  const normalizeValue = (value = "") =>
+    value.toString().trim().toUpperCase().replace(/-/g, "_");
+
+  useEffect(() => {
+    const handleResize = () => {
+      setViewportWidth(window.innerWidth);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  useEffect(() => {
+    const element = userRoleChartRef.current;
+    if (!element) return;
+
+    const updateWidth = () => {
+      setUserRoleChartWidth(element.offsetWidth || 0);
+    };
+
+    updateWidth();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateWidth);
+      return () => window.removeEventListener("resize", updateWidth);
+    }
+
+    const observer = new ResizeObserver(updateWidth);
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, []);
 
   // Memoized stats calculation
   const stats = useMemo(() => {
     const projectManagers = users.filter(
-      (u) => u.role === "project-manager" || u.role === "project_manager",
+      (u) => normalizeValue(u.role) === "PROJECT_MANAGER",
     ).length;
 
     const completedTasks = tasks.filter(
-      (t) => t.status === "completed" || t.status === "done",
+      (t) => ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
     ).length;
     const pendingTasks = tasks.filter(
-      (t) => t.status === "pending" || t.status === "todo",
+      (t) => ["PENDING", "TODO"].includes(normalizeValue(t.status)),
     ).length;
     const inProgressTasks = tasks.filter(
-      (t) => t.status === "in-progress" || t.status === "in_progress",
+      (t) => normalizeValue(t.status) === "IN_PROGRESS",
     ).length;
-    const overdueProjects = projects.filter((p) => p.status === "overdue").length;
+    const overdueProjects = projects.filter(
+      (p) => normalizeValue(p.status) === "OVERDUE",
+    ).length;
 
     return {
       totalUsers: users.length,
@@ -87,10 +129,11 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
       totalTeams: teams.length,
       totalProjectManagers: projectManagers,
       activeProjects: projects.filter(
-        (p) => p.status === "active" || p.status === "in_progress",
+        (p) => ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
       ).length,
-      completedProjects: projects.filter((p) => p.status === "completed")
-        .length,
+      completedProjects: projects.filter(
+        (p) => normalizeValue(p.status) === "COMPLETED",
+      ).length,
       totalTasks: tasks.length,
       completedTasks,
       pendingTasks,
@@ -102,12 +145,17 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
   // Memoized project status data
   const projectStatusData = useMemo(() => {
     const statusCounts = {
-      planned: projects.filter((p) => p.status === "planned").length,
+      planned: projects.filter((p) => normalizeValue(p.status) === "PLANNED").length,
       active: projects.filter(
-        (p) => p.status === "active" || p.status === "in_progress",
+        (p) => ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
       ).length,
-      completed: projects.filter((p) => p.status === "completed").length,
-      "on-hold": projects.filter((p) => p.status === "on-hold").length,
+      completed: projects.filter(
+        (p) => normalizeValue(p.status) === "COMPLETED",
+      ).length,
+      overdue: projects.filter((p) => normalizeValue(p.status) === "OVERDUE").length,
+      "on-hold": projects.filter(
+        (p) => normalizeValue(p.status) === "ON_HOLD",
+      ).length,
     };
 
     return [
@@ -142,13 +190,13 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
   // Memoized task status data
   const taskStatusData = useMemo(() => {
     const completedTasks = tasks.filter(
-      (t) => t.status === "completed" || t.status === "done",
+      (t) => ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
     ).length;
     const pendingTasks = tasks.filter(
-      (t) => t.status === "pending" || t.status === "todo",
+      (t) => ["PENDING", "TODO"].includes(normalizeValue(t.status)),
     ).length;
     const inProgressTasks = tasks.filter(
-      (t) => t.status === "in-progress" || t.status === "in_progress",
+      (t) => normalizeValue(t.status) === "IN_PROGRESS",
     ).length;
 
     return [
@@ -168,12 +216,15 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
 
   // Memoized user role data
   const userRoleData = useMemo(() => {
-    const adminCount = users.filter((u) => u.role === "admin").length;
+    const adminCount = users.filter((u) => normalizeValue(u.role) === "ADMIN").length;
     const pmCount = users.filter(
-      (u) => u.role === "project-manager" || u.role === "project_manager",
+      (u) => normalizeValue(u.role) === "PROJECT_MANAGER",
+    ).length;
+    const qaCount = users.filter(
+      (u) => normalizeValue(u.role) === "QA_TESTER",
     ).length;
     const tmCount = users.filter(
-      (u) => u.role === "team-member" || u.role === "team_member",
+      (u) => normalizeValue(u.role) === "TEAM_MEMBER",
     ).length;
 
     return [
@@ -187,6 +238,11 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
         name: "Team Members",
         value: tmCount,
         color: DASHBOARD_COLORS["team-member"],
+      },
+      {
+        name: "QA Testers",
+        value: qaCount,
+        color: DASHBOARD_COLORS["qa-tester"] || "#F59E0B",
       },
     ].filter((item) => item.value > 0);
   }, [users]);
@@ -239,7 +295,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
         );
 
         const completedTeamTasks = teamTasks.filter(
-          (t) => t.status === "completed" || t.status === "done",
+          (t) => ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
         ).length;
         const totalTeamTasks = teamTasks.length;
         const completionRate =
@@ -259,8 +315,77 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
   // Memoized filtered projects (only recalculates when filter or projects change)
   const filteredProjects = useMemo(() => {
     if (filter === "all") return projects;
-    return projects.filter((p) => p.status === filter);
+    if (filter === "active") {
+      return projects.filter((p) =>
+        ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
+      );
+    }
+    return projects.filter((p) => normalizeValue(p.status) === normalizeValue(filter));
   }, [projects, filter]);
+
+  const renderWrappedLegend = ({ payload }) => {
+    if (!payload?.length) return null;
+
+    return (
+      <div className="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-2 px-2 text-center">
+        {payload.map((entry, index) => (
+          <div
+            key={`${entry.value}-${index}`}
+            className="flex max-w-[120px] items-start gap-2 break-words sm:max-w-[140px]"
+          >
+            <span
+              className="mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full"
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="whitespace-normal break-words leading-tight text-gray-600">
+              {entry.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderResponsivePieLabel = ({ name, percent, x, y, textAnchor, fill }) => {
+    const labelText = `${name} ${(percent * 100).toFixed(0)}%`;
+    const maxCharsPerLine =
+      userRoleChartWidth > 430 ? 18 : userRoleChartWidth > 360 ? 14 : 10;
+    const words = labelText.split(" ");
+    const lines = [];
+    let currentLine = "";
+
+    words.forEach((word) => {
+      const nextLine = currentLine ? `${currentLine} ${word}` : word;
+      if (nextLine.length <= maxCharsPerLine) {
+        currentLine = nextLine;
+      } else {
+        if (currentLine) lines.push(currentLine);
+        currentLine = word;
+      }
+    });
+
+    if (currentLine) lines.push(currentLine);
+
+    return (
+        <text
+          x={x}
+          y={y}
+          fill={fill || "#374151"}
+          textAnchor={textAnchor}
+          fontSize={isLargeScreen ? 12 : 14}
+        >
+        {lines.map((line, index) => (
+          <tspan
+            key={`${labelText}-${index}`}
+            x={x}
+            dy={index === 0 ? 0 : "1.1em"}
+          >
+            {line}
+          </tspan>
+        ))}
+      </text>
+    );
+  };
 
   // Memoized stat cards
   const statCards = useMemo(
@@ -346,7 +471,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mt-4">
         {projectStatusData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
@@ -354,6 +479,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
             </h2>
             <div className="h-64 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
+                <div className="ml-4">
                 <PieChart>
                   <Pie
                     data={projectStatusData}
@@ -374,6 +500,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
                   <Tooltip />
                   <Legend />
                 </PieChart>
+                </div>
               </ResponsiveContainer>
             </div>
           </div>
@@ -406,21 +533,27 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
         )}
 
         {userRoleData.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+            <h2 className="text-lg  font-bold text-gray-900 mb-4">
               User Role Distribution
             </h2>
-            <div className="h-64 w-full relative">
+              <div
+                ref={userRoleChartRef}
+                className={`h-72 sm:h-64 w-full relative p-0.5 ${isLargeScreen ? "text-xs" : "text-base"}`}
+              >
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={userRoleData}
                     cx="50%"
-                    cy="50%"
-                    outerRadius={80}
+                    cy={isMobile ? "42%" : "50%"}
+                    outerRadius={isMobile ? 70 : 60}
                     dataKey="value"
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
+                    labelLine={false}
+                    label={
+                      isMobile
+                        ? false
+                        : renderResponsivePieLabel
                     }
                   >
                     {userRoleData.map((entry, index) => (
@@ -428,7 +561,17 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
                     ))}
                   </Pie>
                   <Tooltip />
-                  <Legend />
+                  <Legend
+                    verticalAlign="bottom"
+                    align="center"
+                    iconSize={10}
+                    content={renderWrappedLegend}
+                    wrapperStyle={{
+                      fontSize: isLargeScreen ? "12px" : "16px",
+                      paddingTop: "12px",
+                      textAlign: "center",
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>

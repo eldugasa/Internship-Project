@@ -23,6 +23,11 @@ import {
   deleteTaskComment 
 } from '../../services/tasksService';
 
+const formatRoleLabel = (role) => {
+  if (!role) return "Team";
+  return role.toString().replace(/[-_]/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 const QATesterTaskDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -181,8 +186,11 @@ const QATesterTaskDetails = () => {
       {/* QA Reports / Comments Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
         <h2 className="font-bold text-gray-900 flex items-center gap-2">
-          <MessageSquare size={18} /> Bug Reports & Notes ({task.comments?.length || 0})
+          <MessageSquare size={18} /> QA Communication ({task.comments?.length || 0})
         </h2>
+        <p className="text-sm text-gray-500">
+          Share bug reports, retest notes, and follow-up messages with the assigned team member here.
+        </p>
 
         <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
           {task.comments && [...task.comments]
@@ -190,7 +198,12 @@ const QATesterTaskDetails = () => {
             .map((comment, index) => (
               <div key={comment.id || index} className="group text-sm border-b border-gray-100 pb-3">
                 <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-800">{comment.user?.name || comment.userName || 'User'}</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-semibold text-gray-800">{comment.user?.name || comment.userName || 'User'}</span>
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                      {formatRoleLabel(comment.user?.role)}
+                    </span>
+                  </div>
                   <div className="flex items-center gap-3">
                     <button 
                       onClick={() => deleteCommentMutation.mutate(comment.id)}
@@ -208,7 +221,7 @@ const QATesterTaskDetails = () => {
         <div className="border-t pt-4 space-y-3">
           <h3 className="font-semibold text-sm">Add Feedback/Bug Report</h3>
           <textarea
-            placeholder="Bug descriptions, Test notes, Reproduction steps..."
+            placeholder="Bug descriptions, test notes, reproduction steps, or a reply to the developer..."
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-[#4DA5AD] min-h-[100px]"

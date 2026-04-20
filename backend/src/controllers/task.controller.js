@@ -41,7 +41,7 @@ const getTaskById = async (req, res) => {
         },
         comments: {
           include: {
-            user: { select: { id: true, name: true, email: true } },
+            user: { select: { id: true, name: true, email: true, role: true } },
           },
           orderBy: { createdAt: "desc" },
         },
@@ -69,6 +69,7 @@ const getTaskById = async (req, res) => {
       description: task.description,
       status: task.status,
       progress: task.progress || 0,
+      previousProgress: task.previousProgress || 0,
       priority: task.priority || "MEDIUM",
       dueDate: task.dueDate,
       estimatedHours: task.estimatedHours,
@@ -126,7 +127,16 @@ const createTask = async (req, res) => {
     // Get project details to find the manager
     const project = await prisma.project.findUnique({
       where: { id: Number(projectId) },
-      select: { managerId: true, name: true },
+      select: {
+        managerId: true,
+        name: true,
+        manager: {
+          select: {
+            id: true,
+            role: true,
+          },
+        },
+      },
     });
 
     if (!project) {
@@ -160,7 +170,13 @@ const createTask = async (req, res) => {
     // Create notifications
     try {
       // Notify project manager
-      if (project.managerId) {
+      const managerRole = project.manager?.role
+        ?.toString()
+        .trim()
+        .toUpperCase()
+        .replace(/-/g, "_");
+
+      if (project.managerId && managerRole !== "ADMIN") {
         await createNotification({
           userId: project.managerId,
           type: NOTIFICATION_TYPES.TASK_ASSIGNED,
@@ -266,6 +282,13 @@ const getMyTasks = async (req, res) => {
             name: true,
             description: true,
             status: true,
+            teamId: true,
+            team: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
       },
@@ -279,12 +302,16 @@ const getMyTasks = async (req, res) => {
       description: task.description,
       status: task.status,
       progress: task.progress || 0,
+      previousProgress: task.previousProgress || 0,
       priority: task.priority || "MEDIUM",
       dueDate: task.dueDate,
       estimatedHours: task.estimatedHours,
       actualHours: task.actualHours,
       projectId: task.projectId,
+      project: task.project,
       projectName: task.project?.name || "Unknown Project",
+      teamId: task.project?.teamId || null,
+      teamName: task.project?.team?.name || "Unassigned",
       assigneeId: task.assigneeId,
       assigneeName: task.assignee?.name || "Unassigned",
       qaTesterId: task.qaTesterId,
@@ -339,46 +366,124 @@ const updateTaskStatus = async (req, res) => {
         .json({ message: "Forbidden: You can only update QA tasks assigned to you" });
     }
 
+    const parsedProgress =
+      progress === undefined || progress === null ? undefined : Number(progress);
+
+    if (
+      parsedProgress !== undefined &&
+      (!Number.isFinite(parsedProgress) || parsedProgress < 0 || parsedProgress > 100)
+    ) {
+      return res.status(400).json({ message: "Progress must be between 0 and 100" });
+    }
+
     // Prepare update data
     const updateData = {
       updatedAt: new Date(),
     };
 
-    if (status) updateData.status = status;
-    if (progress !== undefined) updateData.progress = progress;
+      if (normalizedRole === "TEAM_MEMBER") {
+        const nextProgress = parsedProgress ?? task.progress ?? 0;
+        const currentProgress = task.progress ?? 0;
+
+        updateData.progress = nextProgress;
+        updateData.actualHours = (task.actualHours ?? 0) + 1;
+        updateData.previousProgress =
+          nextProgress < 100 ? nextProgress : currentProgress < 100 ? currentProgress : task.previousProgress ?? 0;
+
+        if (nextProgress >= 100) {
+          updateData.status = task.qaTesterId ? "IN_TEST" : "COMPLETED";
+      } else if (status === "IN_PROGRESS" || task.status === "IN_PROGRESS" || nextProgress > 0) {
+        updateData.status = "IN_PROGRESS";
+      } else {
+        updateData.status = "PENDING";
+      }
+      } else if (normalizedRole === "QA_TESTER") {
+        const qaStatus = (status || "").toString().trim().toUpperCase();
+        const allowedQaStatuses = ["IN_TEST", "FAILED", "PENDING_RETEST", "PASSED", "COMPLETED"];
+
+      if (!allowedQaStatuses.includes(qaStatus)) {
+        return res.status(400).json({ message: "Invalid QA status update" });
+      }
+
+        if (qaStatus === "FAILED") {
+          updateData.progress = 75;
+          updateData.status = "PENDING_RETEST";
+        } else {
+          updateData.progress = qaStatus === "PASSED" ? 100 : parsedProgress ?? task.progress ?? 100;
+          updateData.status = qaStatus === "PASSED" ? "COMPLETED" : qaStatus;
+        }
+      } else {
+        if (status) updateData.status = status;
+        if (parsedProgress !== undefined) updateData.progress = parsedProgress;
+    }
 
     const updatedTask = await prisma.task.update({
       where: { id: Number(id) },
       data: updateData,
     });
 
-    // Create notification for task completion
-    if (status === "COMPLETED" || status === "DONE" || progress === 100) {
+    // Create workflow notifications
+    if (normalizedRole === "TEAM_MEMBER" && updatedTask.progress === 100) {
       try {
-        // Notify project manager
+        if (task.qaTesterId) {
+          await createNotification({
+            userId: task.qaTesterId,
+            type: NOTIFICATION_TYPES.TASK_ASSIGNED_TO_ME,
+            title: "Task Ready for Testing",
+            message: `Task "${task.title}" is ready for QA testing`,
+            data: { taskId: task.id, projectId: task.projectId },
+            link: `/qa-tester/tasks/${task.id}`,
+          });
+        }
+
         if (task.project && task.project.managerId) {
           await createNotification({
             userId: task.project.managerId,
             type: NOTIFICATION_TYPES.TASK_COMPLETED,
-            title: "Task Completed",
-            message: `Task "${task.title}" was completed by ${task.assignee?.name || "team member"}`,
+            title: task.qaTesterId ? "Task Ready for QA" : "Task Completed",
+            message: task.qaTesterId
+              ? `Task "${task.title}" reached 100% and is ready for QA`
+              : `Task "${task.title}" was completed by ${task.assignee?.name || "team member"}`,
             data: { taskId: task.id, projectId: task.projectId },
             link: `/manager/tasks/${task.id}`,
           });
         }
+      } catch (notifErr) {
+        console.error("Error creating completion notification:", notifErr);
+      }
+    }
 
-        if (task.assigneeId && normalizedRole === "QA_TESTER") {
+    if (normalizedRole === "QA_TESTER") {
+      try {
+        if (task.assigneeId) {
           await createNotification({
             userId: task.assigneeId,
             type: NOTIFICATION_TYPES.TASK_COMPLETED,
-            title: "QA Status Updated",
-            message: `QA updated "${task.title}" to ${status}`,
+            title: updateData.status === "COMPLETED" ? "Task Passed QA" : "QA Status Updated",
+            message:
+              updateData.status === "COMPLETED"
+                ? `Task "${task.title}" passed QA and is now completed`
+                : `QA updated "${task.title}" to ${updateData.status}`,
             data: { taskId: task.id, projectId: task.projectId },
             link: `/team-member/tasks/${task.id}`,
           });
         }
+
+        if (task.project?.managerId) {
+          await createNotification({
+            userId: task.project.managerId,
+            type: NOTIFICATION_TYPES.TASK_COMPLETED,
+            title: updateData.status === "COMPLETED" ? "Task Passed QA" : "QA Status Updated",
+            message:
+              updateData.status === "COMPLETED"
+                ? `Task "${task.title}" passed QA and is now completed`
+                : `QA updated "${task.title}" to ${updateData.status}`,
+            data: { taskId: task.id, projectId: task.projectId },
+            link: `/manager/tasks/${task.id}`,
+          });
+        }
       } catch (notifErr) {
-        console.error("Error creating completion notification:", notifErr);
+        console.error("Error creating QA notification:", notifErr);
       }
     }
 
@@ -456,6 +561,9 @@ const updateTaskProgress = async (req, res) => {
       where: { id: parseInt(id) },
       data: {
         progress,
+        ...(normalizedRole === "TEAM_MEMBER" && task.assigneeId === req.user.id
+          ? { actualHours: (task.actualHours ?? 0) + 1 }
+          : {}),
         status:
           progress === 100
             ? "COMPLETED"
@@ -578,7 +686,7 @@ const addTaskComment = async (req, res) => {
         userId: req.user.id,
       },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { select: { id: true, name: true, email: true, role: true } },
       },
     });
 

@@ -15,7 +15,13 @@ const buildProjectFromTask = (task) => {
   return {
     id: task.projectId ?? project.id ?? task.projectName,
     name: project.name || task.projectName || 'Unknown Project',
-    teamName: project.team?.name || project.teamName || 'Unassigned',
+    teamName:
+      task.teamName ||
+      project.team?.name ||
+      project.team?.teamName ||
+      project.teamName ||
+      task.team?.name ||
+      'Unassigned',
     progress: project.progress ?? 0,
   };
 };

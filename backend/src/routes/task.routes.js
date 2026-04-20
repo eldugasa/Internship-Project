@@ -96,7 +96,7 @@ router.get("/:id/comments",
       const comments = await prisma.comment.findMany({
         where: { taskId: parseInt(id) },
         include: {
-          user: { select: { id: true, name: true, email: true } }
+          user: { select: { id: true, name: true, email: true, role: true } }
         },
         orderBy: { createdAt: 'desc' }
       });

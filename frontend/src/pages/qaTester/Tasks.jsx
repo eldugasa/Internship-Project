@@ -20,6 +20,7 @@ const QATesterTasks = () => {
 
   const getStatusIcon = (status) => {
     switch(status?.toLowerCase()) {
+      case 'completed': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'in-test': return <PlayCircle className="w-4 h-4 text-blue-500" />;
       case 'passed': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
       case 'failed': return <AlertCircle className="w-4 h-4 text-red-500" />;
@@ -70,6 +71,7 @@ const QATesterTasks = () => {
             <option value="ALL">All Statuses</option>
             <option value="in-progress">In Progress</option>
             <option value="in-test">In Test</option>
+            <option value="completed">Completed</option>
             <option value="passed">Passed</option>
             <option value="failed">Failed</option>
             <option value="pending-retest">Pending Retest</option>

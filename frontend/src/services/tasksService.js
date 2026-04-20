@@ -50,6 +50,7 @@ const normalizeTask = (task) => {
     status: statusMap[task.status] || task.status?.toLowerCase() || 'pending',
     priority: priorityMap[task.priority] || task.priority?.toLowerCase() || 'medium',
     progress: task.progress || 0,
+    previousProgress: task.previousProgress || 0,
     
     assigneeId: task.assigneeId || task.assignedTo,
     assignee: task.assignee || null,
@@ -61,6 +62,12 @@ const normalizeTask = (task) => {
     projectId: task.projectId,
     project: task.project || null,
     projectName: task.project?.name || task.projectName || 'Unknown Project',
+    teamName:
+      task.project?.team?.name ||
+      task.project?.teamName ||
+      task.team?.name ||
+      task.teamName ||
+      'Unassigned',
     
     dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : null,
     rawDueDate: task.dueDate,

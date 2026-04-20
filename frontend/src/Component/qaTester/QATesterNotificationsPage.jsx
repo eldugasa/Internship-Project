@@ -5,10 +5,12 @@ import { Bell, CheckCircle2, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const QATesterNotificationsPage = () => {
-  const { data: notifications = [], isLoading, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['notifications'],
-    queryFn: getNotifications,
+    queryFn: ({ signal }) => getNotifications(1, 20, false, { signal }),
   });
+
+  const notifications = data?.notifications || [];
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -31,7 +33,17 @@ const QATesterNotificationsPage = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-        {notifications.length === 0 ? (
+        {isError ? (
+          <div className="p-8 text-center text-red-600">
+            <p>{error?.message || 'Failed to load notifications.'}</p>
+            <button
+              onClick={() => refetch()}
+              className="mt-3 text-sm text-[#4DA5AD] hover:underline"
+            >
+              Retry
+            </button>
+          </div>
+        ) : notifications.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             No notifications available.
           </div>

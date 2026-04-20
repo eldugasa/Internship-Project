@@ -12,9 +12,8 @@ import {
   BarChart3, Filter, Search, User, Eye, Loader2
 } from 'lucide-react';
 
-// ============================================
 // 1. QUERY DEFINITIONS
-// ============================================
+
 
 export const myTasksQuery = () => ({
   queryKey: ['team-member', 'my-tasks'],
@@ -26,9 +25,7 @@ export const myTasksQuery = () => ({
   gcTime: 1000 * 60 * 10,
 });
 
-// ============================================
 // 2. HELPER FUNCTIONS
-// ============================================
 
 const parseDate = (dateStr) => {
   if (!dateStr) return null;
@@ -134,9 +131,8 @@ const calculateStats = (tasks, efficiency = 95) => {
   };
 };
 
-// ============================================
 // 3. LOADER (React Router v7)
-// ============================================
+
 
 export async function teamMemberDashboardLoader() {
   console.log('🔄 Loading team member dashboard...');
@@ -150,9 +146,8 @@ export async function teamMemberDashboardLoader() {
   }
 }
 
-// ============================================
 // 4. SKELETON COMPONENT (Shows immediately)
-// ============================================
+
 
 const DashboardSkeleton = () => (
   <div className="space-y-6 p-6">
@@ -231,9 +226,8 @@ const DashboardSkeleton = () => (
   </div>
 );
 
-// ============================================
-// 5. MAIN COMPONENT
-// ============================================
+//  5. MAIN COMPONENT
+
 
 const TeamMemberDashboard = () => {
   const navigate = useNavigate();
@@ -543,20 +537,6 @@ const TeamMemberDashboard = () => {
                         </div>
                       </div>
 
-                      {/* Progress Bar */}
-                      <div className="mb-3">
-                        <div className="flex justify-between text-sm mb-1">
-                          <span>Progress: {task.progress || 0}%</span>
-                          <span>{task.actualHours || 0}/{task.estimatedHours || 0} hrs</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-[#4DA5AD] h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${task.progress || 0}%` }}
-                          ></div>
-                        </div>
-                      </div>
-
                       {/* Action Buttons */}
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
@@ -566,36 +546,7 @@ const TeamMemberDashboard = () => {
                           )}
                         </div>
                         
-                        <div className="flex gap-2">
-                          {task.status === 'pending' && (
-                            <button
-                              onClick={() => handleStartTask(task.id)}
-                              disabled={isUpdating}
-                              className="px-3 py-1.5 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 disabled:opacity-50"
-                            >
-                              {isUpdating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Start'}
-                            </button>
-                          )}
-                          
-                          {task.status === 'in-progress' && (
-                            <div className="flex gap-1">
-                              {[25, 50, 75, 100].map(percent => (
-                                <button
-                                  key={percent}
-                                  onClick={() => handleUpdateProgress(task.id, percent)}
-                                  disabled={isUpdating}
-                                  className={`px-2 py-1 text-xs rounded ${
-                                    task.progress === percent 
-                                      ? 'bg-[#4DA5AD] text-white' 
-                                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                  } disabled:opacity-50`}
-                                >
-                                  {percent}%
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        
                       </div>
                     </div>
                   );

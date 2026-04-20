@@ -1,6 +1,6 @@
 // src/components/teamMember/NotificationBell.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Bell,
@@ -58,9 +58,13 @@ const unreadCountQuery = () => ({
 
 const NotificationBell = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [showNotifications, setShowNotifications] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+
+  const isQATesterRoute = location.pathname.startsWith('/qa-tester');
+  const baseRoute = isQATesterRoute ? '/qa-tester' : '/team-member';
 
   // Fetch notifications
   const {
@@ -83,14 +87,15 @@ const NotificationBell = () => {
 
   // Mark as read mutation
   const markAsReadMutation = useMutation({
-    mutationFn: async (notificationId) => {
+    mutationFn: async ({ notificationId }) => {
       await markAsRead(notificationId);
       return notificationId;
     },
-    onMutate: async (notificationId) => {
+    onMutate: async ({ notificationId, wasUnread }) => {
       await queryClient.cancelQueries({ queryKey: ['notifications'] });
 
       const previousNotifications = queryClient.getQueryData(['notifications', 1, 5]);
+      const previousUnreadCount = queryClient.getQueryData(['notifications', 'unread-count']);
 
       queryClient.setQueryData(['notifications', 1, 5], (old) => {
         if (!old) return old;
@@ -99,16 +104,20 @@ const NotificationBell = () => {
         );
       });
 
-      // Optimistically update unread count
-      queryClient.setQueryData(['notifications', 'unread-count'], (old) =>
-        Math.max(0, (old || 0) - 1)
-      );
+      if (wasUnread) {
+        queryClient.setQueryData(['notifications', 'unread-count'], (old) =>
+          Math.max(0, (old || 0) - 1)
+        );
+      }
 
-      return { previousNotifications };
+      return { previousNotifications, previousUnreadCount };
     },
     onError: (err, variables, context) => {
       if (context?.previousNotifications) {
         queryClient.setQueryData(['notifications', 1, 5], context.previousNotifications);
+      }
+      if (context?.previousUnreadCount !== undefined) {
+        queryClient.setQueryData(['notifications', 'unread-count'], context.previousUnreadCount);
       }
       queryClient.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
       console.error('Error marking notification as read:', err);
@@ -204,8 +213,12 @@ const NotificationBell = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showNotifications]);
 
-  const handleMarkAsRead = (id) => {
-    markAsReadMutation.mutate(id);
+  const handleMarkAsRead = (notification) => {
+    if (!notification?.id) return;
+    markAsReadMutation.mutate({
+      notificationId: notification.id,
+      wasUnread: !notification.read,
+    });
   };
 
   const handleMarkAllAsRead = () => {
@@ -221,21 +234,21 @@ const NotificationBell = () => {
 
   const handleNotificationClick = (notification) => {
     // Mark as read
-    handleMarkAsRead(notification.id);
+    handleMarkAsRead(notification);
 
     // Close dropdown
     setShowNotifications(false);
 
-    // If a team-member receives a link to a project or team,
-    // they do not have a dedicated page for it, so route to dashboard.
+    // QA testers and team members share this bell, but they do not have
+    // dedicated routes for every notification target.
     if (notification.link) {
       if (notification.link.includes('/teams') || notification.link.includes('/projects')) {
-        navigate('/team-member/dashboard');
+        navigate(`${baseRoute}/dashboard`);
       } else {
         // Fix legacy broken links in the database from comments that start with /tasks/
         let finalLink = notification.link;
         if (finalLink.startsWith('/tasks/')) {
-          finalLink = `/team-member${finalLink}`;
+          finalLink = `${baseRoute}${finalLink}`;
         }
         navigate(finalLink);
       }
@@ -249,7 +262,7 @@ const NotificationBell = () => {
     }
 
     // Fallback if no link
-    let path = '/team-member/dashboard';
+    let path = `${baseRoute}/dashboard`;
 
     const taskId = notification.taskId || notification.task?.id || parsedData?.taskId;
 
@@ -263,9 +276,9 @@ const NotificationBell = () => {
       case 'deadline_approaching':
       case 'comment_added':
         if (taskId) {
-          path = `/team-member/tasks/${taskId}`;
+          path = `${baseRoute}/tasks/${taskId}`;
         } else {
-          path = '/team-member/tasks';
+          path = `${baseRoute}/tasks`;
         }
         break;
 
@@ -274,11 +287,11 @@ const NotificationBell = () => {
       case 'member_removed':
       case 'project_created':
       case 'project_updated':
-        path = '/team-member/dashboard';
+        path = `${baseRoute}/dashboard`;
         break;
 
       default:
-        path = '/team-member/dashboard';
+        path = `${baseRoute}/dashboard`;
     }
 
     navigate(path);
@@ -286,7 +299,7 @@ const NotificationBell = () => {
 
   const handleViewAllClick = () => {
     setShowNotifications(false);
-    navigate('/team-member/notifications');
+    navigate(`${baseRoute}/notifications`);
   };
 
   const getNotificationIcon = (type) => {

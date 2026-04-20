@@ -1,7 +1,7 @@
 // src/pages/teamMember/TaskDetails.jsx
-import React, { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useState, useMemo } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Calendar,
@@ -11,21 +11,19 @@ import {
   MessageSquare,
   Trash2,
   Loader2,
-  AlertCircle
-} from 'lucide-react';
-import { 
-  getTaskById, 
-  updateTaskStatus, 
-  addTaskComment, 
-  deleteTaskComment 
-} from '../../services/tasksService';
+  AlertCircle,
+} from "lucide-react";
+import {
+  getTaskById,
+  updateTaskStatus,
+  addTaskComment,
+  deleteTaskComment,
+} from "../../services/tasksService";
 
-// ============================================
-// 1. QUERY DEFINITIONS
-// ============================================
+//  1. QUERY DEFINITIONS
 
 const taskQuery = (id) => ({
-  queryKey: ['team-member', 'task', id],
+  queryKey: ["team-member", "task", id],
   queryFn: async ({ signal }) => {
     const task = await getTaskById(id, { signal });
     return task;
@@ -48,6 +46,60 @@ const STATUS_MAP = {
   completed: "bg-green-100 text-green-800",
   "in-progress": "bg-blue-100 text-blue-800",
   pending: "bg-yellow-100 text-yellow-800",
+  "in-test": "bg-cyan-100 text-cyan-800",
+  failed: "bg-red-100 text-red-800",
+  "pending-retest": "bg-amber-100 text-amber-800",
+};
+
+const COMMENT_TABS = {
+  "project-manager": {
+    label: "Project Manager",
+    prefix: "[To Project Manager]",
+    emptyMessage: "No messages with the project manager yet.",
+    placeholder: "Write a message for the project manager...",
+  },
+  "qa-tester": {
+    label: "QA Tester",
+    prefix: "[To QA Tester]",
+    emptyMessage: "No messages with the QA tester yet.",
+    placeholder: "Write a message for the QA tester...",
+  },
+};
+
+const normalizeRole = (role) =>
+  role?.toString().trim().toLowerCase().replace(/_/g, "-") || "";
+
+const formatRoleLabel = (role) => {
+  if (!role) return "Team";
+  return role
+    .toString()
+    .replace(/[-_]/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getCommentTargetTab = (content = "") => {
+  const trimmed = content.trim();
+  if (trimmed.startsWith(COMMENT_TABS["qa-tester"].prefix)) return "qa-tester";
+  if (trimmed.startsWith(COMMENT_TABS["project-manager"].prefix))
+    return "project-manager";
+  return null;
+};
+
+const stripCommentTargetPrefix = (content = "") => {
+  return content
+    .replace(COMMENT_TABS["qa-tester"].prefix, "")
+    .replace(COMMENT_TABS["project-manager"].prefix, "")
+    .trim();
+};
+
+const getCommentConversationTab = (comment) => {
+  const role = normalizeRole(comment?.user?.role);
+  const explicitTarget = getCommentTargetTab(comment?.content || "");
+
+  if (role === "qa-tester") return "qa-tester";
+  if (role === "project-manager") return "project-manager";
+  if (role === "team-member") return explicitTarget;
+  return explicitTarget || "project-manager";
 };
 
 const formatDate = (date) => {
@@ -63,6 +115,18 @@ const clampProgress = (value) => {
   if (value < 0) return 0;
   if (value > 100) return 100;
   return value;
+};
+
+const getNextTeamMemberStatus = (task, progress, isStartAction = false) => {
+  if (progress >= 100) {
+    return task?.qaTesterId ? "in-test" : "completed";
+  }
+
+  if (isStartAction || progress > 0 || task?.status === "in-progress") {
+    return "in-progress";
+  }
+
+  return "pending";
 };
 
 // ============================================
@@ -83,24 +147,30 @@ const TaskDetailsSkeleton = () => (
         <div className="h-6 w-20 bg-gray-200 rounded-full animate-pulse"></div>
         <div className="h-6 w-24 bg-gray-200 rounded-full animate-pulse"></div>
       </div>
-      
+
       <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
       <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
-      
+
       <div className="grid sm:grid-cols-2 gap-4">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-5 w-32 bg-gray-200 rounded animate-pulse"></div>
+          <div
+            key={i}
+            className="h-5 w-32 bg-gray-200 rounded animate-pulse"
+          ></div>
         ))}
       </div>
-      
+
       <div className="space-y-3">
         <div className="h-3 w-full bg-gray-200 rounded-full animate-pulse"></div>
         <div className="h-4 w-24 bg-gray-200 rounded animate-pulse"></div>
       </div>
-      
+
       <div className="flex gap-2">
         {[...Array(4)].map((_, i) => (
-          <div key={i} className="h-8 w-16 bg-gray-200 rounded animate-pulse"></div>
+          <div
+            key={i}
+            className="h-8 w-16 bg-gray-200 rounded animate-pulse"
+          ></div>
         ))}
       </div>
     </div>
@@ -132,8 +202,10 @@ const TaskDetailsError = ({ error, onRetry }) => (
   <div className="p-6 flex justify-center items-center h-64">
     <div className="text-center">
       <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-      <p className="text-gray-600 mb-4">{error?.message || 'Failed to load task'}</p>
-      <button 
+      <p className="text-gray-600 mb-4">
+        {error?.message || "Failed to load task"}
+      </p>
+      <button
         onClick={onRetry}
         className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93]"
       >
@@ -154,13 +226,14 @@ const TaskDetails = () => {
 
   const [commentText, setCommentText] = useState("");
   const [customProgress, setCustomProgress] = useState("");
+  const [activeCommentTab, setActiveCommentTab] = useState("project-manager");
 
   // Fetch task data
-  const { 
-    data: task, 
-    isLoading, 
+  const {
+    data: task,
+    isLoading,
     error,
-    refetch: refetchTask
+    refetch: refetchTask,
   } = useQuery({
     ...taskQuery(id),
     retry: 1,
@@ -172,27 +245,36 @@ const TaskDetails = () => {
       return await updateTaskStatus(id, status, progress);
     },
     onMutate: async ({ progress, status }) => {
-      await queryClient.cancelQueries({ queryKey: ['team-member', 'task', id] });
-      
-      const previousTask = queryClient.getQueryData(['team-member', 'task', id]);
-      
-      queryClient.setQueryData(['team-member', 'task', id], (old) => ({
+      await queryClient.cancelQueries({
+        queryKey: ["team-member", "task", id],
+      });
+
+      const previousTask = queryClient.getQueryData([
+        "team-member",
+        "task",
+        id,
+      ]);
+
+      queryClient.setQueryData(["team-member", "task", id], (old) => ({
         ...old,
         progress,
         status,
       }));
-      
+
       return { previousTask };
     },
     onError: (err, variables, context) => {
       if (context?.previousTask) {
-        queryClient.setQueryData(['team-member', 'task', id], context.previousTask);
+        queryClient.setQueryData(
+          ["team-member", "task", id],
+          context.previousTask,
+        );
       }
-      console.error('Progress update failed:', err);
-      alert(err.message || 'Failed to update progress');
+      console.error("Progress update failed:", err);
+      alert(err.message || "Failed to update progress");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['team-member', 'task', id] });
+      queryClient.invalidateQueries({ queryKey: ["team-member", "task", id] });
     },
   });
 
@@ -203,34 +285,46 @@ const TaskDetails = () => {
       return response.comment || response;
     },
     onMutate: async (content) => {
-      await queryClient.cancelQueries({ queryKey: ['team-member', 'task', id] });
-      
-      const currentUser = JSON.parse(localStorage.getItem('user'));
+      await queryClient.cancelQueries({
+        queryKey: ["team-member", "task", id],
+      });
+
+      const currentUser = JSON.parse(localStorage.getItem("user"));
       const optimisticComment = {
         id: `temp-${Date.now()}`,
         content,
         createdAt: new Date().toISOString(),
-        user: { name: currentUser?.name || 'You' }
+        user: {
+          name: currentUser?.name || "You",
+          role: currentUser?.role || "team-member",
+        },
       };
-      
-      const previousTask = queryClient.getQueryData(['team-member', 'task', id]);
-      
-      queryClient.setQueryData(['team-member', 'task', id], (old) => ({
+
+      const previousTask = queryClient.getQueryData([
+        "team-member",
+        "task",
+        id,
+      ]);
+
+      queryClient.setQueryData(["team-member", "task", id], (old) => ({
         ...old,
-        comments: [...(old?.comments || []), optimisticComment]
+        comments: [...(old?.comments || []), optimisticComment],
       }));
-      
+
       return { previousTask, optimisticComment };
     },
     onError: (err, variables, context) => {
       if (context?.previousTask) {
-        queryClient.setQueryData(['team-member', 'task', id], context.previousTask);
+        queryClient.setQueryData(
+          ["team-member", "task", id],
+          context.previousTask,
+        );
       }
-      console.error('Failed to add comment:', err);
-      alert('Failed to add comment: ' + err.message);
+      console.error("Failed to add comment:", err);
+      alert("Failed to add comment: " + err.message);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['team-member', 'task', id] });
+      queryClient.invalidateQueries({ queryKey: ["team-member", "task", id] });
     },
   });
 
@@ -240,26 +334,35 @@ const TaskDetails = () => {
       await deleteTaskComment(id, commentId);
     },
     onMutate: async (commentId) => {
-      await queryClient.cancelQueries({ queryKey: ['team-member', 'task', id] });
-      
-      const previousTask = queryClient.getQueryData(['team-member', 'task', id]);
-      
-      queryClient.setQueryData(['team-member', 'task', id], (old) => ({
+      await queryClient.cancelQueries({
+        queryKey: ["team-member", "task", id],
+      });
+
+      const previousTask = queryClient.getQueryData([
+        "team-member",
+        "task",
+        id,
+      ]);
+
+      queryClient.setQueryData(["team-member", "task", id], (old) => ({
         ...old,
-        comments: old?.comments?.filter(c => c.id !== commentId) || []
+        comments: old?.comments?.filter((c) => c.id !== commentId) || [],
       }));
-      
+
       return { previousTask };
     },
     onError: (err, variables, context) => {
       if (context?.previousTask) {
-        queryClient.setQueryData(['team-member', 'task', id], context.previousTask);
+        queryClient.setQueryData(
+          ["team-member", "task", id],
+          context.previousTask,
+        );
       }
-      console.error('Failed to delete comment:', err);
-      alert('Could not delete comment: ' + err.message);
+      console.error("Failed to delete comment:", err);
+      alert("Could not delete comment: " + err.message);
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['team-member', 'task', id] });
+      queryClient.invalidateQueries({ queryKey: ["team-member", "task", id] });
     },
   });
 
@@ -268,23 +371,49 @@ const TaskDetails = () => {
     return new Date(task.dueDate) < new Date();
   }, [task]);
 
+  const commentCounts = useMemo(() => {
+    const comments = task?.comments || [];
+    return comments.reduce(
+      (counts, comment) => {
+        const tab = getCommentConversationTab(comment);
+        if (tab) counts[tab] += 1;
+        return counts;
+      },
+      { "project-manager": 0, "qa-tester": 0 },
+    );
+  }, [task?.comments]);
+
+  const filteredComments = useMemo(() => {
+    return (task?.comments || [])
+      .filter(
+        (comment) => getCommentConversationTab(comment) === activeCommentTab,
+      )
+      .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  }, [activeCommentTab, task?.comments]);
+
   const handleProgressUpdate = (value) => {
     const newProgress = clampProgress(value);
-    const newStatus = newProgress === 100 ? "completed" : newProgress > 0 ? "in-progress" : "pending";
+    const newStatus = getNextTeamMemberStatus(task, newProgress);
     updateProgressMutation.mutate({ progress: newProgress, status: newStatus });
   };
 
   const handleCustomUpdate = () => {
     if (customProgress === "") return;
     const value = clampProgress(Number(customProgress));
-    const newStatus = value === 100 ? "completed" : value > 0 ? "in-progress" : "pending";
+    const newStatus = getNextTeamMemberStatus(task, value);
     updateProgressMutation.mutate({ progress: value, status: newStatus });
     setCustomProgress("");
   };
 
+  const handleStartTask = () => {
+    const status = getNextTeamMemberStatus(task, task?.progress || 0, true);
+    updateProgressMutation.mutate({ progress: task?.progress || 0, status });
+  };
+
   const handleAddComment = () => {
     if (!commentText.trim()) return;
-    addCommentMutation.mutate(commentText);
+    const payload = `${COMMENT_TABS[activeCommentTab].prefix} ${commentText.trim()}`;
+    addCommentMutation.mutate(payload);
     setCommentText("");
   };
 
@@ -294,7 +423,10 @@ const TaskDetails = () => {
   };
 
   const isLoadingData = isLoading && !task;
-  const isUpdating = updateProgressMutation.isPending || addCommentMutation.isPending || deleteCommentMutation.isPending;
+  const isUpdating =
+    updateProgressMutation.isPending ||
+    addCommentMutation.isPending ||
+    deleteCommentMutation.isPending;
 
   // Show skeleton while loading
   if (isLoadingData) {
@@ -310,8 +442,8 @@ const TaskDetails = () => {
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <button 
-          onClick={() => navigate(-1)} 
+        <button
+          onClick={() => navigate(-1)}
           className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
         >
           <ArrowLeft size={18} />
@@ -322,10 +454,14 @@ const TaskDetails = () => {
       {/* Main Info Card */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-6">
         <div className="flex gap-3 flex-wrap">
-          <span className={`px-3 py-1 text-xs font-semibold rounded-full ${PRIORITY_MAP[task.priority] || 'bg-gray-100'}`}>
+          <span
+            className={`px-3 py-1 text-xs font-semibold rounded-full ${PRIORITY_MAP[task.priority] || "bg-gray-100"}`}
+          >
             {task.priority}
           </span>
-          <span className={`px-3 py-1 text-xs font-semibold rounded-full ${STATUS_MAP[task.status] || 'bg-gray-100'}`}>
+          <span
+            className={`px-3 py-1 text-xs font-semibold rounded-full ${STATUS_MAP[task.status] || "bg-gray-100"}`}
+          >
             {task.status}
           </span>
           {isOverdue && (
@@ -335,121 +471,153 @@ const TaskDetails = () => {
           )}
         </div>
 
-        <p className="text-gray-700">{task.description || 'No description provided.'}</p>
+        <p className="text-gray-700">
+          {task.description || "No description provided."}
+        </p>
 
         <div className="grid sm:grid-cols-2 gap-4 text-sm text-gray-600">
           <div className="flex items-center gap-2">
-            <User size={16} /> {task.assigneeName || task.assignee?.name || "Unassigned"}
+            <User size={16} />{" "}
+            {task.assigneeName || task.assignee?.name || "Unassigned"}
           </div>
           <div className="flex items-center gap-2">
-            <Flag size={16} /> {task.projectName || task.project?.name || "No Project"}
+            <Flag size={16} />{" "}
+            {task.projectName || task.project?.name || "No Project"}
           </div>
           <div className="flex items-center gap-2">
             <Calendar size={16} /> Due: {task.dueDate || "No deadline"}
           </div>
           <div className="flex items-center gap-2">
-            <Clock size={16} /> Est: {task.estimatedHours || 0}h / Actual: {task.actualHours || 0}h
+            <Clock size={16} /> Est: {task.estimatedHours || 0}h / Actual:{" "}
+            {task.actualHours || 0}h
           </div>
         </div>
 
         {/* Progress Bar */}
         <div className="space-y-3">
           <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
-            <div 
+            <div
               className="bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] h-3 rounded-full transition-all duration-300"
-              style={{ width: `${task.progress || 0}%` }} 
+              style={{ width: `${task.progress || 0}%` }}
             />
           </div>
-          <div className="text-sm text-gray-600">Progress: {task.progress || 0}%</div>
+          <div className="text-sm text-gray-600">
+            Progress: {task.progress || 0}%
+          </div>
         </div>
 
         {/* Quick Progress Buttons */}
         <div className="flex flex-wrap gap-2">
-          {[25, 50, 75, 100].map(step => (
-            <button 
-              key={step} 
-              onClick={() => handleProgressUpdate(step)} 
-              disabled={isUpdating}
-              className="px-3 py-1 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
-            >
-              {updateProgressMutation.isPending ? (
-                <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
-              ) : null}
-              {step}%
-            </button>
-          ))}
-        </div>
-
-        {/* Custom Progress Update */}
-        <div className="border-t pt-4 space-y-3">
-          <h3 className="font-semibold text-gray-900 text-sm">Custom Update</h3>
-          <div className="flex flex-wrap gap-3">
-            <input
-              type="number"
-              placeholder="Enter progress (0–100)"
-              value={customProgress}
-              onChange={(e) => setCustomProgress(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-full md:w-48 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent outline-none"
-              min="0"
-              max="100"
-              disabled={isUpdating}
-            />
+          {task.status === "pending" && (
             <button
-              onClick={handleCustomUpdate}
-              disabled={isUpdating || !customProgress}
-              className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg text-sm hover:bg-[#3D8B93] transition disabled:opacity-50 flex items-center gap-2"
+              onClick={handleStartTask}
+              disabled={isUpdating}
+              className="px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition disabled:opacity-50"
             >
-              {updateProgressMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-              Update Task
+              Start Task
             </button>
-          </div>
+          )}
+          {["in-progress", "pending-retest", "failed"].includes(task.status) &&
+            [25, 50, 75, 100].map((step) => (
+              <button
+                key={step}
+                onClick={() => handleProgressUpdate(step)}
+                disabled={isUpdating}
+                className="px-3 py-1 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 transition disabled:opacity-50"
+              >
+                {updateProgressMutation.isPending ? (
+                  <Loader2 className="w-3 h-3 animate-spin inline mr-1" />
+                ) : null}
+                {step}%
+              </button>
+            ))}
         </div>
+{/*  */}
       </div>
 
       {/* Comments Section */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
         <h2 className="font-bold text-gray-900 flex items-center gap-2">
-          <MessageSquare size={18} /> Comments ({task.comments?.length || 0})
+          <MessageSquare size={18} /> Task Communication
         </h2>
+        <p className="text-sm text-gray-500">
+          Choose who you want to talk to, then write your message in that
+          conversation tab.
+        </p>
+
+        <div className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+          {Object.entries(COMMENT_TABS).map(([tabKey, tab]) => (
+            <button
+              key={tabKey}
+              type="button"
+              onClick={() => setActiveCommentTab(tabKey)}
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                activeCommentTab === tabKey
+                  ? "bg-[#4DA5AD] text-white"
+                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+              }`}
+            >
+              {tab.label} ({commentCounts[tabKey] || 0})
+            </button>
+          ))}
+        </div>
+
+        <div className="rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-600">
+          Conversation with {COMMENT_TABS[activeCommentTab].label}
+        </div>
 
         <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
-          {task.comments && [...task.comments]
-            .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
-            .map((comment) => (
-              <div key={comment.id} className="group text-sm border-b border-gray-100 pb-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-semibold text-gray-800">{comment.user?.name || 'User'}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400">{formatDate(comment.createdAt)}</span>
-                    <button 
-                      onClick={() => handleDeleteComment(comment.id)}
-                      disabled={deleteCommentMutation.isPending}
-                      className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
-                    >
-                      {deleteCommentMutation.isPending ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : (
-                        <Trash2 size={14} />
-                      )}
-                    </button>
-                  </div>
+          {filteredComments.map((comment) => (
+            <div
+              key={comment.id}
+              className="group text-sm border-b border-gray-100 pb-3"
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-gray-800">
+                    {comment.user?.name || "User"}
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                    {formatRoleLabel(comment.user?.role)}
+                  </span>
                 </div>
-                <div className="text-gray-600 mt-1">{comment.content}</div>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-400">
+                    {formatDate(comment.createdAt)}
+                  </span>
+                  <button
+                    onClick={() => handleDeleteComment(comment.id)}
+                    disabled={deleteCommentMutation.isPending}
+                    className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity disabled:opacity-50"
+                  >
+                    {deleteCommentMutation.isPending ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                  </button>
+                </div>
               </div>
-            ))}
-          {!task.comments?.length && (
-            <div className="text-center text-gray-400 py-4">No comments yet. Be the first to comment!</div>
+              <div className="text-gray-600 mt-1 whitespace-pre-wrap">
+                {stripCommentTargetPrefix(comment.content)}
+              </div>
+            </div>
+          ))}
+          {!filteredComments.length && (
+            <div className="text-center text-gray-400 py-4">
+              {COMMENT_TABS[activeCommentTab].emptyMessage}
+            </div>
           )}
         </div>
 
         <div className="flex gap-2 pt-2">
           <input
             type="text"
-            placeholder="Add a comment..."
+            placeholder={COMMENT_TABS[activeCommentTab].placeholder}
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent outline-none"
-            onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+            onKeyPress={(e) => e.key === "Enter" && handleAddComment()}
             disabled={isUpdating}
           />
           <button
@@ -457,7 +625,9 @@ const TaskDetails = () => {
             disabled={!commentText.trim() || isUpdating}
             className="px-4 py-2 bg-[#4DA5AD] text-white rounded-lg text-sm hover:bg-[#3D8B93] transition disabled:opacity-50 flex items-center gap-2"
           >
-            {addCommentMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+            {addCommentMutation.isPending && (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            )}
             Post
           </button>
         </div>

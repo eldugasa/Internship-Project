@@ -8,7 +8,7 @@ import {
   SortAsc, SortDesc, Download, Loader2, AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getMyTasks, updateTask } from '../../services/tasksService';
+import { getMyTasks, updateTaskStatus } from '../../services/tasksService';
 
 // ============================================
 // 1. QUERY DEFINITIONS
@@ -62,6 +62,9 @@ const getStatusColor = (status) => {
   switch (status) {
     case 'completed': return 'bg-green-100 text-green-800';
     case 'in-progress': return 'bg-blue-100 text-blue-800';
+    case 'in-test': return 'bg-cyan-100 text-cyan-800';
+    case 'failed': return 'bg-red-100 text-red-800';
+    case 'pending-retest': return 'bg-amber-100 text-amber-800';
     case 'pending': return 'bg-yellow-100 text-yellow-800';
     default: return 'bg-gray-100 text-gray-800';
   }
@@ -101,6 +104,18 @@ const extractProjects = (tasks) => {
   });
   
   return uniqueProjects;
+};
+
+const getNextTeamMemberStatus = (task, progress, isStartAction = false) => {
+  if (progress >= 100) {
+    return task.qaTesterId ? 'in-test' : 'completed';
+  }
+
+  if (isStartAction || progress > 0 || task.status === 'in-progress') {
+    return 'in-progress';
+  }
+
+  return 'pending';
 };
 
 // ============================================
@@ -192,8 +207,8 @@ const TeamMemberTasks = () => {
 
   // Update task mutation with optimistic update
   const updateTaskMutation = useMutation({
-    mutationFn: ({ taskId, progress, status }) => 
-      updateTask(taskId, { progress, status }),
+    mutationFn: ({ taskId, progress, status }) =>
+      updateTaskStatus(taskId, status, progress),
     onMutate: async ({ taskId, progress, status }) => {
       await queryClient.cancelQueries({ queryKey: ['team-member', 'tasks'] });
       
@@ -284,13 +299,21 @@ const TeamMemberTasks = () => {
 
   // Handlers
   const handleUpdateProgress = (taskId, progress) => {
-    const status = progress === 100 ? 'completed' : 'in-progress';
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+
+    const status = getNextTeamMemberStatus(task, progress);
     setUpdatingTaskId(taskId);
     updateTaskMutation.mutate({ taskId, progress, status });
   };
 
   const handleStartTask = (taskId) => {
-    handleUpdateProgress(taskId, 0);
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+
+    const status = getNextTeamMemberStatus(task, task.progress || 0, true);
+    setUpdatingTaskId(taskId);
+    updateTaskMutation.mutate({ taskId, progress: task.progress || 0, status });
   };
 
   const handleViewTask = (task) => {
@@ -456,6 +479,9 @@ const TeamMemberTasks = () => {
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
                 <option value="in-progress">In Progress</option>
+                <option value="in-test">In Test</option>
+                <option value="pending-retest">Pending Retest</option>
+                <option value="failed">Failed</option>
                 <option value="completed">Completed</option>
               </select>
             </div>
@@ -520,6 +546,13 @@ const TeamMemberTasks = () => {
                   isTaskUpdating ? 'opacity-75' : ''
                 }`}
               >
+                {task.status === 'pending-retest' && (
+                  <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+                    <AlertCircle className="w-4 h-4" />
+                    Failed in QA
+                  </div>
+                )}
+
                 <div className="flex justify-between items-start mb-4">
                   <div className="flex-1">
                     <h3 className="font-bold text-gray-900 text-lg mb-1">{task.title}</h3>
@@ -609,7 +642,7 @@ const TeamMemberTasks = () => {
                         Start
                       </button>
                     )}
-                    {task.status === 'in-progress' && task.progress !== 100 && (
+                    {(task.status === 'in-progress' || task.status === 'pending-retest' || task.status === 'failed') && task.progress !== 100 && (
                       <div className="flex gap-1">
                         {[25, 50, 75, 100].map(percent => (
                           <button
@@ -627,7 +660,16 @@ const TeamMemberTasks = () => {
                         ))}
                       </div>
                     )}
-                    {task.progress === 100 && (
+                    {(task.status === 'in-test' || task.progress === 100) && (
+                      <button 
+                        disabled
+                        className="px-3 py-1.5 bg-cyan-100 text-cyan-700 text-sm rounded-lg flex items-center"
+                      >
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                        Sent to QA
+                      </button>
+                    )}
+                    {task.status === 'completed' && (
                       <button 
                         disabled
                         className="px-3 py-1.5 bg-green-100 text-green-700 text-sm rounded-lg flex items-center"

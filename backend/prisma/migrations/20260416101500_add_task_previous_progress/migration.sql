@@ -1,0 +1,2 @@
+ALTER TABLE "Task"
+ADD COLUMN "previousProgress" INTEGER NOT NULL DEFAULT 0;

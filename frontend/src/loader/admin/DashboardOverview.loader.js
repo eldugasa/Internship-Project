@@ -21,12 +21,14 @@ export const DASHBOARD_COLORS = {
   planned: '#94A3B8',
   active: '#0f5841',
   completed: '#10B981',
+  overdue: '#EF4444',
   'on-hold': '#F59E0B',
   pending: '#94A3B8',
   in_progress: '#194f87',
   done: '#10B981',
   admin: '#8B5CF6',
   'project-manager': '#3B82F6',
+  'qa-tester': '#F59E0B',
   'team-member': '#10B981',
 };
 

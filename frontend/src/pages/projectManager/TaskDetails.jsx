@@ -5,6 +5,11 @@ import { ArrowLeft, Edit, Clock, User, MessageSquare, FolderKanban, Trash2, Aler
 import { useState, useEffect } from 'react';
 import { getTaskById, updateTask, deleteTask, getTaskComments, addTaskComment, deleteTaskComment } from '../../services/tasksService';
 
+const formatRoleLabel = (role) => {
+  if (!role) return 'Team';
+  return role.toString().replace(/[-_]/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
 export const taskQuery = (id) => ({
   queryKey: ['tasks', id],
   queryFn: ({ signal }) => getTaskById(id, { signal }),
@@ -450,8 +455,11 @@ const TaskDetails = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
             <MessageSquare className="w-5 h-5 mr-2" />
-            Comments ({comments.length})
+            Task Communication ({comments.length})
           </h2>
+          <p className="text-sm text-gray-500 mb-4">
+            Coordinate task assignment and delivery here with the team member and QA tester.
+          </p>
           
           {/* Comments List */}
           <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
@@ -463,9 +471,9 @@ const TaskDetails = () => {
                   <div className="flex justify-between items-center mb-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-medium text-gray-900">{comment.user?.name || 'User'}</span>
-                      {comment.user?.role && (
-                        <span className="text-xs text-gray-400">({comment.user.role})</span>
-                      )}
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                        {formatRoleLabel(comment.user?.role)}
+                      </span>
                       <span className="text-xs text-gray-400">{formatDate(comment.createdAt)}</span>
                     </div>
                     <button
@@ -493,7 +501,7 @@ const TaskDetails = () => {
               type="text"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Add a comment..."
+              placeholder="Write a message for the team member or QA tester..."
               disabled={isLoading}
               className="flex-1 border border-gray-300 rounded-l-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-[#0f5841] focus:border-transparent disabled:bg-gray-50"
             />

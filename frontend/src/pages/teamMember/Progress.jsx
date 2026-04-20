@@ -23,9 +23,8 @@ const myTasksQuery = () => ({
   gcTime: 1000 * 60 * 10,
 });
 
-// ============================================
-// 2. HELPER COMPONENTS
-// ============================================
+//  2. HELPER COMPONENTS
+
 
 const StatCard = ({ title, value, subtext, icon: Icon, colorClass, loading }) => (
   <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 hover:shadow-md transition">
@@ -102,9 +101,8 @@ const MetricGroup = ({ title, items, loading }) => (
   </div>
 );
 
-// ============================================
-// 3. SKELETON COMPONENT
-// ============================================
+//  3. SKELETON COMPONENT
+
 
 const ProgressSkeleton = () => (
   <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -185,9 +183,8 @@ const ProgressSkeleton = () => (
   </div>
 );
 
-// ============================================
 // 4. ERROR COMPONENT
-// ============================================
+
 
 const ProgressError = ({ error, onRetry }) => (
   <div className="p-6 flex justify-center items-center h-64">
@@ -204,9 +201,8 @@ const ProgressError = ({ error, onRetry }) => (
   </div>
 );
 
-// ============================================
-// 5. MAIN COMPONENT
-// ============================================
+//  5. MAIN COMPONENT
+
 
 const TeamMemberProgress = () => {
   const { user } = useAuth();
@@ -223,6 +219,26 @@ const TeamMemberProgress = () => {
     enabled: !!user,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
+
+  const taskDistribution = useMemo(() => {
+    const total = tasks.length;
+    const inProgressStatuses = new Set(['in-progress', 'in-test', 'pending-retest', 'failed']);
+
+    const completed = tasks.filter((task) => task.status === 'completed').length;
+    const inProgress = tasks.filter((task) => inProgressStatuses.has(task.status)).length;
+    const pending = tasks.filter((task) => task.status === 'pending').length;
+
+    const toPercentage = (count) => (total ? Math.round((count / total) * 100) : 0);
+
+    return {
+      completed,
+      inProgress,
+      pending,
+      completedPercentage: toPercentage(completed),
+      inProgressPercentage: toPercentage(inProgress),
+      pendingPercentage: toPercentage(pending),
+    };
+  }, [tasks]);
 
   // Calculate all statistics based on tasks
   const { stats, projectBreakdown, timeStats, performanceMetrics } = useMemo(() => {
@@ -254,7 +270,8 @@ const TeamMemberProgress = () => {
     }
 
     const completed = tasks.filter(t => t.status === 'completed');
-    const inProgress = tasks.filter(t => t.status === 'in-progress');
+    const inProgressStatuses = new Set(['in-progress', 'in-test', 'pending-retest', 'failed']);
+    const inProgress = tasks.filter(t => inProgressStatuses.has(t.status));
     const pending = tasks.filter(t => t.status === 'pending');
     const overdue = tasks.filter(t => 
       t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'
@@ -570,24 +587,24 @@ const TeamMemberProgress = () => {
         <h2 className="text-lg font-bold text-gray-900 mb-4">Task Distribution</h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 bg-green-50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600">{stats.completedCount}</div>
+            <div className="text-2xl font-bold text-green-600">{taskDistribution.completed}</div>
             <div className="text-sm text-gray-600">Completed Tasks</div>
             <div className="w-full bg-green-200 rounded-full h-1.5 mt-2">
-              <div className="bg-green-600 h-1.5 rounded-full" style={{ width: '100%' }}></div>
+              <div className="bg-green-600 h-1.5 rounded-full" style={{ width: `${taskDistribution.completedPercentage}%` }}></div>
             </div>
           </div>
           <div className="p-4 bg-blue-50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600">{stats.inProgressCount}</div>
+            <div className="text-2xl font-bold text-blue-600">{taskDistribution.inProgress}</div>
             <div className="text-sm text-gray-600">In Progress</div>
             <div className="w-full bg-blue-200 rounded-full h-1.5 mt-2">
-              <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${tasks.length ? (stats.inProgressCount / tasks.length) * 100 : 0}%` }}></div>
+              <div className="bg-blue-600 h-1.5 rounded-full" style={{ width: `${taskDistribution.inProgressPercentage}%` }}></div>
             </div>
           </div>
           <div className="p-4 bg-yellow-50 rounded-lg">
-            <div className="text-2xl font-bold text-yellow-600">{stats.pendingCount}</div>
+            <div className="text-2xl font-bold text-yellow-600">{taskDistribution.pending}</div>
             <div className="text-sm text-gray-600">Pending</div>
             <div className="w-full bg-yellow-200 rounded-full h-1.5 mt-2">
-              <div className="bg-yellow-600 h-1.5 rounded-full" style={{ width: `${tasks.length ? (stats.pendingCount / tasks.length) * 100 : 0}%` }}></div>
+              <div className="bg-yellow-600 h-1.5 rounded-full" style={{ width: `${taskDistribution.pendingPercentage}%` }}></div>
             </div>
           </div>
         </div>
