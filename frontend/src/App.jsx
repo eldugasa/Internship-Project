@@ -8,7 +8,6 @@ import ErrorPage from "./pages/ErrorPage";
 
 // Public imports
 import LandingPage from "./LandingPage";
-import Signup from "./auth/Signup";
 import Login from "./auth/Login";
 import ForgetPassword from "./auth/ForgetPassword";
 import ResetPassword from "./auth/ResetPassword";
@@ -89,7 +88,7 @@ export const router = createBrowserRouter([
   },
   {
     path: "/signup",
-    element: <Signup />,
+    element: <Navigate to="/login" replace />,
   },
   {
     path: "/login",

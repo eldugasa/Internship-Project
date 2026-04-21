@@ -198,16 +198,12 @@ export const calculateMemberWorkload = (tasks, teams, projects) => {
           activeTasks: 0,
           completedTasks: 0,
           overdueTasks: 0,
-          totalTasks: 0,
-          totalHours: 0,
-          estimatedHours: 0
+          totalTasks: 0
         });
       }
       
       const member = assigneeMap.get(assigneeId);
       member.totalTasks++;
-      member.totalHours += task.actualHours || 0;
-      member.estimatedHours += task.estimatedHours || 0;
       
       if (task.status === 'completed') {
         member.completedTasks++;

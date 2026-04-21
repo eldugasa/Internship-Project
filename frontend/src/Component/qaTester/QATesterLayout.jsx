@@ -97,6 +97,7 @@ const QATesterLayout = () => {
         userRole={userRole}
         userInitials={userInitials}
         setShowLogoutConfirm={setShowLogoutConfirm}
+        profilePath="/qa-tester/profile"
       />
 
       {/* Mobile Overlay */}
@@ -141,7 +142,7 @@ const QATesterLayout = () => {
             {/* Right Side */}
             <div className="flex items-center space-x-2 notifications-container">
               {/* Notification Bell Component */}
-              <NotificationBell />
+              <NotificationBell baseRoute="/qa-tester" />
 
               {/* Desktop Profile */}
               <div className="hidden lg:flex items-center space-x-3 ml-2">

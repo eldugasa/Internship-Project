@@ -32,10 +32,10 @@ const HeroSection = () => {
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start mb-8 sm:mb-10">
               <Link 
-                to="/signup"
+                to="/login"
                 className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 shadow-lg"
               >
-                Get Started
+                Sign In
               </Link>
             </div>
 

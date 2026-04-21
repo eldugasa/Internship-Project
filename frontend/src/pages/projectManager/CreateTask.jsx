@@ -90,7 +90,6 @@ const CreateTask = () => {
     const qaTesterId = formData.get("qaTesterId");
     const dueDate = formData.get("dueDate");
     const priority = formData.get("priority") || 'MEDIUM';
-    const estimatedHours = formData.get("estimatedHours");
 
     // Update selected project ID for member fetching
     setSelectedProjectId(projectId);
@@ -131,8 +130,7 @@ const CreateTask = () => {
           assigneeId,
           qaTesterId,
           dueDate,
-          priority,
-          estimatedHours
+          priority
         },
         success: false
       };
@@ -147,8 +145,7 @@ const CreateTask = () => {
         assignedTo: parseInt(assigneeId),
         qaTesterId: qaTesterId ? parseInt(qaTesterId) : null,
         dueDate: new Date(dueDate).toISOString(),
-        priority: priority?.toUpperCase() || 'MEDIUM',
-        estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null
+        priority: priority?.toUpperCase() || 'MEDIUM'
       };
 
       console.log('Sending to backend:', taskData);
@@ -172,8 +169,7 @@ const CreateTask = () => {
           assigneeId,
           qaTesterId,
           dueDate,
-          priority,
-          estimatedHours
+          priority
         },
         success: false
       };
@@ -189,8 +185,7 @@ const CreateTask = () => {
       assigneeId: '',
       qaTesterId: '',
       dueDate: '',
-      priority: 'MEDIUM',
-      estimatedHours: ''
+      priority: 'MEDIUM'
     },
     success: false
   });
@@ -380,19 +375,6 @@ const CreateTask = () => {
               </div>
             </div>
 
-            {/* Estimated Hours */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
-              <input
-                type="number"
-                name="estimatedHours"
-                defaultValue={formState.enteredValues?.estimatedHours}
-                min="0"
-                step="0.5"
-                placeholder="e.g., 2.5"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
-              />
-            </div>
           </div>
         </div>
    {/* Error Display */}

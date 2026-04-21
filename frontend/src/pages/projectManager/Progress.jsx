@@ -371,10 +371,6 @@ const Progress = () => {
                         {member.efficiency}%
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Hours:</span>
-                      <span className="font-medium">{member.totalHours}/{member.estimatedHours}h</span>
-                    </div>
                     {member.overdueTasks > 0 && (
                       <div className="mt-3 p-2 bg-red-50 rounded flex items-center gap-2">
                         <AlertCircle className="w-4 h-4 text-red-500" />

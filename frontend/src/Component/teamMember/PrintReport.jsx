@@ -171,27 +171,7 @@ const PrintReport = ({ reportData, weeklyPerformance, projects, timePeriod }) =>
                 </span>
               </td>
             </tr>
-            <tr>
-              <td>Hours Utilization</td>
-              <td><strong>{reportData.utilization}%</strong></td>
-              <td>80%</td>
-              <td>
-                <span className={`badge ${reportData.utilization >= 80 ? 'badge-green' : 'badge-yellow'}`}>
-                  {reportData.utilization >= 80 ? 'Good' : 'Low'}
-                </span>
-              </td>
-            </tr>
-            <tr>
-              <td>Average Time/Task</td>
-              <td><strong>{reportData.avgTime}h</strong></td>
-              <td>8h</td>
-              <td>
-                <span className={`badge ${parseFloat(reportData.avgTime) <= 8 ? 'badge-green' : 'badge-yellow'}`}>
-                  {parseFloat(reportData.avgTime) <= 8 ? 'Good' : 'High'}
-                </span>
-              </td>
-            </tr>
-          </tbody>
+</tbody>
         </table>
 
         <h2>📅 Weekly Performance</h2>
@@ -201,7 +181,6 @@ const PrintReport = ({ reportData, weeklyPerformance, projects, timePeriod }) =>
               <th>Week</th>
               <th>Tasks</th>
               <th>Completed</th>
-              <th>Hours</th>
               <th>Efficiency</th>
             </tr>
           </thead>
@@ -211,7 +190,6 @@ const PrintReport = ({ reportData, weeklyPerformance, projects, timePeriod }) =>
                 <td><strong>{w.week}</strong></td>
                 <td>{w.tasks}</td>
                 <td>{w.completed}</td>
-                <td>{w.hours}h</td>
                 <td>{w.efficiency}%</td>
               </tr>
             ))}
@@ -227,7 +205,6 @@ const PrintReport = ({ reportData, weeklyPerformance, projects, timePeriod }) =>
               <th>Completed</th>
               <th>In Progress</th>
               <th>Pending</th>
-              <th>Hours</th>
               <th>Rate</th>
             </tr>
           </thead>
@@ -239,7 +216,6 @@ const PrintReport = ({ reportData, weeklyPerformance, projects, timePeriod }) =>
                 <td>{p.completed}</td>
                 <td>{p.inProgress || 0}</td>
                 <td>{p.pending || 0}</td>
-                <td>{p.hours}h</td>
                 <td><strong>{p.rate}%</strong></td>
               </tr>
             ))}

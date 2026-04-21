@@ -8,21 +8,14 @@ import {
   SortAsc, SortDesc, Download, Loader2, AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getMyTasks, updateTaskStatus } from '../../services/tasksService';
-
-// ============================================
-// 1. QUERY DEFINITIONS
-// ============================================
-
-export const myTasksQuery = () => ({
-  queryKey: ['team-member', 'tasks'],
-  queryFn: async ({ signal }) => {
-    const tasks = await getMyTasks({ signal });
-    return Array.isArray(tasks) ? tasks : [];
-  },
-  staleTime: 1000 * 60 * 3,
-  gcTime: 1000 * 60 * 10,
-});
+import { updateTaskStatus } from '../../services/tasksService';
+import {
+  getTeamMemberTaskProgress,
+  MY_TASKS_QUERY_KEY,
+  getNextTeamMemberStatus,
+  isTeamMemberTaskDone,
+  myTasksQuery,
+} from './taskShared';
 
 // ============================================
 // 2. HELPER FUNCTIONS
@@ -49,7 +42,7 @@ const formatDate = (dateStr) => {
 
 const isOverdue = (task) => {
   const dueDate = task.dueDate || task.deadline;
-  if (!dueDate || task.status === 'completed') return false;
+  if (!dueDate || isTeamMemberTaskDone(task)) return false;
   const parsedDate = parseDate(dueDate);
   if (!parsedDate) return false;
   const today = new Date();
@@ -61,6 +54,7 @@ const isOverdue = (task) => {
 const getStatusColor = (status) => {
   switch (status) {
     case 'completed': return 'bg-green-100 text-green-800';
+    case 'passed': return 'bg-green-100 text-green-800';
     case 'in-progress': return 'bg-blue-100 text-blue-800';
     case 'in-test': return 'bg-cyan-100 text-cyan-800';
     case 'failed': return 'bg-red-100 text-red-800';
@@ -104,18 +98,6 @@ const extractProjects = (tasks) => {
   });
   
   return uniqueProjects;
-};
-
-const getNextTeamMemberStatus = (task, progress, isStartAction = false) => {
-  if (progress >= 100) {
-    return task.qaTesterId ? 'in-test' : 'completed';
-  }
-
-  if (isStartAction || progress > 0 || task.status === 'in-progress') {
-    return 'in-progress';
-  }
-
-  return 'pending';
 };
 
 // ============================================
@@ -210,15 +192,15 @@ const TeamMemberTasks = () => {
     mutationFn: ({ taskId, progress, status }) =>
       updateTaskStatus(taskId, status, progress),
     onMutate: async ({ taskId, progress, status }) => {
-      await queryClient.cancelQueries({ queryKey: ['team-member', 'tasks'] });
+      await queryClient.cancelQueries({ queryKey: MY_TASKS_QUERY_KEY });
       
-      const previousTasks = queryClient.getQueryData(['team-member', 'tasks']);
+      const previousTasks = queryClient.getQueryData(MY_TASKS_QUERY_KEY);
       
-      queryClient.setQueryData(['team-member', 'tasks'], (old) => {
+      queryClient.setQueryData(MY_TASKS_QUERY_KEY, (old) => {
         if (!old) return old;
         return old.map(task =>
           task.id === taskId 
-            ? { ...task, progress, status, actualHours: (task.actualHours || 0) + 1 }
+            ? { ...task, progress, status }
             : task
         );
       });
@@ -227,13 +209,13 @@ const TeamMemberTasks = () => {
     },
     onError: (err, variables, context) => {
       if (context?.previousTasks) {
-        queryClient.setQueryData(['team-member', 'tasks'], context.previousTasks);
+        queryClient.setQueryData(MY_TASKS_QUERY_KEY, context.previousTasks);
       }
       console.error('Error updating task:', err);
       alert('Failed to update task progress');
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['team-member', 'tasks'] });
+      queryClient.invalidateQueries({ queryKey: MY_TASKS_QUERY_KEY });
       setUpdatingTaskId(null);
     },
   });
@@ -339,8 +321,7 @@ const TeamMemberTasks = () => {
       'Status': task.status,
       'Priority': task.priority,
       'Due Date': task.dueDate || task.deadline || 'N/A',
-      'Progress': `${task.progress || 0}%`,
-      'Hours': `${task.actualHours || 0}/${task.estimatedHours || 0}`
+      'Progress': `${task.progress || 0}%`
     }));
 
     const headers = Object.keys(csvData[0]);
@@ -538,6 +519,8 @@ const TeamMemberTasks = () => {
           {filteredTasks.map(task => {
             const isTaskUpdating = updatingTaskId === task.id;
             const overdue = isOverdue(task);
+            const taskProgress = getTeamMemberTaskProgress(task);
+            const isTaskDone = isTeamMemberTaskDone(task);
             
             return (
               <div 
@@ -549,7 +532,7 @@ const TeamMemberTasks = () => {
                 {task.status === 'pending-retest' && (
                   <div className="mb-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
                     <AlertCircle className="w-4 h-4" />
-                    Failed in QA
+                    Failed 
                   </div>
                 )}
 
@@ -601,21 +584,17 @@ const TeamMemberTasks = () => {
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-gray-700">
-                      Progress: {task.progress || 0}%
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      <Clock className="w-3 h-3 inline mr-1" /> 
-                      {task.actualHours || 0}/{task.estimatedHours || 0} hrs
+                      Progress: {taskProgress}%
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div 
                       className={`h-2 rounded-full transition-all duration-300 ${
-                        task.progress === 100 ? 'bg-green-500' : 
-                        task.progress >= 75 ? 'bg-blue-500' : 
-                        task.progress >= 50 ? 'bg-yellow-500' : 'bg-orange-500'
+                        taskProgress === 100 ? 'bg-green-500' : 
+                        taskProgress >= 75 ? 'bg-blue-500' : 
+                        taskProgress >= 50 ? 'bg-yellow-500' : 'bg-orange-500'
                       }`} 
-                      style={{ width: `${task.progress || 0}%` }}
+                      style={{ width: `${taskProgress}%` }}
                     ></div>
                   </div>
                 </div>
@@ -642,7 +621,7 @@ const TeamMemberTasks = () => {
                         Start
                       </button>
                     )}
-                    {(task.status === 'in-progress' || task.status === 'pending-retest' || task.status === 'failed') && task.progress !== 100 && (
+                    {(task.status === 'in-progress' || task.status === 'pending-retest' || task.status === 'failed') && taskProgress !== 100 && (
                       <div className="flex gap-1">
                         {[25, 50, 75, 100].map(percent => (
                           <button
@@ -650,7 +629,7 @@ const TeamMemberTasks = () => {
                             onClick={() => handleUpdateProgress(task.id, percent)}
                             disabled={isTaskUpdating}
                             className={`px-2 py-1 text-xs rounded ${
-                              task.progress === percent 
+                              taskProgress === percent 
                                 ? 'bg-[#4DA5AD] text-white' 
                                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                             } disabled:opacity-50`}
@@ -660,7 +639,7 @@ const TeamMemberTasks = () => {
                         ))}
                       </div>
                     )}
-                    {(task.status === 'in-test' || task.progress === 100) && (
+                    {(task.status === 'in-test' || (taskProgress === 100 && !isTaskDone)) && (
                       <button 
                         disabled
                         className="px-3 py-1.5 bg-cyan-100 text-cyan-700 text-sm rounded-lg flex items-center"
@@ -669,7 +648,7 @@ const TeamMemberTasks = () => {
                         Sent to QA
                       </button>
                     )}
-                    {task.status === 'completed' && (
+                    {isTaskDone && (
                       <button 
                         disabled
                         className="px-3 py-1.5 bg-green-100 text-green-700 text-sm rounded-lg flex items-center"

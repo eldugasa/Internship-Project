@@ -5,6 +5,38 @@ import {
   NOTIFICATION_TYPES,
 } from "../utils/notificationHelper.js";
 
+const DONE_TASK_STATUSES = new Set(["COMPLETED", "PASSED"]);
+
+const clampProgress = (value) => {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return 0;
+  if (numericValue < 0) return 0;
+  if (numericValue > 100) return 100;
+  return numericValue;
+};
+
+const getNormalizedTaskProgress = (task) => {
+  if (DONE_TASK_STATUSES.has(task?.status)) {
+    return 100;
+  }
+
+  return clampProgress(task?.progress ?? 0);
+};
+
+const getRetestProgress = (task) => {
+  const previousProgress = clampProgress(task?.previousProgress ?? 0);
+  if (previousProgress > 0 && previousProgress < 100) {
+    return previousProgress;
+  }
+
+  const currentProgress = clampProgress(task?.progress ?? 0);
+  if (currentProgress >= 100) {
+    return 75;
+  }
+
+  return currentProgress;
+};
+
 // Get task by ID
 const getTaskById = async (req, res) => {
   try {
@@ -68,12 +100,10 @@ const getTaskById = async (req, res) => {
       title: task.title,
       description: task.description,
       status: task.status,
-      progress: task.progress || 0,
+      progress: getNormalizedTaskProgress(task),
       previousProgress: task.previousProgress || 0,
       priority: task.priority || "MEDIUM",
       dueDate: task.dueDate,
-      estimatedHours: task.estimatedHours,
-      actualHours: task.actualHours,
       assigneeId: task.assigneeId,
       assignee: task.assignee,
       qaTesterId: task.qaTesterId,
@@ -101,7 +131,6 @@ const createTask = async (req, res) => {
       qaTesterId,
       dueDate,
       priority,
-      estimatedHours,
     } = req.body;
 
     // Check if assigned user exists
@@ -155,7 +184,6 @@ const createTask = async (req, res) => {
         assigneeId: Number(assignedTo),
         qaTesterId: qaTesterId ? Number(qaTesterId) : null,
         dueDate: dueDate ? new Date(dueDate) : null,
-        estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
       },
       include: {
         assignee: {
@@ -301,12 +329,10 @@ const getMyTasks = async (req, res) => {
       title: task.title,
       description: task.description,
       status: task.status,
-      progress: task.progress || 0,
+      progress: getNormalizedTaskProgress(task),
       previousProgress: task.previousProgress || 0,
       priority: task.priority || "MEDIUM",
       dueDate: task.dueDate,
-      estimatedHours: task.estimatedHours,
-      actualHours: task.actualHours,
       projectId: task.projectId,
       project: task.project,
       projectName: task.project?.name || "Unknown Project",
@@ -386,7 +412,6 @@ const updateTaskStatus = async (req, res) => {
         const currentProgress = task.progress ?? 0;
 
         updateData.progress = nextProgress;
-        updateData.actualHours = (task.actualHours ?? 0) + 1;
         updateData.previousProgress =
           nextProgress < 100 ? nextProgress : currentProgress < 100 ? currentProgress : task.previousProgress ?? 0;
 
@@ -397,21 +422,27 @@ const updateTaskStatus = async (req, res) => {
       } else {
         updateData.status = "PENDING";
       }
-      } else if (normalizedRole === "QA_TESTER") {
+    } else if (normalizedRole === "QA_TESTER") {
         const qaStatus = (status || "").toString().trim().toUpperCase();
-        const allowedQaStatuses = ["IN_TEST", "FAILED", "PENDING_RETEST", "PASSED", "COMPLETED"];
+        const allowedQaStatuses = ["IN_TEST", "FAILED", "PENDING_RETEST", "PASSED"];
 
       if (!allowedQaStatuses.includes(qaStatus)) {
         return res.status(400).json({ message: "Invalid QA status update" });
       }
 
-        if (qaStatus === "FAILED") {
-          updateData.progress = 75;
-          updateData.status = "PENDING_RETEST";
-        } else {
-          updateData.progress = qaStatus === "PASSED" ? 100 : parsedProgress ?? task.progress ?? 100;
-          updateData.status = qaStatus === "PASSED" ? "COMPLETED" : qaStatus;
-        }
+      if (qaStatus === "PASSED") {
+        updateData.progress = 100;
+        updateData.status = "PASSED";
+      } else if (qaStatus === "FAILED") {
+        updateData.progress = getRetestProgress(task);
+        updateData.status = "FAILED";
+      } else if (qaStatus === "PENDING_RETEST") {
+        updateData.progress = getRetestProgress(task);
+        updateData.status = "PENDING_RETEST";
+      } else {
+        updateData.progress = parsedProgress ?? getNormalizedTaskProgress(task);
+        updateData.status = "IN_TEST";
+      }
       } else {
         if (status) updateData.status = status;
         if (parsedProgress !== undefined) updateData.progress = parsedProgress;
@@ -456,12 +487,13 @@ const updateTaskStatus = async (req, res) => {
     if (normalizedRole === "QA_TESTER") {
       try {
         if (task.assigneeId) {
+          const qaPassed = updateData.status === "PASSED";
           await createNotification({
             userId: task.assigneeId,
             type: NOTIFICATION_TYPES.TASK_COMPLETED,
-            title: updateData.status === "COMPLETED" ? "Task Passed QA" : "QA Status Updated",
+            title: qaPassed ? "Task Passed QA" : "QA Status Updated",
             message:
-              updateData.status === "COMPLETED"
+              qaPassed
                 ? `Task "${task.title}" passed QA and is now completed`
                 : `QA updated "${task.title}" to ${updateData.status}`,
             data: { taskId: task.id, projectId: task.projectId },
@@ -470,12 +502,13 @@ const updateTaskStatus = async (req, res) => {
         }
 
         if (task.project?.managerId) {
+          const qaPassed = updateData.status === "PASSED";
           await createNotification({
             userId: task.project.managerId,
             type: NOTIFICATION_TYPES.TASK_COMPLETED,
-            title: updateData.status === "COMPLETED" ? "Task Passed QA" : "QA Status Updated",
+            title: qaPassed ? "Task Passed QA" : "QA Status Updated",
             message:
-              updateData.status === "COMPLETED"
+              qaPassed
                 ? `Task "${task.title}" passed QA and is now completed`
                 : `QA updated "${task.title}" to ${updateData.status}`,
             data: { taskId: task.id, projectId: task.projectId },
@@ -561,9 +594,6 @@ const updateTaskProgress = async (req, res) => {
       where: { id: parseInt(id) },
       data: {
         progress,
-        ...(normalizedRole === "TEAM_MEMBER" && task.assigneeId === req.user.id
-          ? { actualHours: (task.actualHours ?? 0) + 1 }
-          : {}),
         status:
           progress === 100
             ? "COMPLETED"
@@ -780,7 +810,6 @@ const updateTask = async (req, res) => {
       qaTesterId,
       priority,
       dueDate,
-      estimatedHours,
       status,
       progress,
     } = req.body;
@@ -809,10 +838,6 @@ const updateTask = async (req, res) => {
     }
     if (priority !== undefined) updateData.priority = priority;
     if (dueDate !== undefined) updateData.dueDate = new Date(dueDate);
-    if (estimatedHours !== undefined)
-      updateData.estimatedHours = estimatedHours
-        ? parseFloat(estimatedHours)
-        : null;
     if (status !== undefined) updateData.status = status;
     if (progress !== undefined) updateData.progress = progress;
 

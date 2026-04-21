@@ -391,7 +391,6 @@ static initializeData() {
       teamName: project.teamName,
       progress: 0,
       status: 'pending',
-      actualHours: 0,
       createdAt: new Date().toISOString().split('T')[0],
       updatedAt: new Date().toISOString().split('T')[0],
       tags: taskData.tags || []
@@ -522,8 +521,7 @@ static initializeData() {
         ...currentTask,
         progress: progress,
         status: status,
-        updatedAt: new Date().toISOString().split('T')[0],
-        actualHours: (currentTask.actualHours || 0) + 1
+        updatedAt: new Date().toISOString().split('T')[0]
       };
       
       this.saveTasks(tasks);

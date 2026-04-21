@@ -87,9 +87,6 @@ const TeamMemberReports = () => {
     const inProgress = filteredTasks.filter(t => t.status === 'in-progress');
     const pending = filteredTasks.filter(t => t.status === 'pending');
     
-    const totalHours = filteredTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
-    const estHours = filteredTasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
-    
     // Calculate on-time delivery from REAL data
     const onTimeTasks = completed.filter(t => {
       if (!t.dueDate) return true;
@@ -122,11 +119,8 @@ const TeamMemberReports = () => {
       });
       
       const weekCompleted = weekTasks.filter(t => t.status === 'completed').length;
-      const weekHours = weekTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
-      
       weeks.push({
         week: `Week ${4 - i}`,
-        hours: weekHours,
         tasks: weekTasks.length,
         completed: weekCompleted,
         efficiency: weekTasks.length > 0 ? Math.round((weekCompleted / weekTasks.length) * 100) : 0
@@ -145,8 +139,7 @@ const TeamMemberReports = () => {
       return {
         month,
         tasks: monthTasks.length,
-        completed: monthTasks.filter(t => t.status === 'completed').length,
-        hours: monthTasks.reduce((sum, t) => sum + (t.actualHours || 0), 0)
+        completed: monthTasks.filter(t => t.status === 'completed').length
       };
     }).filter(m => m.tasks > 0);
 
@@ -158,13 +151,11 @@ const TeamMemberReports = () => {
         projectMap[pName] = { 
           total: 0, 
           completed: 0, 
-          hours: 0,
           pending: 0,
           inProgress: 0
         };
       }
       projectMap[pName].total++;
-      projectMap[pName].hours += task.actualHours || 0;
       
       if (task.status === 'completed') {
         projectMap[pName].completed++;
@@ -182,12 +173,8 @@ const TeamMemberReports = () => {
         pendingCount: pending.length,
         inProgressCount: inProgress.length,
         overdueCount: overdueTasks,
-        totalHours,
-        estHours,
         efficiency: filteredTasks.length ? Math.round((completed.length / filteredTasks.length) * 100) : 0,
-        avgTime: completed.length ? (totalHours / completed.length).toFixed(1) : 0,
-        onTimeDelivery: completed.length ? Math.round((onTimeTasks / completed.length) * 100) : 0,
-        utilization: estHours > 0 ? Math.round((totalHours / estHours) * 100) : 0
+        onTimeDelivery: completed.length ? Math.round((onTimeTasks / completed.length) * 100) : 0
       },
       weeklyPerformance: weeks.filter(w => w.tasks > 0),
       monthlyPerformance: monthData,
@@ -233,22 +220,19 @@ const TeamMemberReports = () => {
       ['Overdue', reportData.overdueCount, '-', '-'],
       ['Completion Rate', `${reportData.efficiency}%`, '80%', reportData.efficiency >= 80 ? 'On Track' : 'Behind'],
       ['On-time Delivery', `${reportData.onTimeDelivery}%`, '90%', reportData.onTimeDelivery >= 90 ? 'Excellent' : 'Needs Work'],
-      ['Hours Utilization', `${reportData.utilization}%`, '80%', reportData.utilization >= 80 ? 'Good' : 'Low'],
-      ['Average Time/Task', `${reportData.avgTime}h`, '8h', parseFloat(reportData.avgTime) <= 8 ? 'Good' : 'High'],
       [''],
       ['WEEKLY PERFORMANCE'],
-      ['Week', 'Tasks', 'Completed', 'Hours', 'Efficiency'],
-      ...weeklyPerformance.map(w => [w.week, w.tasks, w.completed, `${w.hours}h`, `${w.efficiency}%`]),
+      ['Week', 'Tasks', 'Completed', 'Efficiency'],
+      ...weeklyPerformance.map(w => [w.week, w.tasks, w.completed, `${w.efficiency}%`]),
       [''],
       ['PROJECT BREAKDOWN'],
-      ['Project', 'Total Tasks', 'Completed', 'In Progress', 'Pending', 'Hours', 'Completion Rate'],
+      ['Project', 'Total Tasks', 'Completed', 'In Progress', 'Pending', 'Completion Rate'],
       ...projects.map(p => [
         p.name,
         p.total,
         p.completed,
         p.inProgress || 0,
         p.pending || 0,
-        `${p.hours}h`,
         `${p.rate}%`
       ])
     ];
@@ -365,7 +349,6 @@ const TeamMemberReports = () => {
                   </span>
                 </div>
                 <div className="flex gap-4 text-xs text-gray-500 mb-3">
-                  <span>Hours: <b className="text-gray-900">{w.hours}h</b></span>
                   <span>Tasks: <b className="text-gray-900">{w.tasks}</b></span>
                   <span>Completed: <b className="text-gray-900">{w.completed}</b></span>
                 </div>
@@ -394,7 +377,6 @@ const TeamMemberReports = () => {
                       <span className="text-green-600">✅ {p.completed}</span>
                       <span className="text-blue-600">🔄 {p.inProgress || 0}</span>
                       <span className="text-yellow-600">⏳ {p.pending || 0}</span>
-                      <span className="text-purple-600">⏱️ {p.hours}h</span>
                     </div>
                   </div>
                   <span className="text-lg font-bold text-[#4DA5AD]">{p.rate}%</span>
@@ -426,7 +408,7 @@ const TeamMemberReports = () => {
                     style={{ height: `${Math.max((month.tasks / Math.max(...monthlyPerformance.map(m => m.tasks))) * 100, 4)}px`, minHeight: '20px' }}
                   >
                     <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-gray-800 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">
-                      {month.tasks} tasks • {month.hours}h
+                      {month.tasks} tasks
                     </div>
                   </div>
                   <div className="text-xs font-bold mt-2">{month.tasks}</div>
@@ -468,20 +450,6 @@ const TeamMemberReports = () => {
                 target="90%" 
                 status={reportData.onTimeDelivery >= 90 ? 'Excellent' : 'Needs Work'} 
                 isPositive={reportData.onTimeDelivery >= 90} 
-              />
-              <TableRow 
-                label="Hours Utilization" 
-                value={`${reportData.utilization}%`} 
-                target="80%" 
-                status={reportData.utilization >= 80 ? 'Good' : 'Low'} 
-                isPositive={reportData.utilization >= 80} 
-              />
-              <TableRow 
-                label="Average Time/Task" 
-                value={`${reportData.avgTime}h`} 
-                target="8h" 
-                status={parseFloat(reportData.avgTime) <= 8 ? 'Good' : 'High'} 
-                isPositive={parseFloat(reportData.avgTime) <= 8} 
               />
             </tbody>
           </table>

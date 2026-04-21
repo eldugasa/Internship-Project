@@ -1,6 +1,6 @@
 // src/context/AuthContext.jsx
 import { createContext, useState, useContext, useEffect } from 'react';
-import { loginApi, registerApi, logoutApi, getCurrentUser } from '../services/authService';
+import { loginApi, logoutApi, getCurrentUser } from '../services/authService';
 
 const AuthContext = createContext();
 
@@ -40,24 +40,6 @@ export const AuthProvider = ({ children }) => {
       console.error("Login error:", error);
       setError(error.message);
       throw error;
-    }
-  };
-
-  // Signup function
-  const signup = async (userData) => {
-    try {
-      setError(null);
-      const newUser = await registerApi({
-        name: userData.name,
-        email: userData.email,
-        password: userData.password
-      });
-      setUser(newUser);
-      return { success: true, user: newUser };
-    } catch (error) {
-      console.error("Signup error:", error);
-      setError(error.message);
-      return { success: false, error: error.message };
     }
   };
 
@@ -131,7 +113,6 @@ export const AuthProvider = ({ children }) => {
     loading,
     error,
     login,
-    signup,
     logout,
     getUserDashboardPath,
     hasRole,
