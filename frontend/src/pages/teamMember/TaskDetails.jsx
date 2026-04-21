@@ -5,7 +5,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
   Calendar,
-  Clock,
   User,
   Flag,
   MessageSquare,
@@ -19,6 +18,12 @@ import {
   addTaskComment,
   deleteTaskComment,
 } from "../../services/tasksService";
+import {
+  getTeamMemberTaskProgress,
+  isTeamMemberTaskDone,
+  MY_TASKS_QUERY_KEY,
+  getNextTeamMemberStatus,
+} from "./taskShared";
 
 //  1. QUERY DEFINITIONS
 
@@ -44,6 +49,7 @@ const PRIORITY_MAP = {
 
 const STATUS_MAP = {
   completed: "bg-green-100 text-green-800",
+  passed: "bg-green-100 text-green-800",
   "in-progress": "bg-blue-100 text-blue-800",
   pending: "bg-yellow-100 text-yellow-800",
   "in-test": "bg-cyan-100 text-cyan-800",
@@ -115,18 +121,6 @@ const clampProgress = (value) => {
   if (value < 0) return 0;
   if (value > 100) return 100;
   return value;
-};
-
-const getNextTeamMemberStatus = (task, progress, isStartAction = false) => {
-  if (progress >= 100) {
-    return task?.qaTesterId ? "in-test" : "completed";
-  }
-
-  if (isStartAction || progress > 0 || task?.status === "in-progress") {
-    return "in-progress";
-  }
-
-  return "pending";
 };
 
 // ============================================
@@ -275,6 +269,7 @@ const TaskDetails = () => {
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["team-member", "task", id] });
+      queryClient.invalidateQueries({ queryKey: MY_TASKS_QUERY_KEY });
     },
   });
 
@@ -367,9 +362,11 @@ const TaskDetails = () => {
   });
 
   const isOverdue = useMemo(() => {
-    if (!task?.dueDate || task?.status === "completed") return false;
+    if (!task?.dueDate || isTeamMemberTaskDone(task)) return false;
     return new Date(task.dueDate) < new Date();
   }, [task]);
+
+  const taskProgress = useMemo(() => getTeamMemberTaskProgress(task), [task]);
 
   const commentCounts = useMemo(() => {
     const comments = task?.comments || [];
@@ -487,10 +484,6 @@ const TaskDetails = () => {
           <div className="flex items-center gap-2">
             <Calendar size={16} /> Due: {task.dueDate || "No deadline"}
           </div>
-          <div className="flex items-center gap-2">
-            <Clock size={16} /> Est: {task.estimatedHours || 0}h / Actual:{" "}
-            {task.actualHours || 0}h
-          </div>
         </div>
 
         {/* Progress Bar */}
@@ -498,11 +491,11 @@ const TaskDetails = () => {
           <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
             <div
               className="bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] h-3 rounded-full transition-all duration-300"
-              style={{ width: `${task.progress || 0}%` }}
+              style={{ width: `${taskProgress}%` }}
             />
           </div>
           <div className="text-sm text-gray-600">
-            Progress: {task.progress || 0}%
+            Progress: {taskProgress}%
           </div>
         </div>
 

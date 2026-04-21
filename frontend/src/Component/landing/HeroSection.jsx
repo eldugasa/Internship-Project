@@ -18,7 +18,7 @@ const HeroSection = () => {
             </div>
             
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-[#2D4A6B] leading-tight mb-4 sm:mb-6">
-              Precision Project
+              Precision Projects
               <br />
               <span className="text-[#4DA5AD]">Management for</span>
               <br />
@@ -32,10 +32,10 @@ const HeroSection = () => {
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start mb-8 sm:mb-10">
               <Link 
-                to="/signup"
+                to="/login"
                 className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 shadow-lg"
               >
-                Get Started
+                Sign In
               </Link>
             </div>
 

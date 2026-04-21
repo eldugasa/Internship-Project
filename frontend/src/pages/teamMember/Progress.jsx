@@ -7,21 +7,7 @@ import {
   BarChart3, PieChart, Zap, Calendar, Loader2
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { getMyTasks } from '../../services/tasksService';
-
-// ============================================
-// 1. QUERY DEFINITIONS
-// ============================================
-
-const myTasksQuery = () => ({
-  queryKey: ['team-member', 'progress-tasks'],
-  queryFn: async ({ signal }) => {
-    const tasks = await getMyTasks({ signal });
-    return Array.isArray(tasks) ? tasks : [];
-  },
-  staleTime: 1000 * 60 * 3,
-  gcTime: 1000 * 60 * 10,
-});
+import { TEAM_MEMBER_ACTIVE_STATUSES, myTasksQuery } from './taskShared';
 
 //  2. HELPER COMPONENTS
 
@@ -222,10 +208,9 @@ const TeamMemberProgress = () => {
 
   const taskDistribution = useMemo(() => {
     const total = tasks.length;
-    const inProgressStatuses = new Set(['in-progress', 'in-test', 'pending-retest', 'failed']);
 
     const completed = tasks.filter((task) => task.status === 'completed').length;
-    const inProgress = tasks.filter((task) => inProgressStatuses.has(task.status)).length;
+    const inProgress = tasks.filter((task) => TEAM_MEMBER_ACTIVE_STATUSES.has(task.status)).length;
     const pending = tasks.filter((task) => task.status === 'pending').length;
 
     const toPercentage = (count) => (total ? Math.round((count / total) * 100) : 0);
@@ -250,8 +235,6 @@ const TeamMemberProgress = () => {
           inProgressCount: 0,
           pendingCount: 0,
           overdueCount: 0,
-          totalHours: 0,
-          utilization: 0,
           avgTime: 0,
           onTimeRate: 0,
         },
@@ -264,22 +247,18 @@ const TeamMemberProgress = () => {
         performanceMetrics: {
           completionRate: 0,
           overdueRate: 0,
-          productivity: 0,
+          activeRate: 0,
         },
       };
     }
 
     const completed = tasks.filter(t => t.status === 'completed');
-    const inProgressStatuses = new Set(['in-progress', 'in-test', 'pending-retest', 'failed']);
-    const inProgress = tasks.filter(t => inProgressStatuses.has(t.status));
+    const inProgress = tasks.filter(t => TEAM_MEMBER_ACTIVE_STATUSES.has(t.status));
     const pending = tasks.filter(t => t.status === 'pending');
     const overdue = tasks.filter(t => 
       t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'completed'
     );
 
-    const totalHours = tasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
-    const estHours = tasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
-    
     // Calculate on-time completion
     const onTimeCompleted = completed.filter(t => {
       if (!t.dueDate) return true;
@@ -308,12 +287,10 @@ const TeamMemberProgress = () => {
           total: 0, 
           completed: 0, 
           inProgress: 0,
-          pending: 0,
-          hours: 0 
+          pending: 0
         };
       }
       projectMap[name].total++;
-      projectMap[name].hours += task.actualHours || 0;
       
       if (task.status === 'completed') {
         projectMap[name].completed++;
@@ -344,8 +321,6 @@ const TeamMemberProgress = () => {
         inProgressCount: inProgress.length,
         pendingCount: pending.length,
         overdueCount: overdue.length,
-        totalHours,
-        utilization: estHours ? Math.round((totalHours / estHours) * 100) : 0,
         avgTime: avgCompletionTime,
         onTimeRate: completed.length ? Math.round((onTimeCompleted / completed.length) * 100) : 0,
       },
@@ -363,7 +338,7 @@ const TeamMemberProgress = () => {
       performanceMetrics: {
         completionRate: tasks.length ? Math.round((completed.length / tasks.length) * 100) : 0,
         overdueRate: tasks.length ? Math.round((overdue.length / tasks.length) * 100) : 0,
-        productivity: totalHours > 0 ? Math.round(completed.length / totalHours * 100) / 100 : 0
+        activeRate: tasks.length ? Math.round((inProgress.length / tasks.length) * 100) : 0
       }
     };
   }, [tasks]);
@@ -445,7 +420,7 @@ const TeamMemberProgress = () => {
         />
         <StatCard 
           title="Tasks Completed" value={stats.completedCount} 
-          subtext={`${stats.totalHours} hours logged`} 
+          subtext={`${stats.inProgressCount} tasks currently active`} 
           icon={CheckCircle} colorClass="bg-blue-50 text-blue-600" 
           loading={isLoading}
         />
@@ -493,8 +468,8 @@ const TeamMemberProgress = () => {
               <Zap className="w-5 h-5 text-purple-500" />
             </div>
             <div>
-              <div className="text-sm text-gray-500">Productivity</div>
-              <div className="text-xl font-bold text-gray-900">{performanceMetrics.productivity} tasks/hr</div>
+              <div className="text-sm text-gray-500">Active Rate</div>
+              <div className="text-xl font-bold text-gray-900">{performanceMetrics.activeRate}%</div>
             </div>
           </div>
         </div>
@@ -529,7 +504,6 @@ const TeamMemberProgress = () => {
                     <span>✅ {proj.completed} done</span>
                     <span>🔄 {proj.inProgress || 0} in progress</span>
                     <span>⏳ {proj.pending || 0} pending</span>
-                    <span>⏱️ {proj.hours}h</span>
                   </div>
                 </div>
               ))
@@ -560,7 +534,7 @@ const TeamMemberProgress = () => {
               items={[
                 { label: "Efficiency Rate", val: `${stats.efficiency}%` },
                 { label: "On-Time Rate", val: `${stats.onTimeRate}%` },
-                { label: "Utilization", val: `${stats.utilization}%` },
+                { label: "Active Rate", val: `${performanceMetrics.activeRate}%` },
                 { label: "Avg. Completion", val: `${stats.avgTime} days` },
               ]}
               loading={isLoading}

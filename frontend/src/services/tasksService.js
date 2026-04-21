@@ -40,16 +40,38 @@ const reversePriorityMap = {
   'high': 'HIGH',
   'critical': 'CRITICAL'
 };
+
+const doneStatuses = new Set(['completed', 'passed']);
+
+const normalizeProgress = (task) => {
+  const normalizedStatus = statusMap[task.status] || task.status?.toLowerCase() || 'pending';
+
+  if (doneStatuses.has(normalizedStatus)) {
+    return 100;
+  }
+
+  const progress = Number(task.progress);
+
+  if (!Number.isFinite(progress)) {
+    return 0;
+  }
+
+  if (progress < 0) return 0;
+  if (progress > 100) return 100;
+  return progress;
+};
  
 const normalizeTask = (task) => {
+  const normalizedStatus = statusMap[task.status] || task.status?.toLowerCase() || 'pending';
+
   return {
     ...task,
     id: task.id,
     title: task.title,
     description: task.description || '',
-    status: statusMap[task.status] || task.status?.toLowerCase() || 'pending',
+    status: normalizedStatus,
     priority: priorityMap[task.priority] || task.priority?.toLowerCase() || 'medium',
-    progress: task.progress || 0,
+    progress: normalizeProgress(task),
     previousProgress: task.previousProgress || 0,
     
     assigneeId: task.assigneeId || task.assignedTo,
@@ -71,9 +93,7 @@ const normalizeTask = (task) => {
     
     dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : null,
     rawDueDate: task.dueDate,
-    
-    estimatedHours: task.estimatedHours || 0,
-    actualHours: task.actualHours || 0,
+
     tags: task.tags || [],
     comments: task.comments || [],
     
@@ -110,8 +130,7 @@ export const createTask = async (taskData, { signal } = {}) => {
     assignedTo: parseInt(taskData.assigneeId || taskData.assignedTo),
     qaTesterId: taskData.qaTesterId ? parseInt(taskData.qaTesterId) : null,
     dueDate: taskData.dueDate,
-    priority: reversePriorityMap[taskData.priority] || 'MEDIUM',
-    estimatedHours: taskData.estimatedHours ? parseFloat(taskData.estimatedHours) : null
+    priority: reversePriorityMap[taskData.priority] || 'MEDIUM'
   };
  
   const response = await apiClient('/tasks', {

@@ -11,8 +11,8 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-gray-200/80 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <nav className="sticky top-0 z-50 px-4 md:px-16 w-full bg-white/95 backdrop-blur-md border-b border-gray-200/80 shadow-sm">
+      <div className="max-w-7xl mx-auto ">
         <div className="flex justify-between items-center h-16 lg:h-20">
           
           {/* Logo/Brand - Left */}
@@ -51,17 +51,17 @@ const Navbar = () => {
 
           {/* Desktop Auth Buttons - Right */}
           <div className="hidden md:flex items-center gap-3">
-            <Link 
+            {/* <Link 
               to="/login"
               className="px-5 py-2.5 text-sm font-medium text-gray-700 hover:text-[#4DA5AD] transition-colors duration-200"
             >
               Sign in
-            </Link>
+            </Link> */}
             <Link 
-              to="/signup"
+              to="/login"
               className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-lg hover:shadow-lg hover:shadow-[#4DA5AD]/20 hover:-translate-y-0.5 transition-all duration-200"
             >
-              Get Started
+              Sign In
             </Link>
           </div>
 
@@ -112,11 +112,11 @@ const Navbar = () => {
                     Sign in
                   </Link>
                   <Link 
-                    to="/signup"
+                    to="/login"
                     onClick={() => setMobileMenuOpen(false)}
                     className="px-4 py-3 text-center text-white bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-lg hover:shadow-lg transition-all duration-200"
                   >
-                    Get Started
+                    Sign In
                   </Link>
                 </div>
               </div>

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getMyTasks } from '../../services/tasksService';
+import { getTeamMemberTaskProgress, myTasksQuery } from '../teamMember/taskShared';
 import { Search, Filter, Clock, CheckCircle2, AlertCircle, PlayCircle, RefreshCw } from 'lucide-react';
 
 const QATesterTasks = () => {
@@ -14,8 +14,7 @@ const QATesterTasks = () => {
   const [statusFilter, setStatusFilter] = useState('ALL');
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ['qa-tasks'],
-    queryFn: getMyTasks,
+    ...myTasksQuery(),
   });
 
   const getStatusIcon = (status) => {
@@ -98,7 +97,10 @@ const QATesterTasks = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredTasks.map((task) => (
+                {filteredTasks.map((task) => {
+                  const taskProgress = getTeamMemberTaskProgress(task);
+
+                  return (
                   <tr 
                     key={task.id} 
                     onClick={() => navigate(`/qa-tester/tasks/${task.id}`)}
@@ -119,18 +121,18 @@ const QATesterTasks = () => {
                       <div className="flex items-center gap-2">
                         <div className="w-full bg-gray-200 rounded-full h-2 max-w-[100px]">
                           <div 
-                            className={`h-2 rounded-full ${task.progress === 100 ? 'bg-green-500' : 'bg-[#4DA5AD]'}`}
-                            style={{ width: `${task.progress || 0}%` }}
+                            className={`h-2 rounded-full ${taskProgress === 100 ? 'bg-green-500' : 'bg-[#4DA5AD]'}`}
+                            style={{ width: `${taskProgress}%` }}
                           ></div>
                         </div>
-                        <span className="text-sm font-medium">{task.progress || 0}%</span>
+                        <span className="text-sm font-medium">{taskProgress}%</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">
                       {task.dueDate || 'No date'}
                     </td>
                   </tr>
-                ))}
+                )})}
               </tbody>
             </table>
           </div>

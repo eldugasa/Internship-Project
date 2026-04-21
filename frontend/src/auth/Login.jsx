@@ -299,19 +299,16 @@ const SignIn = () => {
                 <div className="flex-1 h-px bg-gray-200"></div>
               </div>
 
-              {/* Sign Up Link */}
+              {/* Admin-managed accounts notice */}
               <div className="mt-8 text-center">
                 <p className="text-gray-600">
-                  Don't have an account?{' '}
-                  <Link
-                    to="/signup"
-                    className="font-bold text-[#4DA5AD] hover:text-[#2D4A6B] transition-colors"
-                  >
-                    Create one now
-                  </Link>
+                  Need an account?{' '}
+                  <span className="font-bold text-[#4DA5AD]">
+                    Contact your administrator
+                  </span>
                 </p>
                 <p className="text-xs text-gray-500 mt-3">
-                  New accounts start as Team Members. Contact admin for higher access.
+                  New users can only be created from the admin user management page.
                 </p>
               </div>
             </>

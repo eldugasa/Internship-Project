@@ -11,19 +11,14 @@ import {
   Award, Zap, CalendarDays, BellRing,
   BarChart3, Filter, Search, User, Eye, Loader2
 } from 'lucide-react';
-
-// 1. QUERY DEFINITIONS
-
-
-export const myTasksQuery = () => ({
-  queryKey: ['team-member', 'my-tasks'],
-  queryFn: async ({ signal }) => {
-    const tasks = await getMyTasks({ signal });
-    return Array.isArray(tasks) ? tasks : [];
-  },
-  staleTime: 1000 * 60 * 3, // 3 minutes
-  gcTime: 1000 * 60 * 10,
-});
+import {
+  getTeamMemberTaskProgress,
+  MY_TASKS_QUERY_KEY,
+  TEAM_MEMBER_ACTIVE_STATUSES,
+  getNextTeamMemberStatus,
+  isTeamMemberTaskDone,
+  myTasksQuery,
+} from './taskShared';
 
 // 2. HELPER FUNCTIONS
 
@@ -70,7 +65,7 @@ const formatDate = (dateStr) => {
 };
 
 const isOverdue = (dateStr, status) => {
-  if (status === 'completed' || !dateStr) return false;
+  if (isTeamMemberTaskDone({ status }) || !dateStr) return false;
   const dueDate = parseDate(dateStr);
   if (!dueDate) return false;
   const today = new Date();
@@ -80,7 +75,7 @@ const isOverdue = (dateStr, status) => {
 };
 
 const isInNextWeek = (dateStr, status) => {
-  if (status === 'completed' || !dateStr) return false;
+  if (isTeamMemberTaskDone({ status }) || !dateStr) return false;
   const dueDate = parseDate(dateStr);
   if (!dueDate) return false;
   const today = new Date();
@@ -93,7 +88,7 @@ const isInNextWeek = (dateStr, status) => {
 };
 
 const isUrgent = (dateStr, priority, status) => {
-  if (status === 'completed' || priority !== 'high' || !dateStr) return false;
+  if (isTeamMemberTaskDone({ status }) || priority !== 'high' || !dateStr) return false;
   const dueDate = parseDate(dateStr);
   if (!dueDate) return false;
   const today = new Date();
@@ -106,12 +101,10 @@ const isUrgent = (dateStr, priority, status) => {
 };
 
 const calculateStats = (tasks, efficiency = 95) => {
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
-  const inProgressTasks = tasks.filter(t => t.status === 'in-progress').length;
+  const completedTasks = tasks.filter((t) => isTeamMemberTaskDone(t)).length;
+  const inProgressTasks = tasks.filter(t => TEAM_MEMBER_ACTIVE_STATUSES.has(t.status)).length;
   const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-  const overdueTasks = tasks.filter(t => isOverdue(t.dueDate, t.status)).length;
-  const totalHours = tasks.reduce((sum, t) => sum + (t.actualHours || 0), 0);
-  const estimatedHours = tasks.reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+  const overdueTasks = tasks.filter(t => isOverdue(t.dueDate || t.deadline, t.status)).length;
 
   return {
     totalTasks: tasks.length,
@@ -122,11 +115,6 @@ const calculateStats = (tasks, efficiency = 95) => {
     efficiency,
     completionRate: tasks.length > 0 
       ? Math.round((completedTasks / tasks.length) * 100) 
-      : 0,
-    totalHours,
-    estimatedHours,
-    utilization: estimatedHours > 0 
-      ? Math.round((totalHours / estimatedHours) * 100) 
       : 0
   };
 };
@@ -255,17 +243,17 @@ const TeamMemberDashboard = () => {
       updateTaskStatus(taskId, status, progress),
     onMutate: async ({ taskId, progress, status }) => {
       // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['team-member', 'my-tasks'] });
+      await queryClient.cancelQueries({ queryKey: MY_TASKS_QUERY_KEY });
       
       // Snapshot the previous value
-      const previousTasks = queryClient.getQueryData(['team-member', 'my-tasks']);
+      const previousTasks = queryClient.getQueryData(MY_TASKS_QUERY_KEY);
       
       // Optimistically update
-      queryClient.setQueryData(['team-member', 'my-tasks'], (old) => {
+      queryClient.setQueryData(MY_TASKS_QUERY_KEY, (old) => {
         if (!old) return old;
         return old.map(task => 
           task.id === taskId 
-            ? { ...task, progress, status, actualHours: (task.actualHours || 0) + 1 }
+            ? { ...task, progress, status }
             : task
         );
       });
@@ -275,14 +263,14 @@ const TeamMemberDashboard = () => {
     onError: (err, variables, context) => {
       // Rollback on error
       if (context?.previousTasks) {
-        queryClient.setQueryData(['team-member', 'my-tasks'], context.previousTasks);
+        queryClient.setQueryData(MY_TASKS_QUERY_KEY, context.previousTasks);
       }
       console.error('Error updating task:', err);
       alert('Failed to update task progress');
     },
     onSettled: () => {
       // Refetch after mutation
-      queryClient.invalidateQueries({ queryKey: ['team-member', 'my-tasks'] });
+      queryClient.invalidateQueries({ queryKey: MY_TASKS_QUERY_KEY });
       setUpdatingTaskId(null);
     },
   });
@@ -328,12 +316,15 @@ const TeamMemberDashboard = () => {
   // Helper functions using filtered tasks
   const getUpcomingDeadlines = () => {
     return filteredTasks
-      .filter(task => isInNextWeek(task.dueDate, task.status))
+      .filter(task => isInNextWeek(task.dueDate || task.deadline, task.status))
       .slice(0, 3);
   };
 
   const handleUpdateProgress = async (taskId, progress) => {
-    const status = progress === 100 ? 'completed' : 'in-progress';
+    const task = tasks.find((item) => item.id === taskId);
+    if (!task) return;
+
+    const status = getNextTeamMemberStatus(task, progress);
     setUpdatingTaskId(taskId);
     updateTaskMutation.mutate({ taskId, status, progress });
   };
@@ -345,6 +336,7 @@ const TeamMemberDashboard = () => {
   const getStatusColor = (status) => {
     switch (status) {
       case 'completed': return 'text-green-700 bg-green-50';
+      case 'passed': return 'text-green-700 bg-green-50';
       case 'in-progress': return 'text-blue-700 bg-blue-50';
       case 'pending': return 'text-yellow-700 bg-yellow-50';
       default: return 'text-gray-700 bg-gray-50';
@@ -519,6 +511,7 @@ const TeamMemberDashboard = () => {
               {filteredTasks.length > 0 ? (
                 filteredTasks.map(task => {
                   const isUpdating = updatingTaskId === task.id;
+                  const taskProgress = getTeamMemberTaskProgress(task);
                   
                   return (
                     <div key={task.id} className={`border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow ${isUpdating ? 'opacity-75' : ''}`}>
@@ -540,8 +533,8 @@ const TeamMemberDashboard = () => {
                       {/* Action Buttons */}
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
-                          Due: {formatDate(task.dueDate)}
-                          {isOverdue(task.dueDate, task.status) && (
+                          Due: {formatDate(task.dueDate || task.deadline)}
+                          {isOverdue(task.dueDate || task.deadline, task.status) && (
                             <span className="ml-2 text-red-600 font-medium">(Overdue!)</span>
                           )}
                         </div>
@@ -568,6 +561,10 @@ const TeamMemberDashboard = () => {
             <div className="space-y-3">
               {getUpcomingDeadlines().map(task => (
                 <div key={task.id} className="p-3 border border-gray-200 rounded-lg">
+                  {(() => {
+                    const taskProgress = getTeamMemberTaskProgress(task);
+                    return (
+                      <>
                   <div className="flex justify-between items-start">
                     <h4 className="font-medium text-gray-900 text-sm">{task.title}</h4>
                     <span className={`px-2 py-1 rounded text-xs ${getPriorityColor(task.priority)}`}>
@@ -575,9 +572,12 @@ const TeamMemberDashboard = () => {
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>Due: {formatDate(task.dueDate)}</span>
-                    <span>{task.progress || 0}%</span>
+                    <span>Due: {formatDate(task.dueDate || task.deadline)}</span>
+                    <span>{taskProgress}%</span>
                   </div>
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
               
@@ -606,21 +606,21 @@ const TeamMemberDashboard = () => {
               
               <div>
                 <div className="flex justify-between text-sm mb-1">
-                  <span>Time Utilization</span>
-                  <span className="font-medium">{stats.utilization}%</span>
+                  <span>Tasks In Progress</span>
+                  <span className="font-medium">{stats.inProgressTasks}</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${stats.utilization}%` }}
+                    style={{ width: `${stats.totalTasks ? Math.round((stats.inProgressTasks / stats.totalTasks) * 100) : 0}%` }}
                   ></div>
                 </div>
               </div>
               
               <div className="pt-4 border-t border-gray-100">
                 <div className="flex justify-between text-sm">
-                  <span>Total Hours Worked</span>
-                  <span className="font-medium">{stats.totalHours} hrs</span>
+                  <span>Pending Tasks</span>
+                  <span className="font-medium">{stats.pendingTasks}</span>
                 </div>
               </div>
             </div>

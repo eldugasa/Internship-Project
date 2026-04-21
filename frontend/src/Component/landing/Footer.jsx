@@ -3,7 +3,7 @@ import { Facebook, Linkedin, Send, Youtube } from 'lucide-react';
 
 const Footer = () => {
   return (
-    <footer className="bg-[#1a2a3a] text-white py-12 sm:py-16 px-4 sm:px-6 md:px-8 w-full overflow-hidden">
+    <footer className="bg-[#1a2a3a]  text-white py-12 sm:py-16 px-4 sm:px-6 md:px-16 w-full overflow-hidden">
       <div className="max-w-7xl mx-auto w-full">
         {/* Footer Content - Responsive Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-8 md:mb-10 w-full">

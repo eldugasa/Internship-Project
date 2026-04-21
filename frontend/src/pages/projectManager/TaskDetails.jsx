@@ -392,15 +392,6 @@ const TaskDetails = () => {
               </div>
             </div>
             
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex items-center text-sm text-gray-500 mb-1">
-                <Clock className="w-4 h-4 mr-2" />
-                Time Spent
-              </div>
-              <div className="font-medium text-gray-900">
-                {task.actualHours || 0}/{task.estimatedHours || 0} hrs
-              </div>
-            </div>
           </div>
           
           {/* Progress Section */}

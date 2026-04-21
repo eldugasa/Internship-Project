@@ -29,43 +29,6 @@ export const loginApi = async (email, password, { signal } = {}) => {
   return user;
 };
  
-export const registerApi = async ({ name, email, password }, { signal } = {}) => {
-  const data = await apiClient("/auth/register", {
-    method: "POST",
-    body: JSON.stringify({ 
-      name, 
-      email, 
-      password, 
-      role: "TEAM_MEMBER"
-    }),
-    signal,
-  });
- 
-  let user;
- 
-  if (data?.token) {
-    user = {
-      ...data.user,
-      role: normalizeRole(data.user.role),
-      token: data.token
-    };
-  } else {
-    const logged = await loginApi(email, password, { signal });
-    user = {
-      ...logged,
-      role: normalizeRole(logged.role),
-      token: logged.token || null
-    };
-  }
- 
-  localStorage.setItem("user", JSON.stringify(user));
-  try { localStorage.setItem("userData", JSON.stringify(user)); } catch (e) {
-    console.error("Error setting userData in localStorage:", e);
-  }
- 
-  return user;
-};
- 
 export const forgotPasswordApi = async (email, { signal } = {}) => {
   try {
     const data = await apiClient("/auth/forgot-password", {

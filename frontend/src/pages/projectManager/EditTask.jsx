@@ -73,7 +73,6 @@ const EditTask = () => {
           assigneeId: taskData.assigneeId?.toString() || '',
           priority: taskData.priority?.toLowerCase() || 'medium',
           deadline: formattedDate,
-          estimatedHours: taskData.estimatedHours?.toString() || '',
           tags: Array.isArray(taskData.tags) ? taskData.tags.join(', ') : (taskData.tags || '')
         };
         
@@ -136,7 +135,6 @@ const EditTask = () => {
     const assigneeId = formData.get("assigneeId");
     const priority = formData.get("priority") || 'medium';
     const deadline = formData.get("deadline");
-    const estimatedHours = formData.get("estimatedHours");
     const tags = formData.get("tags");
 
     let errors = [];
@@ -175,7 +173,6 @@ const EditTask = () => {
           assigneeId,
           priority,
           deadline,
-          estimatedHours,
           tags
         },
         success: false
@@ -191,7 +188,6 @@ const EditTask = () => {
         assignedTo: parseInt(assigneeId),
         priority: priority.toUpperCase(),
         dueDate: new Date(deadline).toISOString(),
-        estimatedHours: estimatedHours ? parseFloat(estimatedHours) : null,
         tags: tags ? tags.split(',').map(tag => tag.trim()) : []
       };
 
@@ -213,7 +209,6 @@ const EditTask = () => {
           assigneeId,
           priority,
           deadline,
-          estimatedHours,
           tags
         },
         success: false
@@ -230,7 +225,6 @@ const EditTask = () => {
       assigneeId: '',
       priority: 'medium',
       deadline: '',
-      estimatedHours: '',
       tags: ''
     },
     success: false
@@ -375,8 +369,8 @@ const EditTask = () => {
               </div>
             </div>
 
-            {/* Priority, Deadline, Estimated Hours */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Priority & Deadline */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Priority *
@@ -407,20 +401,6 @@ const EditTask = () => {
                 <p className="text-xs text-gray-500 mt-1">Must be today or a future date</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Estimated Hours
-                </label>
-                <input
-                  type="number"
-                  name="estimatedHours"
-                  defaultValue={formState.enteredValues?.estimatedHours || initialTaskData?.estimatedHours}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
-                  min="0"
-                  step="0.5"
-                  placeholder="e.g., 2.5"
-                />
-              </div>
             </div>
 
             

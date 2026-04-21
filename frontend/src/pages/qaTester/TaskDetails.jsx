@@ -16,12 +16,13 @@ import {
   RefreshCw,
   Link as LinkIcon
 } from 'lucide-react';
-import { 
+import {
   getTaskById, 
   updateTaskStatus, 
   addTaskComment, 
   deleteTaskComment 
 } from '../../services/tasksService';
+import { getTeamMemberTaskProgress, MY_TASKS_QUERY_KEY } from '../teamMember/taskShared';
 
 const formatRoleLabel = (role) => {
   if (!role) return "Team";
@@ -46,11 +47,11 @@ const QATesterTaskDetails = () => {
   const updateStatusMutation = useMutation({
     mutationFn: async ({ status }) => {
       // For QA Tester, progress doesn't change, only status
-      return await updateTaskStatus(id, status, task?.progress);
+      return await updateTaskStatus(id, status, taskProgress);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['qa-task', id] });
-      queryClient.invalidateQueries({ queryKey: ['qa-tasks'] });
+      queryClient.invalidateQueries({ queryKey: MY_TASKS_QUERY_KEY });
     },
   });
 
@@ -102,7 +103,8 @@ const QATesterTaskDetails = () => {
   if (isLoading) return <div className="p-6">Loading task details...</div>;
   if (error) return <div className="p-6 text-red-500">Failed to load task details.</div>;
 
-  const canTest = task?.progress === 100 || ['in-test', 'passed', 'failed', 'pending-retest'].includes(task?.status?.toLowerCase());
+  const taskProgress = getTeamMemberTaskProgress(task);
+  const canTest = taskProgress === 100 || ['in-test', 'passed', 'failed', 'pending-retest'].includes(task?.status?.toLowerCase());
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -140,11 +142,11 @@ const QATesterTaskDetails = () => {
         <div className="space-y-3">
           <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
             <div 
-              className={`bg-[#4DA5AD] h-3 rounded-full transition-all duration-300 ${task.progress === 100 ? 'bg-green-500' : ''}`}
-              style={{ width: `${task.progress || 0}%` }} 
+              className={`bg-[#4DA5AD] h-3 rounded-full transition-all duration-300 ${taskProgress === 100 ? 'bg-green-500' : ''}`}
+              style={{ width: `${taskProgress}%` }} 
             />
           </div>
-          <div className="text-sm text-gray-600">Developer Progress: {task.progress || 0}%</div>
+          <div className="text-sm text-gray-600">Developer Progress: {taskProgress}%</div>
         </div>
 
         {/* QA Action Buttons */}

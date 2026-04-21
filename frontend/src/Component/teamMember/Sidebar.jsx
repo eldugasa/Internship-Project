@@ -17,7 +17,8 @@ const Sidebar = ({
   userName,
   userRole,
   userInitials,
-  setShowLogoutConfirm
+  setShowLogoutConfirm,
+  profilePath
 }) => {
   return (
     <aside
@@ -32,14 +33,19 @@ const Sidebar = ({
       <div className="flex items-center justify-between p-6 border-b border-gray-200">
         {!sidebarCollapsed ? (
           <h1 className="text-xl font-bold">
-            <span style={{ color: '#0f5841' }}>Team</span>
-            <span style={{ color: '#194f87' }}>Member</span>
+            <span style={{ color: '#0f5841' }}>{userName.role=== "team-member" ? "Team" : "QA"}</span>
+            <span style={{ color: '#194f87' }}> {userName.role=== "team-member" ? "Member" : "Tester"}</span>
+            <span style={{ color: '#0f5841' }}></span>
           </h1>
         ) : (
-          <h1 className="text-xl font-bold mx-auto lg:mx-0">
-            <span style={{ color: '#0f5841' }}>T</span>
-            <span style={{ color: '#194f87' }}>M</span>
-          </h1>
+          <h1 className="flex items-center gap-0 text-xl font-bold mx-auto lg:mx-0">
+  <span style={{ color: '#0f5841' }}>
+    {userName.role === "team-member" ? "Team" : "Q"}
+  </span>
+  <span style={{ color: '#194f87' }}>
+    {userName.role === "team-member" ? "M" : "T"}
+  </span>
+</h1>
         )}
         
         {/* Close button on the RIGHT - only visible on mobile when menu is open */}
@@ -103,7 +109,7 @@ const Sidebar = ({
         <div
           className={`flex items-center ${sidebarCollapsed ? 'lg:justify-center' : ''} p-2 rounded-lg hover:bg-gray-100 transition cursor-pointer`}
           onClick={() => {
-            window.location.href = "/team-member/profile";
+            window.location.href = profilePath || "/team-member/profile";
           }}
         >
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"

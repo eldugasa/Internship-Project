@@ -56,7 +56,7 @@ const unreadCountQuery = () => ({
 // 2. COMPONENT
 // ============================================
 
-const NotificationBell = () => {
+const NotificationBell = ({ baseRoute: baseRouteProp }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -64,7 +64,8 @@ const NotificationBell = () => {
   const [deletingId, setDeletingId] = useState(null);
 
   const isQATesterRoute = location.pathname.startsWith('/qa-tester');
-  const baseRoute = isQATesterRoute ? '/qa-tester' : '/team-member';
+  const inferredBaseRoute = isQATesterRoute ? '/qa-tester' : '/team-member';
+  const baseRoute = baseRouteProp || inferredBaseRoute;
 
   // Fetch notifications
   const {

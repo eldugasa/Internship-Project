@@ -8,7 +8,6 @@ export const queryClient = new QueryClient();
 // List of auth endpoints that should NOT redirect on 401
 const AUTH_ENDPOINTS = [
   "/auth/login",
-  "/auth/register",
   "/auth/forgot-password",
   "/auth/reset-password",
 ];
