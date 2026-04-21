@@ -18,7 +18,7 @@ const HeroSection = () => {
             </div>
             
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-[#2D4A6B] leading-tight mb-4 sm:mb-6">
-              Precision Project
+              Precision Projects
               <br />
               <span className="text-[#4DA5AD]">Management for</span>
               <br />
