@@ -1,10 +1,11 @@
 // src/pages/projectManager/TeamsManagement.jsx
 import React, { useState, useMemo, useCallback } from "react";
-import { useNavigate, useLoaderData } from "react-router-dom";
+import { useNavigate, useLoaderData, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, X } from 'lucide-react';
 import TeamCard from "../../Component/projectmanager/TeamCard";
 import { createTeam, deleteTeam } from "../../services/teamsService";
+import { useAuth } from "../../context/AuthContext";
 import {
   teamsQuery,
   usersQuery,
@@ -397,9 +398,19 @@ const CreateTeamModal = ({ isOpen, onClose, users }) => {
 // Main TeamsManagement Component
 const TeamsManagement = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
-  const { role } = useLoaderData();
-  const isAdmin = role === "admin";
+  const { user } = useAuth();
+  const { role, canManageTeams } = useLoaderData();
+  const normalizedRole = (user?.role || role || "guest").toLowerCase().replace(/_/g, "-");
+  const permissionOverrides = Array.isArray(user?.permissionOverrides)
+    ? user.permissionOverrides
+    : [];
+  const isAdminSide = location.pathname.startsWith("/admin");
+  const canShowTeamActions =
+    isAdminSide
+      ? normalizedRole === "super-admin" || permissionOverrides.includes("manage_teams")
+      : !!canManageTeams;
 
   const [showCreateTeamPopup, setShowCreateTeamPopup] = useState(false);
   const [toast, setToast] = useState(null);
@@ -415,7 +426,10 @@ const TeamsManagement = () => {
   const { 
     data: usersData = [],
     error: usersError
-  } = useQuery(usersQuery());
+  } = useQuery({
+    ...usersQuery(),
+    enabled: canShowTeamActions,
+  });
 
   // Delete team mutation
   const deleteTeamMutation = useMutation({
@@ -441,6 +455,10 @@ const TeamsManagement = () => {
 
   const handleDeleteTeam = (teamId, e) => {
     e?.stopPropagation();
+
+    if (!canShowTeamActions) {
+      return;
+    }
     
     if (window.confirm("Are you sure you want to delete this team? This action cannot be undone.")) {
       deleteTeamMutation.mutate(teamId);
@@ -457,7 +475,7 @@ const TeamsManagement = () => {
   }
 
   // Error state
-  if (teamsError || usersError) {
+  if (teamsError || (canShowTeamActions && usersError)) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="bg-red-50 border border-red-200 rounded-lg p-8 max-w-md text-center">
@@ -487,10 +505,12 @@ const TeamsManagement = () => {
             Team Management
           </h1>
           <p className="text-gray-600">
-            Create and manage project teams
+            {canShowTeamActions
+              ? "Create and manage project teams"
+              : "View existing project teams"}
           </p>
         </div>
-        {!isAdmin && (
+        {canShowTeamActions && (
           <button
             onClick={() => setShowCreateTeamPopup(true)}
             disabled={deleteTeamMutation.isPending}
@@ -501,12 +521,22 @@ const TeamsManagement = () => {
         )}
       </div>
 
+      {!canShowTeamActions && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          {isAdminSide
+            ? "View-only mode. Admins can still view teams, but team-management actions stay hidden unless the manage_teams permission is granted."
+            : "View-only mode. Team management is normally available to project managers by default, but it has been revoked for this account."}
+        </div>
+      )}
+
       {/* Teams Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {teamsData.length === 0 ? (
           <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg">
             <p className="text-gray-500">
-              No teams found. Create your first team!
+              {canShowTeamActions
+                ? "No teams found. Create your first team!"
+                : "No teams found."}
             </p>
           </div>
         ) : (
@@ -516,9 +546,9 @@ const TeamsManagement = () => {
             return (
               <TeamCard
                 key={team.id}
-                role={isAdmin}
                 team={displayTeam}
-                showActions={true}
+                showActions={canShowTeamActions}
+                primaryActionLabel={canShowTeamActions ? "Manage Team" : "View Team"}
                 onDelete={(e) => handleDeleteTeam(team.id, e)}
                 onClick={() => navigate(`${team.id}`)}
               />
@@ -528,11 +558,13 @@ const TeamsManagement = () => {
       </div>
 
       {/* Create Team Modal */}
-      <CreateTeamModal
-        isOpen={showCreateTeamPopup}
-        onClose={() => setShowCreateTeamPopup(false)}
-        users={usersData}
-      />
+      {canShowTeamActions && (
+        <CreateTeamModal
+          isOpen={showCreateTeamPopup}
+          onClose={() => setShowCreateTeamPopup(false)}
+          users={usersData}
+        />
+      )}
 
       {/* Toast Notification */}
       {toast && (

@@ -318,21 +318,26 @@ const CreateTask = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">QA Tester</label>
                 {qaTesters.length === 0 ? (
                   <div className="p-3 bg-gray-50 rounded-lg text-center">
-                    <p className="text-sm text-gray-500">No QA testers available</p>
+                    <p className="text-sm text-gray-500">No QA testers available. The project manager will handle QA.</p>
                   </div>
                 ) : (
-                  <select
-                    name="qaTesterId"
-                    defaultValue={formState.enteredValues?.qaTesterId}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
-                  >
-                    <option value="">Select QA tester</option>
-                    {qaTesters.map((tester) => (
-                      <option key={tester.id} value={tester.id}>
-                        {tester.name} ({tester.role || 'QA Tester'})
-                      </option>
-                    ))}
-                  </select>
+                  <>
+                    <select
+                      name="qaTesterId"
+                      defaultValue={formState.enteredValues?.qaTesterId}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#4DA5AD] focus:border-transparent"
+                    >
+                      <option value="">Leave empty to use the project manager</option>
+                      {qaTesters.map((tester) => (
+                        <option key={tester.id} value={tester.id}>
+                          {tester.name} ({tester.role || 'QA Tester'})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      If you do not pick a QA tester, this task will belong to the project manager for QA.
+                    </p>
+                  </>
                 )}
               </div>
             </div>

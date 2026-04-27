@@ -2,9 +2,59 @@
 import { prisma } from "../config/db.js";
 import bcrypt from "bcryptjs";
 import { Prisma } from "@prisma/client";
+import { PERMISSIONS, SENSITIVE_PERMISSIONS } from "../config/permissions.js";
+import {
+  encodePermissionsForRole,
+  getEditablePermissions,
+  getEffectivePermissions,
+  normalizePermissionOverrides,
+  normalizePermissions,
+  normalizeRole,
+} from "../utils/permissionResolver.js";
 
-const normalizeRole = (role = "TEAM_MEMBER") =>
-  role.toString().trim().toUpperCase().replace(/-/g, "_");
+const sanitizeUser = (user) => {
+  const permissions = getEditablePermissions(user.role, user.permissions);
+  const permissionOverrides = normalizePermissionOverrides(user.permissions);
+
+  return {
+    ...user,
+    permissionOverrides,
+    permissions,
+    effectivePermissions: getEffectivePermissions(user.role, user.permissions),
+  };
+};
+
+const canManageSensitiveAccess = (actor) =>
+  actor?.effectivePermissions?.includes("*") ||
+  actor?.effectivePermissions?.includes(PERMISSIONS.MANAGE_ROLES);
+
+const isSuperAdminActor = (actor) => normalizeRole(actor?.role) === "SUPER_ADMIN";
+
+const normalizeUserStatus = (status) => {
+  if (status === undefined || status === null || status === "") return null;
+  const normalizedStatus = status.toString().trim().toLowerCase();
+  return ["active", "inactive"].includes(normalizedStatus) ? normalizedStatus : null;
+};
+
+const validateAccessChange = (actor, role, permissions) => {
+  const normalizedRole = role ? normalizeRole(role) : null;
+  const normalizedPermissions = normalizePermissions(permissions);
+  const touchesAdminRole = normalizedRole === "ADMIN";
+  const touchesSensitiveRole = normalizedRole === "SUPER_ADMIN";
+  const touchesSensitivePermission = normalizedPermissions.some((permission) =>
+    SENSITIVE_PERMISSIONS.includes(permission),
+  );
+
+  if (touchesAdminRole && !isSuperAdminActor(actor)) {
+    return "Only super admins can create admins or upgrade users to admin";
+  }
+
+  if ((touchesSensitiveRole || touchesSensitivePermission) && !canManageSensitiveAccess(actor)) {
+    return "Only super admins can assign super-admin access or sensitive permissions";
+  }
+
+  return null;
+};
 
 // ------------------ ADMIN ROUTES ------------------
 
@@ -16,7 +66,7 @@ export const getAllUsers = async (req, res) => {
         team: { select: { id: true, name: true } }
       }
     });
-    res.json(users);
+    res.json(users.map(sanitizeUser));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
@@ -27,21 +77,51 @@ export const getAllUsers = async (req, res) => {
 export const updateUserRole = async (req, res) => {
   try {
     const { id } = req.params;
-    const { role } = req.body;
+    const { role, permissions, status } = req.body;
 
-    if (!role) {
-      return res.status(400).json({ message: "Role is required" });
+    if (!role && permissions === undefined && status === undefined) {
+      return res.status(400).json({ message: "Role, permissions, or status are required" });
+    }
+
+    const normalizedStatus = normalizeUserStatus(status);
+    if (status !== undefined && !normalizedStatus) {
+      return res.status(400).json({ message: "Status must be active or inactive" });
+    }
+
+    const existingUser = await prisma.user.findUnique({
+      where: { id: parseInt(id) },
+      select: { role: true, permissions: true },
+    });
+
+    if (!existingUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const targetRole = role ?? existingUser.role;
+    const targetPermissions =
+      permissions !== undefined
+        ? normalizePermissions(permissions)
+        : getEditablePermissions(existingUser.role, existingUser.permissions);
+    const accessError = validateAccessChange(req.user, targetRole, targetPermissions);
+    if (accessError) {
+      return res.status(403).json({ message: accessError });
     }
 
     const user = await prisma.user.update({
       where: { id: parseInt(id) },
-      data: { role: normalizeRole(role) },
+      data: {
+        ...(role ? { role: normalizeRole(role) } : {}),
+        ...((permissions !== undefined || role)
+          ? { permissions: encodePermissionsForRole(targetRole, targetPermissions) }
+          : {}),
+        ...(status !== undefined ? { status: normalizedStatus } : {}),
+      },
       include: {
         team: { select: { id: true, name: true } }
       }
     });
 
-    res.json(user);
+    res.json(sanitizeUser(user));
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
@@ -51,11 +131,13 @@ export const updateUserRole = async (req, res) => {
 // CREATE user (example for POST)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, role, phone, location, skill } = req.body; 
+    const { name, email, password, role, phone, location, skill, permissions, status } = req.body; 
 
     const trimmedName = name?.trim();
     const normalizedEmail = email?.trim().toLowerCase();
     const normalizedRole = normalizeRole(role);
+    const normalizedPermissions = normalizePermissions(permissions);
+    const normalizedStatus = normalizeUserStatus(status);
 
     if (!trimmedName || !normalizedEmail || !password) {
       return res.status(400).json({
@@ -71,6 +153,15 @@ export const createUser = async (req, res) => {
       return res.status(400).json({
         message: "Password must be at least 6 characters long",
       });
+    }
+
+    if (status !== undefined && !normalizedStatus) {
+      return res.status(400).json({ message: "Status must be active or inactive" });
+    }
+
+    const accessError = validateAccessChange(req.user, normalizedRole, normalizedPermissions);
+    if (accessError) {
+      return res.status(403).json({ message: accessError });
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -89,6 +180,8 @@ export const createUser = async (req, res) => {
         email: normalizedEmail, 
         password: hashedPassword, 
         role: normalizedRole,
+        permissions: encodePermissionsForRole(normalizedRole, normalizedPermissions),
+        status: normalizedStatus || "active",
         phone: phone || null,        
         location: location || null,
         skill: skill || null
@@ -98,7 +191,7 @@ export const createUser = async (req, res) => {
       }
     });
 
-    res.status(201).json(user);
+    res.status(201).json(sanitizeUser(user));
   } catch (error) {
     console.error(error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -131,6 +224,10 @@ export const getMe = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
+      status: user.status,
+      permissionOverrides: normalizePermissionOverrides(user.permissions),
+      permissions: getEditablePermissions(user.role, user.permissions),
+      effectivePermissions: getEffectivePermissions(user.role, user.permissions),
       phone: user.phone || null,        
       location: user.location || null,
       skill: user.skill || null,
@@ -176,6 +273,10 @@ export const updateCurrentUser = async (req, res) => {
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
+      status: updatedUser.status,
+      permissionOverrides: normalizePermissionOverrides(updatedUser.permissions),
+      permissions: getEditablePermissions(updatedUser.role, updatedUser.permissions),
+      effectivePermissions: getEffectivePermissions(updatedUser.role, updatedUser.permissions),
       phone: updatedUser.phone || null,        
       location: updatedUser.location || null,
       skill: updatedUser.skill || null,

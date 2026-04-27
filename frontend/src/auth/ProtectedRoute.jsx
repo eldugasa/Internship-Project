@@ -3,8 +3,13 @@ import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const ProtectedRoute = ({ children, allowedRoles }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute = ({
+  children,
+  allowedRoles,
+  requiredPermissions,
+  requireAllPermissions = false,
+}) => {
+  const { user, loading, hasAnyPermission, hasAllPermissions } = useAuth();
 
   if (loading) {
     return (
@@ -27,9 +32,24 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   // Normalize allowed roles
   const normalizedAllowedRoles = allowedRoles?.map(role => normalizeRole(role));
 
-  
-  if (normalizedAllowedRoles && !normalizedAllowedRoles.includes(userRole)) {
-   
+  const permissionList = Array.isArray(requiredPermissions)
+    ? requiredPermissions
+    : requiredPermissions
+      ? [requiredPermissions]
+      : [];
+  const matchesRole = normalizedAllowedRoles
+    ? normalizedAllowedRoles.includes(userRole)
+    : false;
+  const matchesPermissions = permissionList.length
+    ? (requireAllPermissions
+        ? hasAllPermissions(permissionList)
+        : hasAnyPermission(permissionList))
+    : false;
+  const hasAccess = (!normalizedAllowedRoles?.length && !permissionList.length)
+    || matchesRole
+    || matchesPermissions;
+
+  if (!hasAccess) {
     return <Navigate to="/login" replace />;
   }
 

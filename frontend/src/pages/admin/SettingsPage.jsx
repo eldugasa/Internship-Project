@@ -20,6 +20,49 @@ import {
   notificationPrefsQuery,
 } from "../../loader/admin/Settings.loader";
 
+const ADMIN_NOTIFICATION_FIELDS = [
+  {
+    key: "userRegistered",
+    label: "New User Registered",
+    description: "Get notified when a new user account is created.",
+  },
+  {
+    key: "userDeleted",
+    label: "User Deleted",
+    description: "Get notified when a user account is deleted.",
+  },
+  {
+    key: "teamCreated",
+    label: "Team Created",
+    description: "Get notified when a new team is created.",
+  },
+  {
+    key: "teamDeleted",
+    label: "Team Deleted",
+    description: "Get notified when a team is deleted.",
+  },
+  {
+    key: "projectCreated",
+    label: "Project Created",
+    description: "Get notified when a new project is created.",
+  },
+  {
+    key: "projectCompleted",
+    label: "Project Completed",
+    description: "Get notified when a project is marked complete.",
+  },
+  {
+    key: "roleChanged",
+    label: "Role Changed",
+    description: "Get notified when user access or role changes.",
+  },
+  {
+    key: "systemAlerts",
+    label: "System Alerts",
+    description: "Get notified about important admin-side system alerts.",
+  },
+];
+
 // Loading skeleton component
 const SettingsSkeleton = () => (
   <div className="p-6 max-w-4xl mx-auto">
@@ -317,6 +360,23 @@ const SettingsPage = () => {
 
   const safeUser = userData || {};
   const safeNotifications = notificationPrefs || {};
+  const normalizedRole = safeUser.role?.toLowerCase().replace(/_/g, "-") || "";
+  const isAdminRole =
+    normalizedRole === "admin" || normalizedRole === "super-admin";
+  const visibleNotificationFields = isAdminRole
+    ? ADMIN_NOTIFICATION_FIELDS.filter(
+        (field) => safeNotifications[field.key] !== undefined,
+      )
+    : Object.entries(safeNotifications)
+        .filter(
+          ([key]) =>
+            key !== "emailNotifications" && key !== "inAppNotifications",
+        )
+        .map(([key]) => ({
+          key,
+          label: key.replace(/([A-Z])/g, " $1").trim(),
+          description: "",
+        }));
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
@@ -398,24 +458,26 @@ const SettingsPage = () => {
         )}
 
         <div className="space-y-4">
-          {Object.entries(safeNotifications).map(([key, value]) => {
-            if (key === "emailNotifications" || key === "inAppNotifications")
-              return null;
+          {visibleNotificationFields.map(({ key, label, description }) => {
+            const value = !!safeNotifications[key];
 
             return (
               <div
                 key={key}
-                className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition"
+                className="flex items-center justify-between gap-4 p-3 hover:bg-gray-50 rounded-lg transition"
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-700 capitalize">
-                    {key.replace(/([A-Z])/g, " $1").trim()}
-                  </span>
+                <div className="flex items-start gap-2">
                   {value ? (
-                    <Bell className="w-4 h-4" style={{ color: "#0f5841" }} />
+                    <Bell className="mt-0.5 w-4 h-4 shrink-0" style={{ color: "#0f5841" }} />
                   ) : (
-                    <BellOff className="w-4 h-4 text-gray-400" />
+                    <BellOff className="mt-0.5 w-4 h-4 shrink-0 text-gray-400" />
                   )}
+                  <div>
+                    <span className="block text-gray-700">{label}</span>
+                    {description ? (
+                      <p className="mt-1 text-xs text-gray-500">{description}</p>
+                    ) : null}
+                  </div>
                 </div>
                 <button
                   onClick={() => toggleNotification(key)}

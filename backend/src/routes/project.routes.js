@@ -1,12 +1,15 @@
 import express from "express";
 import authenticate from "../middleware/auth.middleware.js";
+import { requirePermission } from "../middleware/permission.middleware.js";
 import { authorize } from "../middleware/role.middleware.js";
+import { PERMISSIONS } from "../config/permissions.js";
 import {
   createProject,
+  deleteProject,
   getAllProjects,
   getProjectById,
-  updateProject, // ✅ Import from controller
   getProjectMembers,
+  updateProject,
 } from "../controllers/project.controller.js";
 
 const router = express.Router();
@@ -15,29 +18,71 @@ const router = express.Router();
 router.use(authenticate);
 
 // CREATE PROJECT
-router.post("/", authorize("admin", "project_manager"), createProject);
+router.post(
+  "/",
+  authorize("SUPER_ADMIN", "admin", "project_manager"),
+  requirePermission(PERMISSIONS.MANAGE_PROJECTS),
+  createProject,
+);
 
 // GET ALL PROJECTS
-router.get("/", authorize("admin", "project_manager"), getAllProjects);
+router.get(
+  "/",
+  authorize("SUPER_ADMIN", "admin", "project_manager"),
+  getAllProjects,
+);
 
-// UPDATE PROJECT - USE CONTROLLER
+// UPDATE PROJECT
 router.put(
   "/:id",
-  authorize("PROJECT_MANAGER", "project-manager", "project_manager", "admin"),
-  updateProject, // ✅ Use the controller, not inline
+  authorize(
+    "SUPER_ADMIN",
+    "PROJECT_MANAGER",
+    "project-manager",
+    "project_manager",
+    "admin",
+  ),
+  requirePermission(PERMISSIONS.MANAGE_PROJECTS),
+  updateProject,
+);
+
+// DELETE PROJECT
+router.delete(
+  "/:id",
+  authorize(
+    "SUPER_ADMIN",
+    "PROJECT_MANAGER",
+    "project-manager",
+    "project_manager",
+    "admin",
+  ),
+  requirePermission(PERMISSIONS.MANAGE_PROJECTS),
+  deleteProject,
 );
 
 // GET SINGLE PROJECT
 router.get(
   "/:id",
-  authorize("admin", "project_manager", "team-member", "team_member"),
+  authorize(
+    "SUPER_ADMIN",
+    "admin",
+    "project_manager",
+    "team-member",
+    "team_member",
+  ),
   getProjectById,
 );
 
 // GET PROJECT MEMBERS
 router.get(
   "/:projectId/members",
-  authorize("admin", "project_manager", "team-member", "team_member"),
+  authorize(
+    "SUPER_ADMIN",
+    "admin",
+    "project_manager",
+    "team-member",
+    "team_member",
+  ),
   getProjectMembers,
 );
 

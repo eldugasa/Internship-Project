@@ -30,7 +30,7 @@ export default function ErrorPage() {
         buttonAction = () => {
           const userStr = localStorage.getItem('user');
           const user = userStr ? JSON.parse(userStr) : null;
-          if (user?.role === 'admin') navigate('/admin/dashboard');
+          if (user?.role === 'admin' || user?.role === 'super-admin') navigate('/admin/dashboard');
           else if (user?.role === 'project-manager') navigate('/manager/dashboard');
           else navigate('/team-member/dashboard');
         };
@@ -43,7 +43,7 @@ export default function ErrorPage() {
         buttonAction = () => {
           const userStr = localStorage.getItem('user');
           const user = userStr ? JSON.parse(userStr) : null;
-          if (user?.role === 'admin') navigate('/admin/dashboard');
+          if (user?.role === 'admin' || user?.role === 'super-admin') navigate('/admin/dashboard');
           else if (user?.role === 'project-manager') navigate('/manager/dashboard');
           else navigate('/');
         };

@@ -2,13 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Plus, CheckSquare, User, Calendar, FolderKanban } from 'lucide-react';
-import { getProjectById } from '../../services/projectsService';
+import { getProjectById, deleteProject as deleteProjectApi } from '../../services/projectsService';
 import { getTasksByProject, deleteTask } from '../../services/tasksService';
 import { getProjectMembers } from '../../services/projectsService';
+import { useAuth } from '../../context/AuthContext';
+import { PERMISSIONS } from '../../config/permissions';
 
 const ProjectDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { hasPermission, hasRole } = useAuth();
+  const canManageProjects = hasPermission(PERMISSIONS.MANAGE_PROJECTS);
+  const canAssignTasks = hasPermission(PERMISSIONS.ASSIGN_TASKS);
+  const isProjectManager = hasRole(['project-manager', 'project_manager']);
 
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState(null);
@@ -59,7 +65,7 @@ const ProjectDetails = () => {
     if (!window.confirm('Are you sure you want to delete this project? All associated tasks will also be deleted.')) return;
 
     try {
-      await deleteProject(id);
+      await deleteProjectApi(id);
       navigate('/manager/projects');
     } catch (error) {
       console.error('Error deleting project:', error);
@@ -89,21 +95,31 @@ const ProjectDetails = () => {
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Projects
         </button>
-        <div className="flex space-x-3">
-          <button 
-            onClick={() => navigate(`/manager/projects/edit/${id}`)} 
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center"
-          >
-            <Edit className="w-4 h-4 mr-2" /> Edit Project
-          </button>
-          <button 
-            onClick={deleteProject} 
-            className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center"
-          >
-            <Trash2 className="w-4 h-4 mr-2" /> Delete Project
-          </button>
-        </div>
+        {canManageProjects && (
+          <div className="flex space-x-3">
+            <button 
+              onClick={() => navigate(`/manager/projects/edit/${id}`)} 
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center"
+            >
+              <Edit className="w-4 h-4 mr-2" /> Edit Project
+            </button>
+            <button 
+              onClick={deleteProject} 
+              className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center"
+            >
+              <Trash2 className="w-4 h-4 mr-2" /> Delete Project
+            </button>
+          </div>
+        )}
       </div>
+
+      {!canManageProjects && isProjectManager && (
+        <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          View-only mode. You can still see existing project details, but project-management actions are hidden because the
+          <span className="mx-1 font-semibold">manage_projects</span>
+          permission has been revoked for this account.
+        </div>
+      )}
 
       {/* Project Header */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
@@ -167,12 +183,14 @@ const ProjectDetails = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-bold text-gray-900">Project Tasks ({projectTasks.length})</h2>
-            <button 
-              onClick={addTask} 
-              className="px-3 py-1 text-sm bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center"
-            >
-              <Plus className="w-4 h-4 mr-1" /> Add Task
-            </button>
+            {canAssignTasks && (
+              <button 
+                onClick={addTask} 
+                className="px-3 py-1 text-sm bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center"
+              >
+                <Plus className="w-4 h-4 mr-1" /> Add Task
+              </button>
+            )}
           </div>
           {projectTasks.length > 0 ? (
             <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -187,15 +205,17 @@ const ProjectDetails = () => {
                         <span>{task.assigneeName || task.assignee || 'Unassigned'}</span>
                       </div>
                     </div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteTask(task.id);
-                      }} 
-                      className="p-1 text-gray-400 hover:text-red-500"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {canAssignTasks && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteTask(task.id);
+                        }} 
+                        className="p-1 text-gray-400 hover:text-red-500"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex-1 mr-4">
@@ -225,12 +245,14 @@ const ProjectDetails = () => {
             <div className="text-center py-8">
               <CheckSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No tasks assigned to this project yet.</p>
-              <button 
-                onClick={addTask} 
-                className="mt-3 px-4 py-2 text-sm bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93]"
-              >
-                Create First Task
-              </button>
+              {canAssignTasks && (
+                <button 
+                  onClick={addTask} 
+                  className="mt-3 px-4 py-2 text-sm bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93]"
+                >
+                  Create First Task
+                </button>
+              )}
             </div>
           )}
         </div>

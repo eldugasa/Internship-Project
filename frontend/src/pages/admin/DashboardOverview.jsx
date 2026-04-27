@@ -61,7 +61,7 @@ const DashboardSkeleton = () => (
 );
 
 // Main Dashboard Content Component - Moved outside to prevent recreation
-const DashboardContent = ({ projects, users, teams, tasks }) => {
+const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false }) => {
   const [filter, setFilter] = useState("all");
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth : 1280,
@@ -189,6 +189,8 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
 
   // Memoized task status data
   const taskStatusData = useMemo(() => {
+    if (isSuperAdmin) return [];
+
     const completedTasks = tasks.filter(
       (t) => ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
     ).length;
@@ -212,7 +214,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
         color: DASHBOARD_COLORS.completed,
       },
     ].filter((item) => item.value > 0);
-  }, [tasks]);
+  }, [isSuperAdmin, tasks]);
 
   // Memoized user role data
   const userRoleData = useMemo(() => {
@@ -258,10 +260,12 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
       const year = date.getFullYear();
       const month = date.getMonth();
 
-      const tasksInMonth = tasks.filter((task) => {
-        const taskDate = new Date(task.createdAt);
-        return taskDate.getMonth() === month && taskDate.getFullYear() === year;
-      }).length;
+      const tasksInMonth = isSuperAdmin
+        ? 0
+        : tasks.filter((task) => {
+            const taskDate = new Date(task.createdAt);
+            return taskDate.getMonth() === month && taskDate.getFullYear() === year;
+          }).length;
 
       const projectsInMonth = projects.filter((project) => {
         const projectDate = new Date(
@@ -280,10 +284,12 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
     }
 
     return months;
-  }, [projects, tasks]);
+  }, [isSuperAdmin, projects, tasks]);
 
   // Memoized team performance data
   const teamPerformanceData = useMemo(() => {
+    if (isSuperAdmin) return [];
+
     return teams
       .map((team) => {
         const teamProjects = projects.filter(
@@ -310,7 +316,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
         };
       })
       .slice(0, 5);
-  }, [projects, teams, tasks]);
+  }, [isSuperAdmin, projects, teams, tasks]);
 
   // Memoized filtered projects (only recalculates when filter or projects change)
   const filteredProjects = useMemo(() => {
@@ -444,11 +450,32 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
     [stats],
   );
 
+  const visibleStatCards = useMemo(() => {
+    if (!isSuperAdmin) return statCards;
+
+    return statCards
+      .filter(
+        (stat) => stat.title !== "Total Tasks" && stat.title !== "Completed Tasks",
+      )
+      .map((stat) =>
+        stat.title === "Project Managers"
+          ? {
+              ...stat,
+              title: "Total Teams",
+              value: stats.totalTeams,
+              icon: "ðŸ‘¨",
+              bgColor: "bg-cyan-50",
+              textColor: "text-cyan-600",
+            }
+          : stat,
+      );
+  }, [isSuperAdmin, statCards, stats.totalTeams]);
+
   return (
     <>
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
-        {statCards.map((stat, index) => (
+        {visibleStatCards.map((stat, index) => (
           <div
     key={stat.title}  // Better than index
     className={`${stat.bgColor} rounded-lg sm:rounded-xl p-2 sm:p-3 lg:p-4 shadow-sm hover:shadow-md transition-shadow`}
@@ -506,7 +533,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
           </div>
         )}
 
-        {taskStatusData.length > 0 && (
+        {!isSuperAdmin && taskStatusData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-bold text-gray-900 mb-4">
               Task Status Overview
@@ -580,7 +607,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
-            Monthly Activity (Last 6 Months)
+            {isSuperAdmin ? "Monthly Platform Growth (Last 6 Months)" : "Monthly Activity (Last 6 Months)"}
           </h2>
           <div className="h-64 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -591,7 +618,7 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
+                {!isSuperAdmin && <YAxis yAxisId="right" orientation="right" />}
                 <Tooltip />
                 <Legend />
                 <Line
@@ -602,19 +629,21 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
                   strokeWidth={2}
                   name="Projects"
                 />
-                <Line
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="tasks"
-                  stroke="#F59E0B"
-                  strokeWidth={2}
-                  name="Tasks"
-                />
+                {!isSuperAdmin && (
+                  <Line
+                    yAxisId="right"
+                    type="monotone"
+                    dataKey="tasks"
+                    stroke="#F59E0B"
+                    strokeWidth={2}
+                    name="Tasks"
+                  />
+                )}
               </LineChart>
             </ResponsiveContainer>
           </div>
         </div>
-{teamPerformanceData.length > 0 && (
+{!isSuperAdmin && teamPerformanceData.length > 0 && (
   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
     <h2 className="text-lg font-bold text-gray-900 mb-4">
       Team Performance (Completion Rate)
@@ -798,6 +827,10 @@ const DashboardContent = ({ projects, users, teams, tasks }) => {
 };
 
 const DashboardOverview = () => {
+  const userStr = localStorage.getItem("user");
+  const user = userStr ? JSON.parse(userStr) : null;
+  const isSuperAdmin = user?.role === "super-admin";
+
   const {
     data: projects,
     isLoading: projectsLoading,
@@ -820,7 +853,11 @@ const DashboardOverview = () => {
     data: tasks,
     isLoading: tasksLoading,
     error: tasksError,
-  } = useQuery({ queryKey: ["tasks"], queryFn: getTasks });
+  } = useQuery({
+    queryKey: ["tasks"],
+    queryFn: getTasks,
+    enabled: !isSuperAdmin,
+  });
 
   const isLoading =
     projectsLoading || usersLoading || teamsLoading || tasksLoading;
@@ -839,7 +876,8 @@ const DashboardOverview = () => {
       projects={projects}
       users={users}
       teams={teams}
-      tasks={tasks}
+      tasks={tasks || []}
+      isSuperAdmin={isSuperAdmin}
     />
   );
 };

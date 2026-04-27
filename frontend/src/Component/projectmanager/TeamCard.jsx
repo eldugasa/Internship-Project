@@ -3,7 +3,13 @@ import React from "react";
 import { Trash2, Settings } from "lucide-react";
 import { useNavigation } from "react-router-dom";
 
-const TeamCard = ({ team, showActions = false, onDelete, onClick, role }) => {
+const TeamCard = ({
+  team,
+  showActions = false,
+  onDelete,
+  onClick,
+  primaryActionLabel = "Manage Team",
+}) => {
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting"; // You can replace this with actual state if needed
   return (
@@ -23,7 +29,7 @@ const TeamCard = ({ team, showActions = false, onDelete, onClick, role }) => {
             {/* <button className="p-2 hover:bg-gray-200 rounded-lg">
               <Settings className="w-4 h-4" />
             </button> */}
-            {!role && (
+            {showActions && (
               <button
                 onClick={onDelete}
                 className="p-2 hover:bg-red-100 rounded-lg text-red-500"
@@ -58,7 +64,7 @@ const TeamCard = ({ team, showActions = false, onDelete, onClick, role }) => {
         }}
         disabled={isSubmitting}
       >
-        {isSubmitting ? "Loading..." : "Manage Team"}
+        {isSubmitting ? "Loading..." : primaryActionLabel}
       </button>
     </div>
   );

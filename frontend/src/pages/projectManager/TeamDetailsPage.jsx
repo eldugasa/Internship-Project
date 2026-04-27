@@ -3,6 +3,7 @@ import React, { useState, Suspense } from "react";
 import {
   useParams,
   useNavigate,
+  useLocation,
   useLoaderData,
   Await,
   useRevalidator,
@@ -14,6 +15,7 @@ import {
 import { deleteProject } from "../../services/projectsService";
 import { UserPlus, UserMinus, X, ArrowLeft, RefreshCw } from "lucide-react";
 import { teamDetailsLoader } from "../../loader/admin/TeamDetailsPage.loader";
+import { useAuth } from "../../context/AuthContext";
 
 // Re-export the loader for the route
 export { teamDetailsLoader as loader };
@@ -92,9 +94,25 @@ const TeamDetailsError = ({ error, teamId }) => (
 const TeamDetailsPage = () => {
   const { teamId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const revalidator = useRevalidator();
   const loaderData = useLoaderData();
-  const isAdmin = loaderData.role === "admin";
+  const { user } = useAuth();
+  const canManageTeams = !!loaderData.canManageTeams;
+  const normalizedRole =
+    (user?.role || loaderData.role || "guest").toLowerCase().replace(/_/g, "-");
+  const permissionOverrides = Array.isArray(user?.permissionOverrides)
+    ? user.permissionOverrides
+    : [];
+  const isAdminSide = location.pathname.startsWith("/admin");
+  const canShowTeamActions =
+    isAdminSide
+      ? normalizedRole === "super-admin" || permissionOverrides.includes("manage_teams")
+      : canManageTeams;
+  const teamsBasePath =
+    normalizedRole === "admin" || normalizedRole === "super-admin"
+      ? "/admin/teams"
+      : "/manager/teams";
 
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -139,6 +157,7 @@ const TeamDetailsPage = () => {
 
   // Remove team member
   const removeTeamMember = async (userId) => {
+    if (!canShowTeamActions) return;
     if (!window.confirm("Are you sure you want to remove this member?")) return;
 
     setActionLoading(true);
@@ -156,6 +175,7 @@ const TeamDetailsPage = () => {
 
   // Add team member
   const addTeamMember = async (userId) => {
+    if (!canShowTeamActions) return;
     setActionLoading(true);
     try {
       await addMemberToTeam(teamId, userId);
@@ -172,6 +192,7 @@ const TeamDetailsPage = () => {
 
   // Remove project
   const removeProject = async (projectId) => {
+    if (!canShowTeamActions) return;
     if (!window.confirm("Are you sure you want to delete this project?"))
       return;
 
@@ -193,7 +214,7 @@ const TeamDetailsPage = () => {
       {/* Header with refresh button */}
       <div className="flex items-center justify-between mb-8">
         <button
-          onClick={() => navigate("/manager/teams")}
+          onClick={() => navigate(teamsBasePath)}
           className="flex items-center text-gray-600 hover:text-gray-900"
           disabled={actionLoading}
         >
@@ -211,7 +232,7 @@ const TeamDetailsPage = () => {
             {revalidator.state === "loading" ? "Refreshing..." : "Refresh"}
           </button>
           <button
-            onClick={() => navigate("/manager/teams")}
+            onClick={() => navigate(teamsBasePath)}
             className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             disabled={actionLoading}
           >
@@ -306,6 +327,16 @@ const TeamDetailsPage = () => {
                   </div>
                 </div>
 
+                {!canShowTeamActions && (
+                  <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    {isAdminSide ? (
+                      <>View-only mode. Admins can still view team details, but management actions stay hidden unless the <span className="mx-1 font-semibold">manage_teams</span> permission is granted.</>
+                    ) : (
+                      <>View-only mode. Team management is normally available to project managers by default, but it has been revoked for this account.</>
+                    )}
+                  </div>
+                )}
+
                 {/* Team Members and Projects Sections */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   {/* Team Members Section */}
@@ -314,7 +345,7 @@ const TeamDetailsPage = () => {
                       <h2 className="text-xl font-bold text-gray-900">
                         Team Members ({teamMembers.length})
                       </h2>
-                      {!isAdmin && (
+                      {canShowTeamActions && (
                         <button
                           onClick={() => setShowAddMemberPopup(true)}
                           disabled={actionLoading}
@@ -331,7 +362,7 @@ const TeamDetailsPage = () => {
                           <p className="text-gray-500">
                             No members in this team
                           </p>
-                          {!isAdmin && (
+                          {canShowTeamActions && (
                             <button
                               onClick={() => setShowAddMemberPopup(true)}
                               className="mt-2 text-sm text-[#4DA5AD] hover:underline"
@@ -362,7 +393,7 @@ const TeamDetailsPage = () => {
                                 </p>
                               </div>
                             </div>
-                            {!isAdmin && (
+                            {canShowTeamActions && (
                               <button
                                 onClick={() => removeTeamMember(member.id)}
                                 disabled={actionLoading}
@@ -455,7 +486,7 @@ const TeamDetailsPage = () => {
                                     ).toLocaleDateString()
                                   : "N/A"}
                               </div>
-                              {!isAdmin && (
+                              {canShowTeamActions && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -476,7 +507,7 @@ const TeamDetailsPage = () => {
                 </div>
 
                 {/* Add Member Modal */}
-                {showAddMemberPopup && (
+                {showAddMemberPopup && canShowTeamActions && (
                   <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
                     <div className="bg-white rounded-xl shadow-2xl border border-gray-200 max-w-2xl w-full max-h-[80vh] flex flex-col">
                       <div className="p-6 border-b border-gray-200 flex justify-between items-center">

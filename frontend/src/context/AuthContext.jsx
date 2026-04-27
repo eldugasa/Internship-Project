@@ -1,6 +1,12 @@
 // src/context/AuthContext.jsx
 import { createContext, useState, useContext, useEffect } from 'react';
-import { loginApi, logoutApi, getCurrentUser } from '../services/authService';
+import {
+  loginApi,
+  logoutApi,
+  getCurrentUser,
+  fetchCurrentUserApi,
+  persistCurrentUser,
+} from '../services/authService';
 
 const AuthContext = createContext();
 
@@ -18,6 +24,8 @@ export const AuthProvider = ({ children }) => {
         const storedUser = getCurrentUser();
         if (storedUser) {
           setUser(storedUser);
+          const freshUser = await fetchCurrentUserApi();
+          setUser(freshUser);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
@@ -50,6 +58,21 @@ export const AuthProvider = ({ children }) => {
     setError(null);
   };
 
+  const refreshUser = async () => {
+    const freshUser = await fetchCurrentUserApi();
+    setUser(freshUser);
+    return freshUser;
+  };
+
+  const updateStoredUser = (nextUser) => {
+    const normalizedUser = persistCurrentUser({
+      ...nextUser,
+      token: nextUser?.token || user?.token,
+    });
+    setUser(normalizedUser);
+    return normalizedUser;
+  };
+
   // Get user's dashboard path based on role
   const getUserDashboardPath = () => {
     if (!user) return '/login';
@@ -57,6 +80,7 @@ export const AuthProvider = ({ children }) => {
     const role = user.role?.toLowerCase() || '';
     
     switch (role) {
+      case 'super-admin':
       case 'admin':
         return '/admin/dashboard';
       case 'project-manager':
@@ -73,22 +97,35 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const getPermissions = () => {
+    if (!user) return [];
+
+    const permissions = Array.isArray(user.effectivePermissions)
+      ? user.effectivePermissions
+      : user.effectivePermissions
+        ? [user.effectivePermissions]
+        : [];
+
+    return permissions;
+  };
+
   // Check if user has specific role
   const hasRole = (roles) => {
     if (!user || !user.role) return false;
-    
-    const userRole = user.role.toLowerCase();
+    const normalizeRole = (role = "") => role.toLowerCase().replace(/_/g, "-");
+    const userRole = normalizeRole(user.role);
     
     if (Array.isArray(roles)) {
-      return roles.some(role => role.toLowerCase() === userRole);
+      return roles.some(role => normalizeRole(role) === userRole);
     }
     
-    return roles.toLowerCase() === userRole;
+    return normalizeRole(roles) === userRole;
   };
 
   // Check if user is admin
   const isAdmin = () => {
-    return user?.role?.toLowerCase() === 'admin';
+    const role = user?.role?.toLowerCase();
+    return role === 'admin' || role === 'super-admin';
   };
 
   // Check if user is project manager
@@ -108,6 +145,23 @@ export const AuthProvider = ({ children }) => {
     return role === 'qa-tester' || role === 'qa_tester';
   };
 
+  const isSuperAdmin = () => {
+    return user?.role?.toLowerCase() === 'super-admin';
+  };
+
+  const hasPermission = (permission) => {
+    const permissions = getPermissions();
+    return permissions.includes('*') || permissions.includes(permission);
+  };
+
+  const hasAnyPermission = (permissions = []) => {
+    return permissions.some((permission) => hasPermission(permission));
+  };
+
+  const hasAllPermissions = (permissions = []) => {
+    return permissions.every((permission) => hasPermission(permission));
+  };
+
   const value = {
     user,
     loading,
@@ -116,10 +170,16 @@ export const AuthProvider = ({ children }) => {
     logout,
     getUserDashboardPath,
     hasRole,
+    hasPermission,
+    hasAnyPermission,
+    hasAllPermissions,
     isAdmin,
+    isSuperAdmin,
     isProjectManager,
     isQATester,
     isTeamMember,
+    refreshUser,
+    updateStoredUser,
     isAuthenticated: !!user
   };
 

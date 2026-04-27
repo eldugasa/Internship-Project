@@ -2,6 +2,11 @@ import { prisma } from "../config/db.js";
 import { comparePassword } from "../utils/hash.js";
 import { generateToken } from "../utils/jwt.js";
 import { createNotification } from '../utils/notificationHelper.js';
+import {
+  getEditablePermissions,
+  getEffectivePermissions,
+  normalizePermissionOverrides,
+} from "../utils/permissionResolver.js";
 import jwt from 'jsonwebtoken';
 import { sendPasswordResetEmail } from '../utils/email.js';
 
@@ -26,6 +31,10 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    if (user.status === "inactive") {
+      return res.status(403).json({ message: "This account is inactive. Contact an admin." });
+    }
+
     const isMatch = await comparePassword(password, user.password);
 
     if (!isMatch) {
@@ -33,6 +42,9 @@ const login = async (req, res) => {
     }
 
     const token = generateToken(user);
+    const permissions = getEditablePermissions(user.role, user.permissions);
+    const effectivePermissions = getEffectivePermissions(user.role, user.permissions);
+    const permissionOverrides = normalizePermissionOverrides(user.permissions);
 
     res.json({
       token,
@@ -40,7 +52,11 @@ const login = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        status: user.status,
+        permissionOverrides,
+        permissions,
+        effectivePermissions,
       }
     });
   } catch (err) {

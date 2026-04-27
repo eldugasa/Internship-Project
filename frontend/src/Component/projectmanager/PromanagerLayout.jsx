@@ -3,8 +3,10 @@ import React, { useState, useMemo, useEffect } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
+  UsersRound,
   FolderKanban,
   CheckSquare,
+  FlaskConical,
   TrendingUp,
   FileText,
   Settings,
@@ -16,26 +18,30 @@ import {
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 import Sidebar from "./Sidebar";
+import { PERMISSIONS } from "../../config/permissions";
+import { useAuth } from "../../context/AuthContext";
 
 const ProjectManagerLayout = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Get user from localStorage
-  const userData = useMemo(() => {
-    try {
-      return JSON.parse(localStorage.getItem("user")) || {};
-    } catch {
-      return {};
-    }
-  }, []);
+  const userData = user || {};
 
   const userName = userData?.name || "Project Manager";
   const userRole = userData?.role || "project-manager";
+  const normalizedRole = userRole.toLowerCase().replace(/_/g, "-");
+  const effectivePermissions = userData?.effectivePermissions || [];
+  const hasPermission = (permission) =>
+    effectivePermissions.includes("*") || effectivePermissions.includes(permission);
+  const canViewProjects =
+    normalizedRole === "project-manager" ||
+    hasPermission(PERMISSIONS.MANAGE_PROJECTS);
+  const canTestTasks = hasPermission(PERMISSIONS.TEST_TASKS);
 
   const userInitials = useMemo(() => {
     if (!userName) return "PM";
@@ -46,14 +52,25 @@ const ProjectManagerLayout = () => {
   }, [userName]);
 
   const navItems = [
-    { path: "/manager/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/manager/projects", icon: FolderKanban, label: "Projects" },
-    { path: "/manager/teams", icon: Users, label: "Teams" },
-    { path: "/manager/tasks", icon: CheckSquare, label: "Tasks" },
-    { path: "/manager/progress", icon: TrendingUp, label: "Progress" },
-    { path: "/manager/reports", icon: FileText, label: "Reports" },
-    { path: "/manager/settings", icon: Settings, label: "Settings" },
-  ];
+    {
+      path: "/manager/dashboard",
+      icon: LayoutDashboard,
+      label: "Dashboard",
+      visible:
+        hasPermission(PERMISSIONS.MANAGE_PROJECTS) ||
+        hasPermission(PERMISSIONS.MANAGE_TEAMS) ||
+        hasPermission(PERMISSIONS.ASSIGN_TASKS) ||
+        hasPermission(PERMISSIONS.VIEW_REPORTS),
+    },
+    { path: "/manager/users", icon: Users, label: "Users", visible: hasPermission(PERMISSIONS.MANAGE_USERS) },
+    { path: "/manager/projects", icon: FolderKanban, label: "Projects", visible: canViewProjects },
+    { path: "/manager/teams", icon: UsersRound, label: "Teams", visible: true },
+    { path: "/manager/tasks", icon: CheckSquare, label: "Tasks", visible: hasPermission(PERMISSIONS.ASSIGN_TASKS) },
+    { path: "/qa-tester/dashboard", icon: FlaskConical, label: "QA Workspace", visible: canTestTasks },
+    { path: "/manager/progress", icon: TrendingUp, label: "Progress", visible: hasPermission(PERMISSIONS.VIEW_REPORTS) },
+    { path: "/manager/reports", icon: FileText, label: "Reports", visible: hasPermission(PERMISSIONS.VIEW_REPORTS) },
+    { path: "/manager/settings", icon: Settings, label: "Settings", visible: hasPermission(PERMISSIONS.MANAGE_SETTINGS) },
+  ].filter((item) => item.visible);
 
   // Close mobile menu when screen size changes to large
   useEffect(() => {
