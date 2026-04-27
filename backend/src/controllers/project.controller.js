@@ -6,8 +6,9 @@ import {
   NOTIFICATION_TYPES,
 } from "../utils/notificationHelper.js";
 
-// Helper to normalize role
-const normalizeRole = (role) => (role || "").toUpperCase().replace("-", "_");
+// Normalize role values like "super-admin" and "project_manager" to "SUPER_ADMIN".
+const normalizeRole = (role = "") =>
+  role.toString().trim().toUpperCase().replace(/-/g, "_");
 
 // Create a project
 export const createProject = async (req, res) => {
@@ -17,7 +18,11 @@ export const createProject = async (req, res) => {
     const managerId = req.user.id;
     const role = normalizeRole(req.user.role);
 
-    if (role !== "PROJECT_MANAGER" && role !== "ADMIN") {
+    if (
+      role !== "SUPER_ADMIN" &&
+      role !== "PROJECT_MANAGER" &&
+      role !== "ADMIN"
+    ) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -196,7 +201,11 @@ export const getAllProjects = async (req, res) => {
     const role = normalizeRole(req.user.role);
 
     let projects;
-    if (role === "ADMIN" || role === "PROJECT_MANAGER") {
+    if (
+      role === "SUPER_ADMIN" ||
+      role === "ADMIN" ||
+      role === "PROJECT_MANAGER"
+    ) {
       projects = await prisma.project.findMany({
         include: {
           tasks: true,
@@ -318,7 +327,11 @@ export const deleteProject = async (req, res) => {
     const { id } = req.params;
     const role = normalizeRole(req.user.role);
 
-    if (role !== "ADMIN" && role !== "PROJECT_MANAGER") {
+    if (
+      role !== "SUPER_ADMIN" &&
+      role !== "ADMIN" &&
+      role !== "PROJECT_MANAGER"
+    ) {
       return res.status(403).json({ message: "Forbidden" });
     }
 

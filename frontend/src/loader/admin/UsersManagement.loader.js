@@ -41,16 +41,27 @@ export const usersLoader = (queryClient) => async () => {
 
 // Helper functions (keep as is)
 export const ROLE_OPTIONS = [
+  { value: 'super-admin', label: 'Super Admin' },
   { value: 'admin', label: 'Administrator' },
   { value: 'project-manager', label: 'Project Manager' },
   { value: 'qa-tester', label: 'QA Tester' },
   { value: 'team-member', label: 'Team Member' },
 ];
 
+export const PERMISSION_OPTIONS = [
+  { value: 'manage_users', label: 'Manage Users' },
+  { value: 'manage_teams', label: 'Manage Teams' },
+  { value: 'manage_projects', label: 'Manage Projects' },
+  { value: 'assign_tasks', label: 'Assign Tasks' },
+  { value: 'test_tasks', label: 'Test Tasks' },
+];
+
 export const toDisplayRole = (role = '') => role?.replace(/[-_]/g, ' ') || '';
 
 export const getRoleColor = (role) => {
   switch (role) {
+    case 'super-admin':
+      return 'bg-fuchsia-100 text-fuchsia-800';
     case 'admin':
       return 'bg-purple-100 text-purple-800';
     case 'project-manager':

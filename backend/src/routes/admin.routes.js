@@ -8,7 +8,7 @@ const router = express.Router();
 router.get(
   "/dashboard",
   authenticate,
-  authorize("ADMIN"),
+  authorize("ADMIN", "SUPER_ADMIN"),
   getAdminDashboard
 );
 

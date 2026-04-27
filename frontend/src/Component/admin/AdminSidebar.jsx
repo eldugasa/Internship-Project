@@ -6,6 +6,7 @@ import {
   Users,
   UsersRound,
   FolderKanban,
+  CheckSquare,
   BarChart3,
   Settings,
   LogOut,
@@ -13,20 +14,61 @@ import {
   ChevronRight,
   X
 } from 'lucide-react';
+import { PERMISSIONS } from '../../config/permissions';
+import { useAuth } from '../../context/AuthContext';
 
 const AdminSidebar = ({ collapsed, onToggle, onClose, isMobile }) => {
   const navigate = useNavigate();
-
+  const { user } = useAuth();
+  const effectivePermissions = user?.effectivePermissions || [];
+  const hasPermission = (permission) =>
+    effectivePermissions.includes('*') || effectivePermissions.includes(permission);
+  const normalizedRole = user?.role?.toLowerCase?.() || "";
+  const isSuperAdmin = normalizedRole === "super-admin";
+  const adminProjectsPath =
+    normalizedRole === "admin" ? "/manager/projects" : "/admin/projects";
   const menuItems = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/admin/users', label: 'Users', icon: Users },
-    { path: '/admin/teams', label: 'Teams', icon: UsersRound },
-    { path: '/admin/projects', label: 'Projects', icon: FolderKanban },
-    { path: '/admin/reports', label: 'Reports', icon: BarChart3 },
-    { path: '/admin/settings', label: 'Settings', icon: Settings },
-  ];
+    {
+      path: '/admin/dashboard',
+      label: 'Dashboard',
+      icon: LayoutDashboard,
+      visible:
+        hasPermission(PERMISSIONS.MANAGE_USERS) ||
+        hasPermission(PERMISSIONS.MANAGE_TEAMS) ||
+        hasPermission(PERMISSIONS.MANAGE_PROJECTS) ||
+        hasPermission(PERMISSIONS.VIEW_REPORTS) ||
+        hasPermission(PERMISSIONS.MANAGE_SETTINGS),
+    },
+    { path: '/admin/users', label: 'Users', icon: Users, visible: hasPermission(PERMISSIONS.MANAGE_USERS) },
+    {
+      path: '/admin/teams',
+      label: 'Teams',
+      icon: UsersRound,
+      visible:
+        normalizedRole === "admin" ||
+        (!isSuperAdmin && hasPermission(PERMISSIONS.MANAGE_TEAMS)),
+    },
+    {
+      path: adminProjectsPath,
+      label: 'Projects',
+      icon: FolderKanban,
+      visible: !isSuperAdmin && hasPermission(PERMISSIONS.MANAGE_PROJECTS),
+    },
+    {
+      path: '/manager/tasks',
+      label: 'Tasks',
+      icon: CheckSquare,
+      visible: !isSuperAdmin && hasPermission(PERMISSIONS.ASSIGN_TASKS),
+    },
+    { path: '/admin/reports', label: 'Reports', icon: BarChart3, visible: hasPermission(PERMISSIONS.VIEW_REPORTS) },
+    { path: '/admin/settings', label: 'Settings', icon: Settings, visible: hasPermission(PERMISSIONS.MANAGE_SETTINGS) },
+  ].filter((item) => item.visible);
 
   const handleLogout = () => {
+    if (!window.confirm('Are you sure you want to logout?')) {
+      return;
+    }
+
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     navigate('/login');
@@ -38,9 +80,6 @@ const AdminSidebar = ({ collapsed, onToggle, onClose, isMobile }) => {
     }
   };
 
-  // Get user from localStorage for the user card
-  const userStr = localStorage.getItem('user');
-  const user = userStr ? JSON.parse(userStr) : null;
   const userName = user?.name || 'Admin User';
   const userRole = user?.role || 'admin';
   

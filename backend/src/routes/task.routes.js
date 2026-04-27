@@ -2,6 +2,8 @@ import express from "express";
 import { prisma } from "../config/db.js";
 import authenticate from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/role.middleware.js";
+import { requirePermission } from "../middleware/permission.middleware.js";
+import { PERMISSIONS } from "../config/permissions.js";
 import { 
   createTask, 
   getTasksByProject, 
@@ -23,19 +25,20 @@ const router = express.Router();
 router.use(authenticate);
 
 router.post("/", 
-  authorize("PROJECT_MANAGER", "project-manager", "project_manager"), 
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requirePermission(PERMISSIONS.ASSIGN_TASKS),
   createTask
 );
 
 
 router.get("/", 
-  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"), 
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"), 
   getAllTasks
 );
 
 // GET /api/tasks/project/:projectId - Get tasks by project (All roles)
 router.get("/project/:projectId",
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   getTasksByProject
 );
 
@@ -47,19 +50,20 @@ router.get("/my-tasks",
 
 
 router.get("/:id", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   getTaskById
 );
 
 
 router.put("/:id", 
-  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requirePermission(PERMISSIONS.ASSIGN_TASKS),
   updateTask
 );
 
 // PUT /api/tasks/:id/status - Update task status
 router.put("/:id/status",
-  authorize("TEAM_MEMBER", "QA_TESTER", "PROJECT_MANAGER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
+  authorize("SUPER_ADMIN", "TEAM_MEMBER", "QA_TESTER", "PROJECT_MANAGER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   updateTaskStatus
 );
 
@@ -74,13 +78,15 @@ router.get("/my-tasks",
 
 
 router.put("/:id/assign", 
-  authorize("PROJECT_MANAGER", "project-manager", "project_manager"),
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requirePermission(PERMISSIONS.ASSIGN_TASKS),
   assignTask
 );
 
 
 router.delete("/:id", 
-  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requirePermission(PERMISSIONS.ASSIGN_TASKS),
   deleteTask
 );
 
@@ -88,7 +94,7 @@ router.delete("/:id",
 
 //  GET /api/tasks/:id/comments - Get all comments
 router.get("/:id/comments", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   async (req, res) => {
     try {
       const { id } = req.params;
@@ -111,12 +117,12 @@ router.get("/:id/comments",
 
 //  Add a comment
 router.post("/:id/comments", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   addTaskComment
 );
 
 router.delete("/:id/comments/:commentId", 
-  authorize("ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
   deleteComment // Use the controller function created above
 );
 

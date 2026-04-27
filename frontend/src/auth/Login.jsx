@@ -57,6 +57,7 @@ const SignIn = () => {
         const userRole = normalizeRole(user.role);
 
         switch (userRole) {
+          case 'super-admin':
           case 'admin':
             navigate('/admin/dashboard');
             break;

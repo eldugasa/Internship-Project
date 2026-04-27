@@ -1,6 +1,10 @@
 import express from "express";
 import authenticate from "../middleware/auth.middleware.js";
-import { authorize } from "../middleware/role.middleware.js";
+import {
+  requireAnyPermission,
+  requirePermission,
+} from "../middleware/permission.middleware.js";
+import { PERMISSIONS } from "../config/permissions.js";
 import {
   createTeam,
   getAllTeams,
@@ -18,38 +22,42 @@ router.use(authenticate);
 // GET all teams
 router.get(
   "/",
-  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requireAnyPermission(PERMISSIONS.MANAGE_TEAMS, PERMISSIONS.MANAGE_USERS),
   getAllTeams
 );
 
 // GET team by ID
-router.get("/:teamId", getTeamById);
+router.get(
+  "/:teamId",
+  requireAnyPermission(PERMISSIONS.MANAGE_TEAMS, PERMISSIONS.MANAGE_USERS),
+  getTeamById,
+);
 
 // POST create team
 router.post(
   "/",
-  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requirePermission(PERMISSIONS.MANAGE_TEAMS),
   createTeam
 );
 
 // DELETE team (Admin only)
 router.delete(
   "/:teamId",
-  authorize("ADMIN"),
+  requirePermission(PERMISSIONS.MANAGE_TEAMS),
   deleteTeam
 );
 
 // Add member to team
 router.put(
   "/:teamId/add-member",
-  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requirePermission(PERMISSIONS.MANAGE_TEAMS),
   assignUserToTeam
 );
 
 // Remove member from team
 router.put(
   "/:teamId/remove-member",
-  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requirePermission(PERMISSIONS.MANAGE_TEAMS),
   removeUserFromTeam
 );
 

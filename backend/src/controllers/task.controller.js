@@ -37,6 +37,22 @@ const getRetestProgress = (task) => {
   return currentProgress;
 };
 
+const resolveFallbackQaTesterId = (projectManagerId, requestedQaTesterId) => {
+  if (requestedQaTesterId === undefined) {
+    return undefined;
+  }
+
+  if (
+    requestedQaTesterId === null ||
+    requestedQaTesterId === "" ||
+    Number.isNaN(Number(requestedQaTesterId))
+  ) {
+    return projectManagerId ?? null;
+  }
+
+  return Number(requestedQaTesterId);
+};
+
 // Get task by ID
 const getTaskById = async (req, res) => {
   try {
@@ -172,6 +188,11 @@ const createTask = async (req, res) => {
       return res.status(404).json({ message: "Project not found" });
     }
 
+    const resolvedQaTesterId = resolveFallbackQaTesterId(
+      project.managerId,
+      qaTesterId,
+    );
+
     // Create the task
     const task = await prisma.task.create({
       data: {
@@ -182,7 +203,7 @@ const createTask = async (req, res) => {
         priority: priority || "MEDIUM",
         projectId: Number(projectId),
         assigneeId: Number(assignedTo),
-        qaTesterId: qaTesterId ? Number(qaTesterId) : null,
+        qaTesterId: resolvedQaTesterId ?? null,
         dueDate: dueDate ? new Date(dueDate) : null,
       },
       include: {
@@ -226,11 +247,16 @@ const createTask = async (req, res) => {
       });
 
       if (task.qaTesterId) {
+        const qaAssignmentMessage =
+          resolvedQaTesterId === project.managerId && !qaTesterId
+            ? `No QA tester was selected, so "${task.title}" will be tested by the project manager`
+            : `You have been assigned to test "${task.title}" in project "${project.name}"`;
+
         await createNotification({
           userId: task.qaTesterId,
           type: NOTIFICATION_TYPES.TASK_ASSIGNED_TO_ME,
           title: "Task Assigned for QA",
-          message: `You have been assigned to test "${task.title}" in project "${project.name}"`,
+          message: qaAssignmentMessage,
           data: { taskId: task.id, projectId: task.projectId },
           link: `/qa-tester/tasks/${task.id}`,
         });
@@ -833,8 +859,12 @@ const updateTask = async (req, res) => {
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
     if (assigneeId !== undefined) updateData.assigneeId = parseInt(assigneeId);
-    if (qaTesterId !== undefined) {
-      updateData.qaTesterId = qaTesterId ? parseInt(qaTesterId) : null;
+    const resolvedQaTesterId = resolveFallbackQaTesterId(
+      existingTask.project?.managerId,
+      qaTesterId,
+    );
+    if (resolvedQaTesterId !== undefined) {
+      updateData.qaTesterId = resolvedQaTesterId;
     }
     if (priority !== undefined) updateData.priority = priority;
     if (dueDate !== undefined) updateData.dueDate = new Date(dueDate);

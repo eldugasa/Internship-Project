@@ -1,6 +1,34 @@
 // src/loader/admin/TeamsManagement.loader.js
 import { getTeams } from '../../services/teamsService';
-import { getUsers } from '../../services/usersService';
+import { getCurrentUserProfile, getUsers } from '../../services/usersService';
+
+const normalizeRole = (role = "") => role.toLowerCase().replace(/_/g, "-");
+
+const resolveCanManageTeams = (user = {}) => {
+  const normalizedRole = normalizeRole(user.role || "guest");
+  const effectivePermissions = Array.isArray(user.effectivePermissions)
+    ? user.effectivePermissions
+    : [];
+  const permissionOverrides = Array.isArray(user.permissionOverrides)
+    ? user.permissionOverrides
+    : [];
+  const hasExplicitManageTeamsGrant = permissionOverrides.includes("manage_teams");
+  const hasExplicitManageTeamsRevoke = permissionOverrides.includes("!manage_teams");
+
+  if (effectivePermissions.includes("*")) {
+    return true;
+  }
+
+  if (normalizedRole === "project-manager") {
+    return !hasExplicitManageTeamsRevoke;
+  }
+
+  if (normalizedRole === "admin") {
+    return hasExplicitManageTeamsGrant;
+  }
+
+  return effectivePermissions.includes("manage_teams");
+};
 
 // Define Query Keys and Functions
 export const teamsQuery = () => ({
@@ -18,15 +46,29 @@ export const usersQuery = () => ({
 });
 
 export const teamsLoader = (queryClient) => async () => {
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  let user = {};
+  try {
+    user = await getCurrentUserProfile();
+  } catch {
+    const fallbackUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const fallbackRole = normalizeRole(fallbackUser.role || "guest");
+    user =
+      fallbackRole === "admin" || fallbackRole === "super-admin"
+        ? { role: fallbackUser.role || "guest", permissions: [], effectivePermissions: [] }
+        : fallbackUser;
+  }
+  const canManageTeams = resolveCanManageTeams(user);
   
   // Prefetch both teams and users into the cache
   await Promise.all([
     queryClient.ensureQueryData(teamsQuery()),
-    queryClient.ensureQueryData(usersQuery()),
+    ...(canManageTeams ? [queryClient.ensureQueryData(usersQuery())] : []),
   ]);
 
-  return { role: user.role || 'guest' };
+  return {
+    role: user.role || 'guest',
+    canManageTeams,
+  };
 };
 
 // Helper functions

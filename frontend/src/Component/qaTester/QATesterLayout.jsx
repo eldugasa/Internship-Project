@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import NotificationBell from "../teamMember/NotificationBell";
 import Sidebar from "../teamMember/Sidebar";
+import { PERMISSIONS } from "../../config/permissions";
 
 const QATesterLayout = () => {
   const navigate = useNavigate();
@@ -32,6 +33,9 @@ const QATesterLayout = () => {
 
   const userName = userData?.name || "QA Tester";
   const userRole = userData?.role || "qa-tester";
+  const effectivePermissions = userData?.effectivePermissions || [];
+  const hasPermission = (permission) =>
+    effectivePermissions.includes("*") || effectivePermissions.includes(permission);
 
   const userInitials = useMemo(() => {
     if (!userName) return "QA";
@@ -42,11 +46,11 @@ const QATesterLayout = () => {
   }, [userName]);
 
   const navItems = [
-    { path: "/qa-tester/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-    { path: "/qa-tester/tasks", icon: CheckSquare, label: "Tasks" },
-    { path: "/qa-tester/projects", icon: FolderOpen, label: "Projects" },
-    { path: "/qa-tester/profile", icon: User, label: "Profile" },
-  ];
+    { path: "/qa-tester/dashboard", icon: LayoutDashboard, label: "Dashboard", visible: hasPermission(PERMISSIONS.TEST_TASKS) },
+    { path: "/qa-tester/tasks", icon: CheckSquare, label: "Tasks", visible: hasPermission(PERMISSIONS.TEST_TASKS) },
+    { path: "/qa-tester/projects", icon: FolderOpen, label: "Projects", visible: hasPermission(PERMISSIONS.TEST_TASKS) },
+    { path: "/qa-tester/profile", icon: User, label: "Profile", visible: true },
+  ].filter((item) => item.visible);
 
   // Close mobile menu when screen size changes to large
   useEffect(() => {

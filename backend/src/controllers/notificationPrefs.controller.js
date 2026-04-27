@@ -10,6 +10,9 @@ const getDefaultPrefs = (role) => {
   const roleSpecificPrefs = {
     ADMIN: {
       userRegistered: true,
+      userDeleted: true,
+      teamCreated: true,
+      teamDeleted: true,
       projectCreated: true,
       projectCompleted: true,
       systemAlerts: true,

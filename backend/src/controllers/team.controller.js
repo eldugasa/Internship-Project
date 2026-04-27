@@ -1,5 +1,46 @@
 import { prisma } from "../config/db.js";
-import { createNotification, NOTIFICATION_TYPES } from "../utils/notificationHelper.js";
+import {
+  createBulkNotifications,
+  createNotification,
+  NOTIFICATION_TYPES,
+} from "../utils/notificationHelper.js";
+
+const notifyAdminUsersAboutTeamMemberAddition = async ({
+  actorName,
+  memberName,
+  teamId,
+  teamName,
+}) => {
+  const adminUsers = await prisma.user.findMany({
+    where: {
+      status: "active",
+      role: { in: ["ADMIN", "SUPER_ADMIN"] },
+    },
+    select: { id: true },
+  });
+
+  if (!adminUsers.length) {
+    return;
+  }
+
+  await createBulkNotifications(
+    adminUsers.map((admin) => ({
+      userId: admin.id,
+      type: NOTIFICATION_TYPES.SYSTEM_ALERT,
+      title: "Team Member Added",
+      message: actorName
+        ? `${actorName} added ${memberName} to team "${teamName}".`
+        : `${memberName} was added to team "${teamName}".`,
+      data: {
+        teamId,
+        teamName,
+        memberName,
+      },
+      link: `/admin/teams/${teamId}`,
+      read: false,
+    })),
+  );
+};
 
 // ==============================
 // Create Team
@@ -41,6 +82,11 @@ const createTeam = async (req, res) => {
     if (members.length > 0) {
       try {
         for (const member of members) {
+          const memberUser = await prisma.user.findUnique({
+            where: { id: member.id },
+            select: { name: true },
+          });
+
           await createNotification({
             userId: member.id,
             type: NOTIFICATION_TYPES.ADDED_TO_TEAM,
@@ -48,6 +94,13 @@ const createTeam = async (req, res) => {
             message: `You have been added to team "${team.name}"`,
             data: { teamId: team.id, teamName: team.name },
             link: `/team-member/teams/${team.id}`
+          });
+
+          await notifyAdminUsersAboutTeamMemberAddition({
+            actorName: req.user?.name,
+            memberName: memberUser?.name || `User #${member.id}`,
+            teamId: team.id,
+            teamName: team.name,
           });
         }
         console.log(`✅ Sent notifications to ${members.length} team members`);
@@ -242,6 +295,14 @@ const assignUserToTeam = async (req, res) => {
         },
         link: `/team-member/teams/${team.id}`
       });
+
+      await notifyAdminUsersAboutTeamMemberAddition({
+        actorName: req.user?.name,
+        memberName: user.name || `User #${user.id}`,
+        teamId: team.id,
+        teamName: team.name,
+      });
+
       console.log(`✅ Notification sent to user ${userId} for team addition`);
     } catch (notifErr) {
       console.error('Error sending team addition notification:', notifErr);

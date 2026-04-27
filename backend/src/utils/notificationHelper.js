@@ -4,6 +4,9 @@ import { prisma } from "../config/db.js";
 const typeToPrefMap = {
   // Admin notifications
   'user_registered': 'userRegistered',
+  'user_deleted': 'userDeleted',
+  'team_created': 'teamCreated',
+  'team_deleted': 'teamDeleted',
   'project_created': 'projectCreated',
   'project_completed': 'projectCompleted',
   'system_alert': 'systemAlerts',
@@ -27,6 +30,21 @@ const typeToPrefMap = {
   'member_removed': 'memberRemoved' // ADD THIS
 };
 
+const ADMIN_LEVEL_ROLES = new Set(['admin', 'super-admin']);
+const TASK_NOTIFICATION_TYPES = new Set([
+  'task_assigned',
+  'task_completed',
+  'task_overdue',
+  'task_assigned_to_me',
+  'task_completed_by_me',
+  'task_overdue_for_me',
+  'deadline_approaching',
+  'comment_added',
+]);
+
+const shouldSkipTaskNotificationForRole = (role, type) =>
+  ADMIN_LEVEL_ROLES.has(role) && TASK_NOTIFICATION_TYPES.has(type);
+
 // Create single notification with preference check
 export const createNotification = async ({
   userId,
@@ -42,12 +60,18 @@ export const createNotification = async ({
       where: { id: userId },
       select: { 
         notificationPrefs: true,
-        email: true 
+        email: true,
+        role: true,
       }
     });
 
     if (!user) {
       console.log(`User ${userId} not found`);
+      return null;
+    }
+
+    if (shouldSkipTaskNotificationForRole(user.role, type)) {
+      console.log(`Skipping ${type} notification for ${user.role} user ${userId}`);
       return null;
     }
 
@@ -112,11 +136,12 @@ export const createBulkNotifications = async (notifications) => {
     // Get preferences for all users
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
-      select: { id: true, notificationPrefs: true }
+      select: { id: true, notificationPrefs: true, role: true }
     });
 
     // Create a map of user preferences
     const prefsMap = {};
+    const roleMap = {};
     users.forEach(user => {
       let prefs = user.notificationPrefs;
       if (typeof prefs === 'string') {
@@ -129,12 +154,18 @@ export const createBulkNotifications = async (notifications) => {
         prefs = {};
       }
       prefsMap[user.id] = prefs;
+      roleMap[user.id] = user.role;
     });
 
     // Filter notifications based on preferences
     const filteredNotifications = notifications.filter(notif => {
       const userPrefs = prefsMap[notif.userId] || {};
       const prefKey = typeToPrefMap[notif.type];
+      const userRole = roleMap[notif.userId];
+
+      if (shouldSkipTaskNotificationForRole(userRole, notif.type)) {
+        return false;
+      }
       
       // Check if user has disabled in-app notifications
       if (userPrefs.inAppNotifications === false) return false;
@@ -164,6 +195,7 @@ export const createBulkNotifications = async (notifications) => {
 export const NOTIFICATION_TYPES = {
   // Admin
   USER_REGISTERED: 'user_registered',
+  USER_DELETED: 'user_deleted',
   PROJECT_CREATED: 'project_created',
   PROJECT_COMPLETED: 'project_completed',
   SYSTEM_ALERT: 'system_alert',

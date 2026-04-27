@@ -10,6 +10,8 @@ import {
   Grid3x3, List, SortAsc, SortDesc
 } from 'lucide-react';
 import { deleteProject } from '../../services/projectsService';
+import { useAuth } from '../../context/AuthContext';
+import { PERMISSIONS } from '../../config/permissions';
 import { 
   projectsLoader, 
   calculateStats, 
@@ -119,7 +121,7 @@ const ProjectsError = ({ error, onRetry }) => {
 };
 
 // Project Card Component
-const ProjectCard = ({ project, onDelete, onView, onEdit, getStatusBadge, isOverdue, isAtRisk }) => {
+const ProjectCard = ({ project, onDelete, onView, onEdit, getStatusBadge, isOverdue, isAtRisk, canManageProjects }) => {
   const [showMenu, setShowMenu] = useState(false);
   const overdue = isOverdue(project);
   const atRisk = isAtRisk(project);
@@ -154,24 +156,26 @@ const ProjectCard = ({ project, onDelete, onView, onEdit, getStatusBadge, isOver
               <p className="text-sm text-gray-500 line-clamp-2">{project.description}</p>
             )}
           </div>
-          <div className="relative menu-container">
-            <button onClick={() => setShowMenu(!showMenu)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-              <MoreVertical className="w-5 h-5 text-gray-500" />
-            </button>
-            {showMenu && (
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
-                <button onClick={() => { onView(); setShowMenu(false); }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                  <Eye className="w-4 h-4" /> View Details
-                </button>
-                <button onClick={() => { onEdit(); setShowMenu(false); }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
-                  <Edit className="w-4 h-4" /> Edit Project
-                </button>
-                <button onClick={() => { onDelete(project.id); setShowMenu(false); }} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
-                  <Trash2 className="w-4 h-4" /> Delete Project
-                </button>
-              </div>
-            )}
-          </div>
+          {canManageProjects && (
+            <div className="relative menu-container">
+              <button onClick={() => setShowMenu(!showMenu)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+                <MoreVertical className="w-5 h-5 text-gray-500" />
+              </button>
+              {showMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                  <button onClick={() => { onView(); setShowMenu(false); }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <Eye className="w-4 h-4" /> View Details
+                  </button>
+                  <button onClick={() => { onEdit(); setShowMenu(false); }} className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+                    <Edit className="w-4 h-4" /> Edit Project
+                  </button>
+                  <button onClick={() => { onDelete(project.id); setShowMenu(false); }} className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+                    <Trash2 className="w-4 h-4" /> Delete Project
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
@@ -233,7 +237,7 @@ const ProjectCard = ({ project, onDelete, onView, onEdit, getStatusBadge, isOver
 };
 
 // Empty State Component
-const EmptyState = ({ searchQuery, onClear, onCreate, hasFilters }) => (
+const EmptyState = ({ searchQuery, onClear, onCreate, hasFilters, canManageProjects }) => (
   <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
     {searchQuery || hasFilters ? (
       <>
@@ -252,10 +256,16 @@ const EmptyState = ({ searchQuery, onClear, onCreate, hasFilters }) => (
           <FolderKanban className="w-12 h-12 text-[#0f5841]" />
         </div>
         <h3 className="text-xl font-bold text-gray-900 mb-2">No projects yet</h3>
-        <p className="text-gray-500 mb-6">Get started by creating your first project</p>
-        <button onClick={onCreate} className="px-6 py-2.5 bg-gradient-to-r from-[#0f5841] to-[#194f87] text-white rounded-lg hover:shadow-lg transition-all font-medium inline-flex items-center gap-2">
-          <Plus className="w-5 h-5" /> Create Project
-        </button>
+        <p className="text-gray-500 mb-6">
+          {canManageProjects
+            ? "Get started by creating your first project"
+            : "No projects are available to view right now."}
+        </p>
+        {canManageProjects && (
+          <button onClick={onCreate} className="px-6 py-2.5 bg-gradient-to-r from-[#0f5841] to-[#194f87] text-white rounded-lg hover:shadow-lg transition-all font-medium inline-flex items-center gap-2">
+            <Plus className="w-5 h-5" /> Create Project
+          </button>
+        )}
       </>
     )}
   </div>
@@ -266,6 +276,9 @@ const Projects = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const loaderData = useLoaderData();
+  const { hasPermission, hasRole } = useAuth();
+  const canManageProjects = hasPermission(PERMISSIONS.MANAGE_PROJECTS);
+  const isProjectManager = hasRole(["project-manager", "project_manager"]);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('projectsViewMode') || 'grid');
@@ -425,21 +438,23 @@ const Projects = () => {
       <div className="p-6 max-w-7xl mx-auto">
         {/* Header Section */}
         <div className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Projects Dashboard</h1>
-              <p className="text-gray-600 mt-1">Manage and monitor all your projects in one place</p>
-            </div>
-            <div className="flex items-center gap-3">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Projects Dashboard</h1>
+            <p className="text-gray-600 mt-1">Manage and monitor all your projects in one place</p>
+          </div>
+          <div className="flex items-center gap-3">
               <button onClick={handleExport} disabled={safeProjects.length === 0} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50" title="Export to CSV">
                 <Download className="w-5 h-5 text-gray-600" />
               </button>
               <button onClick={() => refetchProjects()} disabled={isFetching} className="p-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50" title="Refresh">
                 <RefreshCw className={`w-5 h-5 text-gray-600 ${isFetching ? 'animate-spin' : ''}`} />
               </button>
-              <button onClick={() => navigate('/manager/projects/create')} className="px-4 py-2 bg-gradient-to-r from-[#0f5841] to-[#194f87] text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2">
-                <Plus className="w-5 h-5" /> New Project
-              </button>
+              {canManageProjects && (
+                <button onClick={() => navigate('/manager/projects/create')} className="px-4 py-2 bg-gradient-to-r from-[#0f5841] to-[#194f87] text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2">
+                  <Plus className="w-5 h-5" /> New Project
+                </button>
+              )}
             </div>
           </div>
 
@@ -491,6 +506,14 @@ const Projects = () => {
   />
 </div>
         </div>
+
+        {!canManageProjects && isProjectManager && (
+          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            View-only mode. Project managers can still see existing projects, but project-management actions are hidden because the
+            <span className="mx-1 font-semibold">manage_projects</span>
+            permission has been revoked for this account.
+          </div>
+        )}
 
         {/* Filters & Search Bar */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6">
@@ -560,6 +583,7 @@ const Projects = () => {
                   getStatusBadge={getStatusBadge} 
                   isOverdue={isOverdue}
                   isAtRisk={isAtRisk}
+                  canManageProjects={canManageProjects}
                 />
               ))}
             </div>
@@ -616,12 +640,16 @@ const Projects = () => {
                             <button onClick={() => navigate(`/manager/projects/${project.id}`)} className="p-2 text-[#0f5841] hover:bg-[#0f5841]/10 rounded-lg" title="View Details">
                               <Eye className="w-5 h-5" />
                             </button>
-                            <button onClick={() => navigate(`/manager/projects/${project.id}/edit`)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit Project">
-                              <Edit className="w-5 h-5" />
-                            </button>
-                            <button onClick={() => handleDeleteProject(project.id)} disabled={deletingId === project.id} className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50" title="Delete Project">
-                              {deletingId === project.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
-                            </button>
+                            {canManageProjects && (
+                              <>
+                                <button onClick={() => navigate(`/manager/projects/${project.id}/edit`)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit Project">
+                                  <Edit className="w-5 h-5" />
+                                </button>
+                                <button onClick={() => handleDeleteProject(project.id)} disabled={deletingId === project.id} className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50" title="Delete Project">
+                                  {deletingId === project.id ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+                                </button>
+                              </>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -632,7 +660,7 @@ const Projects = () => {
             </div>
           )
         ) : (
-          <EmptyState searchQuery={searchQuery} onClear={clearFilters} onCreate={() => navigate('/manager/projects/create')} hasFilters={statusFilter !== 'all'} />
+          <EmptyState searchQuery={searchQuery} onClear={clearFilters} onCreate={() => navigate('/manager/projects/create')} hasFilters={statusFilter !== 'all'} canManageProjects={canManageProjects} />
         )}
       </div>
     </div>

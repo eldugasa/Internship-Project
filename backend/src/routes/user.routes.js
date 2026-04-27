@@ -1,7 +1,11 @@
 // src/routes/user.routes.js
 import express from "express";
 import authenticate from "../middleware/auth.middleware.js";
-import { authorize } from "../middleware/role.middleware.js";
+import {
+  requireAnyPermission,
+  requirePermission,
+} from "../middleware/permission.middleware.js";
+import { PERMISSIONS } from "../config/permissions.js";
 import {
   getAllUsers,
   createUser,
@@ -20,15 +24,20 @@ const router = express.Router();
 router.get(
   "/",
   authenticate,
-  authorize("ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+  requireAnyPermission(PERMISSIONS.MANAGE_USERS, PERMISSIONS.MANAGE_TEAMS),
   getAllUsers,
 );
 
 // Create a new user (Admin only)
-router.post("/", authenticate, authorize("ADMIN"), createUser);
+router.post("/", authenticate, requirePermission(PERMISSIONS.MANAGE_USERS), createUser);
 
 // Update a user's role (Admin only)
-router.put("/:id/role", authenticate, authorize("ADMIN"), updateUserRole);
+router.put(
+  "/:id/role",
+  authenticate,
+  requireAnyPermission(PERMISSIONS.MANAGE_USERS, PERMISSIONS.MANAGE_ROLES),
+  updateUserRole,
+);
 
 // -------------------- Logged-in User Endpoints --------------------
 
@@ -41,6 +50,6 @@ router.put("/me/profile", authenticate, updateCurrentUser); // ✅ fixed here
 // Change logged-in user's password
 router.put("/me/password", authenticate, changePassword);
 
-router.delete("/:id", authenticate, authorize("ADMIN"), deleteUser); // to delete user....
+router.delete("/:id", authenticate, requirePermission(PERMISSIONS.MANAGE_USERS), deleteUser); // to delete user....
 
 export default router;
