@@ -1,6 +1,7 @@
 // src/pages/projectManager/Projects.jsx
 import React, { useState, Suspense, useEffect, useMemo, useCallback } from 'react';
-import { useNavigate, useLoaderData, Await } from 'react-router-dom';
+import { useNavigate, useLoaderData, Await, useLocation } from 'react-router-dom';
+import {motion, AnimatePresence, spring} from 'framer-motion';
 import { 
   Plus, Search, Filter, Trash2, X, 
   FolderKanban, Calendar, Clock, Users,
@@ -121,7 +122,7 @@ const ProjectsError = ({ error, onRetry }) => {
 };
 
 // Project Card Component
-const ProjectCard = ({ project, onDelete, onView, onEdit, getStatusBadge, isOverdue, isAtRisk, canManageProjects }) => {
+const ProjectCard = ({ project, index, onDelete, onView, onEdit, getStatusBadge, isOverdue, isAtRisk, canManageProjects }) => {
   const [showMenu, setShowMenu] = useState(false);
   const overdue = isOverdue(project);
   const atRisk = isAtRisk(project);
@@ -144,7 +145,19 @@ const ProjectCard = ({ project, onDelete, onView, onEdit, getStatusBadge, isOver
   };
 
   return (
-    <div className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300">
+    <motion.div 
+      layout
+      initial={{ opacity: 0, y: 24, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -16, scale: 0.97 }}
+      whileHover={{ y: -6, scale: 1.01 }}
+      transition={{
+        duration: 0.28,
+        delay: index * 0.08,
+        ease: 'easeOut',
+      }}
+      className="group bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300"
+    >
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
@@ -232,8 +245,38 @@ const ProjectCard = ({ project, onDelete, onView, onEdit, getStatusBadge, isOver
           </button>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
+};
+
+const resolveCanManageProjects = (user = {}, isAdminView = false) => {
+  const normalizedRole = (user?.role || 'guest').toLowerCase().replace(/_/g, '-');
+  const effectivePermissions = Array.isArray(user?.effectivePermissions)
+    ? user.effectivePermissions
+    : [];
+  const permissionOverrides = Array.isArray(user?.permissionOverrides)
+    ? user.permissionOverrides
+    : [];
+  const hasExplicitGrant = permissionOverrides.includes(PERMISSIONS.MANAGE_PROJECTS);
+  const hasExplicitRevoke = permissionOverrides.includes(`!${PERMISSIONS.MANAGE_PROJECTS}`);
+
+  if (effectivePermissions.includes('*')) {
+    return true;
+  }
+
+  if (normalizedRole === 'project-manager') {
+    return !hasExplicitRevoke;
+  }
+
+  if (normalizedRole === 'admin') {
+    return hasExplicitGrant;
+  }
+
+  if (isAdminView) {
+    return normalizedRole === 'super-admin' || hasExplicitGrant;
+  }
+
+  return effectivePermissions.includes(PERMISSIONS.MANAGE_PROJECTS);
 };
 
 // Empty State Component
@@ -274,11 +317,15 @@ const EmptyState = ({ searchQuery, onClear, onCreate, hasFilters, canManageProje
 // Main Projects Component
 const Projects = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const loaderData = useLoaderData();
-  const { hasPermission, hasRole } = useAuth();
-  const canManageProjects = hasPermission(PERMISSIONS.MANAGE_PROJECTS);
+  const { user, hasRole } = useAuth();
   const isProjectManager = hasRole(["project-manager", "project_manager"]);
+  const isAdminView = location.pathname.startsWith('/admin');
+  const canManageProjects = resolveCanManageProjects(user, isAdminView);
+  const projectsBasePath = isAdminView ? '/admin/projects' : '/manager/projects';
+  const createProjectPath = `${projectsBasePath}/create`;
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('projectsViewMode') || 'grid');
@@ -451,9 +498,15 @@ const Projects = () => {
                 <RefreshCw className={`w-5 h-5 text-gray-600 ${isFetching ? 'animate-spin' : ''}`} />
               </button>
               {canManageProjects && (
-                <button onClick={() => navigate('/manager/projects/create')} className="px-4 py-2 bg-gradient-to-r from-[#0f5841] to-[#194f87] text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.9 }}
+                  transition={{type: 'spring', stiffness: 500 }}
+                  onClick={() => navigate(createProjectPath)}
+                  className="px-4 py-2 bg-gradient-to-r from-[#0f5841] to-[#194f87] text-white rounded-lg hover:shadow-lg transition-all cursor-pointer flex items-center gap-2"
+                >
                   <Plus className="w-5 h-5" /> New Project
-                </button>
+                </motion.button>
               )}
             </div>
           </div>
@@ -507,11 +560,15 @@ const Projects = () => {
 </div>
         </div>
 
-        {!canManageProjects && isProjectManager && (
+        {!canManageProjects && (
           <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            View-only mode. Project managers can still see existing projects, but project-management actions are hidden because the
+            {isAdminView
+              ? 'View-only mode. Admins can still see existing projects, but project-management actions are hidden unless the'
+              : 'View-only mode. Project managers can still see existing projects, but project-management actions are hidden because the'}
             <span className="mx-1 font-semibold">manage_projects</span>
-            permission has been revoked for this account.
+            {isAdminView
+              ? 'permission is granted.'
+              : 'permission has been revoked for this account.'}
           </div>
         )}
 
@@ -533,18 +590,14 @@ const Projects = () => {
                 <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f5841] bg-white">
                   <option value="all">All Status</option>
                   <option value="active">Active</option>
-                  <option value="in-progress">In Progress</option>
                   <option value="planned">Planned</option>
                   <option value="completed">Completed</option>
-                  <option value="on-hold">On Hold</option>
-                  <option value="cancelled">Cancelled</option>
                 </select>
                 
                 <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f5841] bg-white">
                   <option value="deadline">Sort by Deadline</option>
                   <option value="progress">Sort by Progress</option>
                   <option value="name">Sort by Name</option>
-                  <option value="tasks">Sort by Tasks</option>
                 </select>
                 
                 <button onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')} className="px-4 py-2.5 border border-gray-200 rounded-lg hover:bg-gray-50 flex items-center gap-2">
@@ -569,24 +622,31 @@ const Projects = () => {
           <p className="text-sm text-gray-600">Showing {filteredProjects.length} of {safeProjects.length} projects{isFetching && <Loader2 className="w-4 h-4 inline ml-2 animate-spin" />}</p>
           {hasActiveFilters && <button onClick={clearFilters} className="text-sm text-[#0f5841] hover:underline flex items-center gap-1"><X className="w-3 h-3" /> Clear all filters</button>}
         </div>
-
+      
         {filteredProjects.length > 0 ? (
           viewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProjects.map(project => (
+            <motion.div
+              layout
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              <AnimatePresence>
+              {filteredProjects.map((project, index) => (
                 <ProjectCard 
                   key={project.id} 
                   project={project} 
+                  index={index}
                   onDelete={handleDeleteProject} 
-                  onView={() => navigate(`/manager/projects/${project.id}`)}
-                  onEdit={() => navigate(`/manager/projects/${project.id}/edit`)}
+                  onView={() => navigate(`${projectsBasePath}/${project.id}`)}
+                  onEdit={() => navigate(`${projectsBasePath}/${project.id}/edit`)}
                   getStatusBadge={getStatusBadge} 
                   isOverdue={isOverdue}
                   isAtRisk={isAtRisk}
                   canManageProjects={canManageProjects}
                 />
               ))}
-            </div>
+              </AnimatePresence>
+            </motion.div>
+
           ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="overflow-x-auto">
@@ -602,7 +662,13 @@ const Projects = () => {
                       <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <motion.tbody layout
+            
+                 initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                   transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+                  className="divide-y divide-gray-200" >
                     {filteredProjects.map(project => (
                       <tr key={project.id} className="hover:bg-gray-50 transition-colors">
                         <td className="px-6 py-4">
@@ -637,12 +703,12 @@ const Projects = () => {
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
-                            <button onClick={() => navigate(`/manager/projects/${project.id}`)} className="p-2 text-[#0f5841] hover:bg-[#0f5841]/10 rounded-lg" title="View Details">
+                            <button onClick={() => navigate(`${projectsBasePath}/${project.id}`)} className="p-2 text-[#0f5841] hover:bg-[#0f5841]/10 rounded-lg" title="View Details">
                               <Eye className="w-5 h-5" />
                             </button>
                             {canManageProjects && (
                               <>
-                                <button onClick={() => navigate(`/manager/projects/${project.id}/edit`)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit Project">
+                                <button onClick={() => navigate(`${projectsBasePath}/${project.id}/edit`)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Edit Project">
                                   <Edit className="w-5 h-5" />
                                 </button>
                                 <button onClick={() => handleDeleteProject(project.id)} disabled={deletingId === project.id} className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-50" title="Delete Project">
@@ -654,15 +720,17 @@ const Projects = () => {
                         </td>
                       </tr>
                     ))}
-                  </tbody>
+                  </motion.tbody>
                 </table>
               </div>
             </div>
           )
         ) : (
-          <EmptyState searchQuery={searchQuery} onClear={clearFilters} onCreate={() => navigate('/manager/projects/create')} hasFilters={statusFilter !== 'all'} canManageProjects={canManageProjects} />
+          <EmptyState searchQuery={searchQuery} onClear={clearFilters} onCreate={() => navigate(createProjectPath)} hasFilters={statusFilter !== 'all'} canManageProjects={canManageProjects} />
         )}
+     
       </div>
+
     </div>
   );
 };

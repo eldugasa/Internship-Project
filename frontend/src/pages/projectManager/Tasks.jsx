@@ -4,6 +4,8 @@ import { useNavigate, useLoaderData, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Search, Filter, Eye, X, ChevronDown, ChevronUp, RefreshCw, Trash2, Edit, AlertCircle, Loader2 } from 'lucide-react';
 import { deleteTask } from '../../services/tasksService';
+import { useAuth } from '../../context/AuthContext';
+import { PERMISSIONS } from '../../config/permissions';
 import { 
   tasksLoader, 
   getPriorityColor, 
@@ -46,7 +48,7 @@ const TasksError = ({ error, onRetry }) => (
 );
 
 // Task Row Component
-const TaskRow = ({ task, projects, onView,  onDelete }) => {
+const TaskRow = ({ task, projects, onView, onDelete, canAssignTasks }) => {
   const overdue = isTaskOverdue(task);
   
   return (
@@ -92,10 +94,11 @@ const TaskRow = ({ task, projects, onView,  onDelete }) => {
           <button onClick={() => onView(task)} className="p-1 text-[#0f5841] hover:bg-[#0f5841]/10 rounded" title="View">
             <Eye className="w-4 h-4" />
           </button>
-         
-          <button onClick={() => onDelete(task.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {canAssignTasks && (
+            <button onClick={() => onDelete(task.id)} className="p-1 text-red-500 hover:bg-red-50 rounded" title="Delete">
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </td>
     </tr>
@@ -103,7 +106,7 @@ const TaskRow = ({ task, projects, onView,  onDelete }) => {
 };
 
 // Mobile Task Card
-const MobileTaskCard = ({ task, projects, onView, onEdit, onDelete }) => {
+const MobileTaskCard = ({ task, projects, onView, onEdit, onDelete, canAssignTasks }) => {
   const overdue = isTaskOverdue(task);
   
   return (
@@ -129,12 +132,16 @@ const MobileTaskCard = ({ task, projects, onView, onEdit, onDelete }) => {
           <button onClick={() => onView(task)} className="p-1 text-[#0f5841]">
             <Eye className="w-4 h-4" />
           </button>
-          <button onClick={() => onEdit(task)} className="p-1 text-blue-600">
-            <Edit className="w-4 h-4" />
-          </button>
-          <button onClick={() => onDelete(task.id)} className="p-1 text-red-500">
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {canAssignTasks && (
+            <>
+              <button onClick={() => onEdit(task)} className="p-1 text-blue-600">
+                <Edit className="w-4 h-4" />
+              </button>
+              <button onClick={() => onDelete(task.id)} className="p-1 text-red-500">
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
       </div>
       <div className="space-y-2 text-sm">
@@ -167,22 +174,22 @@ const MobileTaskCard = ({ task, projects, onView, onEdit, onDelete }) => {
 };
 
 // Empty State
-const EmptyState = ({ searchQuery, onClearSearch, onCreateTask }) => (
+const EmptyState = ({ searchQuery, onClearSearch, onCreateTask, canAssignTasks }) => (
   <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
     <div className="text-4xl mb-4">{searchQuery ? '🔍' : '📝'}</div>
     <h3 className="text-lg font-medium text-gray-900 mb-2">
       {searchQuery ? 'No tasks found' : 'No tasks yet'}
     </h3>
     <p className="text-gray-500 mb-4">
-      {searchQuery ? `No tasks match "${searchQuery}"` : 'Create your first task to get started'}
+      {searchQuery ? `No tasks match "${searchQuery}"` : canAssignTasks ? 'Create your first task to get started' : 'No tasks are available to manage right now'}
     </p>
     {searchQuery ? (
       <button onClick={onClearSearch} className="text-[#0f5841] hover:underline">Clear search</button>
-    ) : (
+    ) : canAssignTasks ? (
       <button onClick={onCreateTask} className="px-4 py-2 bg-[#0f5841] text-white rounded-lg hover:bg-[#0a4030] inline-flex items-center gap-2">
         <Plus className="w-4 h-4" /> Create Task
       </button>
-    )}
+    ) : null}
   </div>
 );
 
@@ -191,6 +198,8 @@ const Tasks = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const loaderData = useLoaderData();
+  const { hasPermission } = useAuth();
+  const canAssignTasks = hasPermission(PERMISSIONS.ASSIGN_TASKS);
   
   const queryParams = new URLSearchParams(location.search);
   const [filter, setFilter] = useState('all');
@@ -276,12 +285,14 @@ const Tasks = () => {
           >
             <RefreshCw className={`w-5 h-5 text-gray-600 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
-          <button
-            onClick={() => navigate('/manager/tasks/create')}
-            className="px-4 py-2 bg-[#0f5841] text-white rounded-lg hover:bg-[#0a4030] flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" /> New Task
-          </button>
+          {canAssignTasks && (
+            <button
+              onClick={() => navigate('/manager/tasks/create')}
+              className="px-4 py-2 bg-[#0f5841] text-white rounded-lg hover:bg-[#0a4030] flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> New Task
+            </button>
+          )}
         </div>
       </div>
 
@@ -380,8 +391,8 @@ const Tasks = () => {
                       task={task}
                       projects={safeProjects}
                       onView={handleViewTask}
-                     
                       onDelete={handleDeleteTask}
+                      canAssignTasks={canAssignTasks}
                     />
                   ))}
                 </tbody>
@@ -397,8 +408,9 @@ const Tasks = () => {
                 task={task}
                 projects={safeProjects}
                 onView={handleViewTask}
-               
+                onEdit={(task) => navigate(`/manager/tasks/edit/${task.id}`)}
                 onDelete={handleDeleteTask}
+                canAssignTasks={canAssignTasks}
               />
             ))}
           </div>
@@ -408,6 +420,7 @@ const Tasks = () => {
           searchQuery={searchQuery} 
           onClearSearch={clearSearch}
           onCreateTask={() => navigate('/manager/tasks/create')}
+          canAssignTasks={canAssignTasks}
         />
       )}
     </div>

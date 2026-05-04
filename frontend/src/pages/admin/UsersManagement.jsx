@@ -1,5 +1,6 @@
 // src/pages/admin/UsersManagement.jsx
 import React, { useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   createUser,
@@ -401,6 +402,7 @@ const UsersManagement = () => {
       />
 
       {/* Popups */}
+      <AnimatePresence>
       {showAddUserPopup && (
         <AddUserPopup
           newUser={newUser}
@@ -414,6 +416,7 @@ const UsersManagement = () => {
           showPermissionAssignment={canAssignPermissions}
         />
       )}
+      
 
       {showEditUserPopup && selectedUser && (
         <EditUserPopup
@@ -438,6 +441,7 @@ const UsersManagement = () => {
           }
         />
       )}
+     
 
       {showViewUserPopup && selectedUser && (
         <ViewUserPopup
@@ -448,6 +452,7 @@ const UsersManagement = () => {
           }}
         />
       )}
+       </AnimatePresence>
 
       {/* Toast Notifications */}
       {toast && (

@@ -3,6 +3,7 @@ import React, { useState, useMemo, useCallback } from "react";
 import { useNavigate, useLoaderData, useLocation } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, X } from 'lucide-react';
+import {motion, AnimatePresence} from 'framer-motion';
 import TeamCard from "../../Component/projectmanager/TeamCard";
 import { createTeam, deleteTeam } from "../../services/teamsService";
 import { useAuth } from "../../context/AuthContext";
@@ -48,7 +49,7 @@ const TeamsSkeleton = () => (
 );
 
 // Create Team Modal Component with React Query
-const CreateTeamModal = ({ isOpen, onClose, users }) => {
+const CreateTeamModal = ({ onClose, users, onToast }) => {
   const queryClient = useQueryClient();
   const [memberSearchQuery, setMemberSearchQuery] = useState("");
   const [newTeam, setNewTeam] = useState({
@@ -58,7 +59,6 @@ const CreateTeamModal = ({ isOpen, onClose, users }) => {
     selectedMembers: [],
   });
   const [formErrors, setFormErrors] = useState({});
-  const [toast, setToast] = useState(null);
 
   // Filter members based on search query
   const filteredMembers = useMemo(() => {
@@ -84,9 +84,8 @@ const CreateTeamModal = ({ isOpen, onClose, users }) => {
     mutationFn: createTeam,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
-      setToast({ message: "Team created successfully!", type: "success" });
+      onToast?.("Team created successfully!", "success");
       handleClose();
-      setTimeout(() => setToast(null), 3000);
     },
     onError: (err) => {
       const errorMessage = err.message || "Failed to create team";
@@ -94,8 +93,7 @@ const CreateTeamModal = ({ isOpen, onClose, users }) => {
       if (errorMessage.includes("duplicate") || errorMessage.includes("already exists")) {
         setFormErrors({ name: "A team with this name already exists" });
       } else {
-        setToast({ message: errorMessage, type: "error" });
-        setTimeout(() => setToast(null), 3000);
+        onToast?.(errorMessage, "error");
       }
     },
   });
@@ -172,12 +170,16 @@ const CreateTeamModal = ({ isOpen, onClose, users }) => {
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80">
-        <div
+      <motion.div
+        initial={{ opacity: 0, y: -30 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -30 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80"
+      >
+        <motion.div
+         
           className="bg-white rounded-xl shadow-2xl border border-gray-200 w-full max-w-3xl flex flex-col"
           style={{ maxHeight: "80vh" }}
         >
@@ -376,21 +378,9 @@ const CreateTeamModal = ({ isOpen, onClose, users }) => {
               </button>
             </div>
           </form>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      {/* Toast Notification */}
-      {toast && (
-        <div className="fixed bottom-4 right-4 z-50 animate-slide-up">
-          <div className={`px-4 py-3 rounded-lg shadow-lg ${
-            toast.type === 'success' 
-              ? 'bg-green-50 border border-green-200 text-green-800' 
-              : 'bg-red-50 border border-red-200 text-red-800'
-          }`}>
-            {toast.message}
-          </div>
-        </div>
-      )}
     </>
   );
 };
@@ -415,6 +405,11 @@ const TeamsManagement = () => {
   const [showCreateTeamPopup, setShowCreateTeamPopup] = useState(false);
   const [toast, setToast] = useState(null);
 
+  const showToast = (message, type = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   // Fetch data with React Query
   const { 
     data: teamsData = [], 
@@ -436,8 +431,7 @@ const TeamsManagement = () => {
     mutationFn: deleteTeam,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teams'] });
-      setToast({ message: "Team deleted successfully!", type: "success" });
-      setTimeout(() => setToast(null), 3000);
+      showToast("Team deleted successfully!", "success");
     },
     onError: (err) => {
       let errorMessage = err.message || "Failed to delete team";
@@ -448,8 +442,7 @@ const TeamsManagement = () => {
         errorMessage = "Cannot delete team that has members. Please remove all members first.";
       }
       
-      setToast({ message: errorMessage, type: "error" });
-      setTimeout(() => setToast(null), 3000);
+      showToast(errorMessage, "error");
     },
   });
 
@@ -499,6 +492,7 @@ const TeamsManagement = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
+      <AnimatePresence>
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 mb-2">
@@ -520,6 +514,8 @@ const TeamsManagement = () => {
           </button>
         )}
       </div>
+      </AnimatePresence>
+      
 
       {!canShowTeamActions && (
         <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
@@ -531,6 +527,7 @@ const TeamsManagement = () => {
 
       {/* Teams Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <AnimatePresence>
         {teamsData.length === 0 ? (
           <div className="col-span-full text-center py-12 bg-gray-50 rounded-lg">
             <p className="text-gray-500">
@@ -555,16 +552,21 @@ const TeamsManagement = () => {
             );
           })
         )}
+        </AnimatePresence>
       </div>
+      
+
 
       {/* Create Team Modal */}
-      {canShowTeamActions && (
-        <CreateTeamModal
-          isOpen={showCreateTeamPopup}
-          onClose={() => setShowCreateTeamPopup(false)}
-          users={usersData}
-        />
-      )}
+      <AnimatePresence>
+        {canShowTeamActions && showCreateTeamPopup && (
+          <CreateTeamModal
+            onClose={() => setShowCreateTeamPopup(false)}
+            users={usersData}
+            onToast={showToast}
+          />
+        )}
+      </AnimatePresence>
 
       {/* Toast Notification */}
       {toast && (

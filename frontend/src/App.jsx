@@ -15,8 +15,6 @@ import { usersLoader } from "./loader/admin/UsersManagement.loader";
 import TeamsManagement, {
   loader as teamsLoader,
 } from "./pages/projectManager/TeamsManagement";
-import ProjectsManagement from "./pages/admin/ProjectsManagement";
-import { projectsLoader } from "./loader/admin/ProjectsManagement.loader";
 import Reports from "./pages/admin/Reports";
 import { reportsLoader } from "./loader/admin/Reports.loader";
 import SettingsPage from "./pages/admin/SettingsPage";
@@ -220,12 +218,41 @@ export const router = createBrowserRouter([
       },
       {
         path: "projects",
-        element: (
-          <ProtectedRoute requiredPermissions={[PERMISSIONS.MANAGE_PROJECTS]}>
-            <ProjectsManagement />
-          </ProtectedRoute>
-        ),
-        loader: projectsLoader,
+        children: [
+          {
+            index: true,
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "super-admin"]}>
+                <Projects />
+              </ProtectedRoute>
+            ),
+            loader: pmprojectsLoader,
+          },
+          {
+            path: ":id",
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "super-admin"]}>
+                <ProjectDetails />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "edit/:id",
+            element: (
+              <ProtectedRoute requiredPermissions={[PERMISSIONS.MANAGE_PROJECTS]}>
+                <EditProject />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "create",
+            element: (
+              <ProtectedRoute requiredPermissions={[PERMISSIONS.MANAGE_PROJECTS]}>
+                <CreateProject />
+              </ProtectedRoute>
+            ),
+          },
+        ],
       },
       {
         path: "reports",

@@ -1,6 +1,6 @@
 // src/components/projectManager/EditProject.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useActionState } from 'react';
 import { X, Save, Users, Loader2, AlertCircle } from 'lucide-react';
 import { getProjectById, updateProject } from '../../services/projectsService';
@@ -22,7 +22,12 @@ const isEndDateAfterStart = (startDate, endDate) => {
 
 const EditProject = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
+  const isAdminView = location.pathname.startsWith('/admin');
+  const projectDetailsPath = isAdminView
+    ? `/admin/projects/${id}`
+    : `/manager/projects/${id}`;
 
   const [teams, setTeams] = useState([]);
   const [fetchingData, setFetchingData] = useState(true);
@@ -212,7 +217,11 @@ const EditProject = () => {
   // Redirect on success
   if (formState.success) {
     setTimeout(() => {
-      navigate(`/manager/projects/${formState.projectId}`);
+      navigate(
+        isAdminView
+          ? `/admin/projects/${formState.projectId}`
+          : `/manager/projects/${formState.projectId}`
+      );
     }, 1500);
   }
 
@@ -244,7 +253,7 @@ const EditProject = () => {
           </div>
 
           <button
-            onClick={() => navigate(`/manager/projects/${id}`)}
+            onClick={() => navigate(projectDetailsPath)}
             className="p-2 hover:bg-gray-200 rounded-lg transition"
             aria-label="Close"
           >
@@ -411,7 +420,7 @@ const EditProject = () => {
           <div className="flex flex-col sm:flex-row justify-end gap-3">
             <button
               type="button"
-              onClick={() => navigate(`/manager/projects/${id}`)}
+              onClick={() => navigate(projectDetailsPath)}
               className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition order-2 sm:order-1"
             >
               Cancel

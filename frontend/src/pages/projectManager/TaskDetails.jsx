@@ -4,6 +4,8 @@ import { useLoaderData, useParams, useNavigate, useSubmit, useActionData } from 
 import { ArrowLeft, Edit, Clock, User, MessageSquare, FolderKanban, Trash2, AlertCircle, Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getTaskById, updateTask, deleteTask, getTaskComments, addTaskComment, deleteTaskComment } from '../../services/tasksService';
+import { useAuth } from '../../context/AuthContext';
+import { PERMISSIONS } from '../../config/permissions';
 
 const formatRoleLabel = (role) => {
   if (!role) return 'Team';
@@ -128,6 +130,8 @@ const TaskDetails = () => {
   const submit = useSubmit();
   const actionData = useActionData(); // This can be null initially
   const { task: initialTask, comments: initialComments } = useLoaderData();
+  const { hasPermission } = useAuth();
+  const canAssignTasks = hasPermission(PERMISSIONS.ASSIGN_TASKS);
   
   const [newComment, setNewComment] = useState('');
   const [pendingIntent, setPendingIntent] = useState(null);
@@ -295,28 +299,30 @@ const TaskDetails = () => {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Tasks
           </button>
-          <div className="flex space-x-2">
-            <button 
-              onClick={() => navigate(`/manager/tasks/edit/${id}`)}
-              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
-              disabled={isLoading}
-            >
-              <Edit className="w-4 h-4" />
-              Edit Task
-            </button>
-            <button 
-              onClick={handleDeleteTask}
-              className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
-              disabled={isLoading}
-            >
-              {pendingIntent === 'delete-task' ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4" />
-              )}
-              Delete
-            </button>
-          </div>
+          {canAssignTasks && (
+            <div className="flex space-x-2">
+              <button 
+                onClick={() => navigate(`/manager/tasks/edit/${id}`)}
+                className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
+                disabled={isLoading}
+              >
+                <Edit className="w-4 h-4" />
+                Edit Task
+              </button>
+              <button 
+                onClick={handleDeleteTask}
+                className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors flex items-center gap-2"
+                disabled={isLoading}
+              >
+                {pendingIntent === 'delete-task' ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                Delete
+              </button>
+            </div>
+          )}
         </div>
         
         {/* Messages */}

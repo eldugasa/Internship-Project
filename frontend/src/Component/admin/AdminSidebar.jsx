@@ -25,8 +25,6 @@ const AdminSidebar = ({ collapsed, onToggle, onClose, isMobile }) => {
     effectivePermissions.includes('*') || effectivePermissions.includes(permission);
   const normalizedRole = user?.role?.toLowerCase?.() || "";
   const isSuperAdmin = normalizedRole === "super-admin";
-  const adminProjectsPath =
-    normalizedRole === "admin" ? "/manager/projects" : "/admin/projects";
   const menuItems = [
     {
       path: '/admin/dashboard',
@@ -49,10 +47,12 @@ const AdminSidebar = ({ collapsed, onToggle, onClose, isMobile }) => {
         (!isSuperAdmin && hasPermission(PERMISSIONS.MANAGE_TEAMS)),
     },
     {
-      path: adminProjectsPath,
+      path: '/admin/projects',
       label: 'Projects',
       icon: FolderKanban,
-      visible: !isSuperAdmin && hasPermission(PERMISSIONS.MANAGE_PROJECTS),
+      visible:
+        !isSuperAdmin &&
+        (normalizedRole === "admin" || hasPermission(PERMISSIONS.MANAGE_PROJECTS)),
     },
     {
       path: '/manager/tasks',

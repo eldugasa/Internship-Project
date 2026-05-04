@@ -45,17 +45,26 @@ const getRevokedPermissions = (permissions = []) =>
     .filter((permission) => permission.startsWith("!"))
     .map((permission) => permission.slice(1));
 
-export const getEditablePermissions = (role, storedPermissions = []) => {
+const getRolePermissionBaseline = (role) => {
   const normalizedRole = normalizeRole(role);
+  const basePermissions = normalizePermissions(
+    ROLE_PERMISSIONS[normalizedRole] || [],
+  ).filter((permission) => permission !== "*");
   const roleDefaultPermissions = normalizePermissions(
     ROLE_DEFAULT_PERMISSIONS[normalizedRole] || [],
   );
+
+  return [...new Set([...basePermissions, ...roleDefaultPermissions])];
+};
+
+export const getEditablePermissions = (role, storedPermissions = []) => {
+  const rolePermissionBaseline = getRolePermissionBaseline(role);
   const grantedPermissions = normalizePermissions(
     getGrantedPermissions(storedPermissions),
   );
   const revokedPermissions = new Set(getRevokedPermissions(storedPermissions));
   const activePermissions = [...new Set([
-    ...roleDefaultPermissions,
+    ...rolePermissionBaseline,
     ...grantedPermissions,
   ])];
 
@@ -65,16 +74,13 @@ export const getEditablePermissions = (role, storedPermissions = []) => {
 };
 
 export const encodePermissionsForRole = (role, selectedPermissions = []) => {
-  const normalizedRole = normalizeRole(role);
-  const roleDefaultPermissions = normalizePermissions(
-    ROLE_DEFAULT_PERMISSIONS[normalizedRole] || [],
-  );
+  const rolePermissionBaseline = getRolePermissionBaseline(role);
   const normalizedSelectedPermissions = normalizePermissions(selectedPermissions);
 
   const grantedPermissions = normalizedSelectedPermissions.filter(
-    (permission) => !roleDefaultPermissions.includes(permission),
+    (permission) => !rolePermissionBaseline.includes(permission),
   );
-  const revokedPermissions = roleDefaultPermissions
+  const revokedPermissions = rolePermissionBaseline
     .filter((permission) => !normalizedSelectedPermissions.includes(permission))
     .map((permission) => `!${permission}`);
 
@@ -90,5 +96,5 @@ export const getEffectivePermissions = (role, storedPermissions = []) => {
     return ["*"];
   }
 
-  return [...new Set([...basePermissions, ...editablePermissions])];
+  return editablePermissions;
 };

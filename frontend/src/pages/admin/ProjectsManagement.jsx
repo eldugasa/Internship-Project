@@ -1,9 +1,11 @@
 // src/pages/admin/ProjectsManagement.jsx
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLoaderData } from "react-router-dom";
+import { useLoaderData, useNavigate } from "react-router-dom";
 import ProjectCard from "../../Component/admin/ProjectCard";
 import { projectsQuery } from "../../loader/admin/ProjectsManagement.loader";
+import { useAuth } from "../../context/AuthContext";
+import { PERMISSIONS } from "../../config/permissions";
 
 // Helper function to calculate stats
 const calculateStats = (projects) => ({
@@ -131,6 +133,9 @@ const StatCard = ({ title, value, color = "gray" }) => {
 const ProjectsManagement = () => {
   const [filter, setFilter] = useState("all");
   const loaderData = useLoaderData();
+  const navigate = useNavigate();
+  const { hasPermission } = useAuth();
+  const canManageProjects = hasPermission(PERMISSIONS.MANAGE_PROJECTS);
 
   const {
     data: projects = [],
@@ -181,6 +186,14 @@ const ProjectsManagement = () => {
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        {!canManageProjects && (
+          <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            View-only mode. You can still see existing projects, but project-management actions stay hidden unless the
+            <span className="mx-1 font-semibold">manage_projects</span>
+            permission is granted.
+          </div>
+        )}
+
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h2 className="text-lg font-bold text-gray-900">All Projects</h2>
           <div className="flex space-x-2">
@@ -203,7 +216,11 @@ const ProjectsManagement = () => {
         {filteredProjects.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredProjects.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onClick={() => navigate(`/admin/projects/${project.id}`)}
+              />
             ))}
           </div>
         ) : (
