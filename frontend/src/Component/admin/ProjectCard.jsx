@@ -1,7 +1,7 @@
 // src/components/admin/ProjectCard.jsx
 import React from "react";
 
-const ProjectCard = ({ project, compact = false }) => {
+const ProjectCard = ({ project, compact = false, onClick }) => {
   if (compact) {
     return (
       <div key={project.id}>
@@ -25,7 +25,11 @@ const ProjectCard = ({ project, compact = false }) => {
   }
 
   return (
-    <div className="border border-gray-200 rounded-xl p-5 hover:shadow-md transition">
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full border border-gray-200 rounded-xl p-5 hover:shadow-md transition text-left"
+    >
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="font-bold text-gray-900">{project.name}</h3>
@@ -65,7 +69,7 @@ const ProjectCard = ({ project, compact = false }) => {
         Manager: {project.managerName || project.manager} • Due:{" "}
         {project.dueDate}
       </div>
-    </div>
+    </button>
   );
 };
 

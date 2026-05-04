@@ -18,6 +18,43 @@ const reverseStatusMap = {
   cancelled: "CANCELLED",
 };
 
+const clampProgress = (value) => {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) return 0;
+  if (numericValue < 0) return 0;
+  if (numericValue > 100) return 100;
+
+  return numericValue;
+};
+
+export const resolveProjectProgress = (project, tasks = null) => {
+  const normalizedStatus =
+    statusMap[project?.status] || project?.status?.toLowerCase() || "planned";
+
+  if (normalizedStatus === "completed") {
+    return 100;
+  }
+
+  if (Array.isArray(tasks) && tasks.length > 0) {
+    const completedTasks = tasks.filter(
+      (task) => task.status === "completed" || task.status === "passed",
+    ).length;
+
+    return Math.round((completedTasks / tasks.length) * 100);
+  }
+
+  const taskSummary = project?.tasks;
+  const totalTasks = Number(taskSummary?.total ?? 0);
+  const completedTasks = Number(taskSummary?.completed ?? 0);
+
+  if (Number.isFinite(totalTasks) && totalTasks > 0) {
+    return Math.round((completedTasks / totalTasks) * 100);
+  }
+
+  return clampProgress(project?.progress);
+};
+
 // Helper to normalize project data
 const normalizeProject = (project) => ({
   ...project,
@@ -26,7 +63,7 @@ const normalizeProject = (project) => ({
   description: project.description || "",
   status:
     statusMap[project.status] || project.status?.toLowerCase() || "planned",
-  progress: project.progress || 0,
+  progress: resolveProjectProgress(project),
   startDate: project.startDate
     ? new Date(project.startDate).toLocaleDateString()
     : null,

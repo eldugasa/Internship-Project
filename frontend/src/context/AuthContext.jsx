@@ -17,6 +17,11 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const clearAuthState = () => {
+    logoutApi();
+    setUser(null);
+  };
+
   // Initialize auth state on mount
   useEffect(() => {
     const initializeAuth = async () => {
@@ -29,6 +34,9 @@ export const AuthProvider = ({ children }) => {
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        if (error?.code === 401) {
+          clearAuthState();
+        }
       } finally {
         setLoading(false);
       }
@@ -53,15 +61,21 @@ export const AuthProvider = ({ children }) => {
 
   // Logout function
   const logout = () => {
-    logoutApi();
-    setUser(null);
+    clearAuthState();
     setError(null);
   };
 
   const refreshUser = async () => {
-    const freshUser = await fetchCurrentUserApi();
-    setUser(freshUser);
-    return freshUser;
+    try {
+      const freshUser = await fetchCurrentUserApi();
+      setUser(freshUser);
+      return freshUser;
+    } catch (error) {
+      if (error?.code === 401) {
+        clearAuthState();
+      }
+      throw error;
+    }
   };
 
   const updateStoredUser = (nextUser) => {

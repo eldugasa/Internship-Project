@@ -320,13 +320,29 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
 
   // Memoized filtered projects (only recalculates when filter or projects change)
   const filteredProjects = useMemo(() => {
-    if (filter === "all") return projects;
-    if (filter === "active") {
-      return projects.filter((p) =>
-        ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
-      );
-    }
-    return projects.filter((p) => normalizeValue(p.status) === normalizeValue(filter));
+    const matchedProjects =
+      filter === "all"
+        ? projects
+        : filter === "active"
+          ? projects.filter((p) =>
+              ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
+            )
+          : projects.filter(
+              (p) => normalizeValue(p.status) === normalizeValue(filter),
+            );
+
+    return [...matchedProjects]
+      .sort((a, b) => {
+        const dateA = new Date(
+          a.createdAt || a.updatedAt || a.startDate || a.dueDate || 0,
+        ).getTime();
+        const dateB = new Date(
+          b.createdAt || b.updatedAt || b.startDate || b.dueDate || 0,
+        ).getTime();
+
+        return dateB - dateA;
+      })
+      .slice(0, 5);
   }, [projects, filter]);
 
   const renderWrappedLegend = ({ payload }) => {
@@ -720,7 +736,7 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
           <div>
             <h2 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900">
-              All Projects Overview
+              Recent Projects Overview
             </h2>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">
               View and manage project status across all teams

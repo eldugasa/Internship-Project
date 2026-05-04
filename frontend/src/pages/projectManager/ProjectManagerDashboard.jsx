@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLoaderData } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import {motion, AnimatePresence} from 'framer-motion';
 import { 
   FolderKanban, TrendingUp, CheckCircle, AlertCircle,
   Calendar, Clock, Users, Plus, Eye,
@@ -278,13 +279,7 @@ const ManagerDashboard = () => {
                   <RefreshCw className="w-5 h-5 text-gray-600" />
                 )}
               </button>
-              <button
-                onClick={() => navigate('/manager/projects/create')}
-                className="px-4 py-2 bg-gradient-to-r from-[#0f5841] to-[#194f87] text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                <span>New Project</span>
-              </button>
+             
             </div>
           </div>
         </div>

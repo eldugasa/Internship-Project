@@ -59,11 +59,22 @@ export const apiClient = async (endpoint, options = {}) => {
 
       if (!isAuthEndpoint) {
         localStorage.removeItem("user");
-        window.location.href = "/login";
-        return;
+        try {
+          localStorage.removeItem("userData");
+        } catch (e) {
+          console.error("Error removing userData from localStorage:", e);
+        }
+
+        const error = new Error(data.message || data.error || "Unauthorized");
+        error.code = 401;
+        error.info = data;
+        throw error;
       }
 
-      throw new Error(data.message || data.error || "Invalid credentials");
+      const error = new Error(data.message || data.error || "Invalid credentials");
+      error.code = 401;
+      error.info = data;
+      throw error;
     }
 
     const error = new Error(data.message || data.error || "Something went wrong");

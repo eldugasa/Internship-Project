@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import {motion, AnimatePresence} from "framer-motion";
 import { Check, Download, Edit, Eye, Trash2, UserPlus, X } from "lucide-react";
 import {
   ROLE_OPTIONS,
@@ -199,17 +200,19 @@ export const UsersManagementContent = ({
             <Download className="w-5 h-5" />
             Export CSV
           </button>
-          <button
+          <motion.button
+           whileHover={{ scale: 1.05 }}
+          transition={{ type: 'spring', stiffness: 500 }}
             onClick={onShowAddUser}
             disabled={isAddingUser}
-            className="px-4 py-2 rounded-lg text-white flex items-center gap-2 hover:shadow-lg transition disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-white flex items-center cursor-pointer gap-2 hover:shadow-lg transition disabled:opacity-50"
             style={{
               background: "linear-gradient(to right, #0f5841, #194f87)",
             }}
           >
             <UserPlus className="w-5 h-5" />
             Add User
-          </button>
+          </motion.button>
         </div>
       </div>
 
@@ -292,12 +295,18 @@ export const UsersManagementContent = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
+              <AnimatePresence mode='wait'>
               {paginatedUsers.length > 0 ? (
                 paginatedUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
+             <motion.tr
+            layout 
+            key={user.id}
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+            className="hover:bg-gray-50 transition-colors"
+          >
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <div
@@ -370,18 +379,19 @@ export const UsersManagementContent = ({
                         </button>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))
               ) : (
-                <tr>
+                <motion.tr layout key="empty-state">
                   <td
                     colSpan="5"
                     className="px-6 py-12 text-center text-gray-500"
                   >
                     No users found matching your criteria
                   </td>
-                </tr>
+                </motion.tr>
               )}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>
@@ -415,23 +425,27 @@ export const UsersManagementContent = ({
 
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: 'spring', stiffness: 500 }}
                 onClick={() => onPageChange(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-gray-300 px-3 py-2 bg-green-800 text-white text-sm  transition  disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Previous
-              </button>
+              </motion.button>
               <span className="text-sm text-gray-600">
                 Page {page} of {totalPages}
               </span>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: 'spring', stiffness: 500 }}
                 onClick={() => onPageChange(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-gray-300 px-3 py-2 min-w-fit- bg-green-800 text-white text-sm  transition  disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
-              </button>
+              </motion.button>
             </div>
           )}
         </div>
@@ -441,7 +455,12 @@ export const UsersManagementContent = ({
 );
 
 export const ViewUserPopup = ({ user, onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 bg-opacity-50">
+  <motion.div
+    initial={{ opacity: 0, y: -30 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -30 }}
+    className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 bg-opacity-50"
+  >
     <div className="bg-white rounded-xl shadow-2xl w-full max-w-[90%] sm:max-w-md mx-auto max-h-[90vh] overflow-y-auto">
       <div className="p-4 sm:p-6">
         <div className="flex justify-between items-center mb-4 sm:mb-6">
@@ -580,7 +599,7 @@ export const ViewUserPopup = ({ user, onClose }) => (
         </button>
       </div>
     </div>
-  </div>
+  </motion.div>
 );
 
 export const EditUserPopup = ({
@@ -595,7 +614,12 @@ export const EditUserPopup = ({
   roleLocked = false,
   lockMessage = "",
 }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 bg-opacity-50">
+  <motion.div
+    initial={{ opacity: 0, y: -30 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -30 }}
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 bg-opacity-50"
+  >
     <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden">
       <div className="flex items-center justify-between p-6 border-b border-gray-200">
         <h2 className="text-xl font-bold text-gray-900">Edit User Access</h2>
@@ -713,7 +737,7 @@ export const EditUserPopup = ({
         </div>
       </div>
     </div>
-  </div>
+  </motion.div>
 );
 
 export const AddUserPopup = ({
@@ -727,7 +751,12 @@ export const AddUserPopup = ({
   availablePermissionOptions,
   showPermissionAssignment = true,
 }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+  <motion.div
+    initial={{ opacity: 0, y: -30 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -30 }}
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 bg-opacity-50"
+  >
     <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
       <div className="flex items-center justify-between p-6 border-b border-gray-200">
         <h2 className="text-xl font-bold text-gray-900">Add New User</h2>
@@ -846,7 +875,7 @@ export const AddUserPopup = ({
         </div>
       </form>
     </div>
-  </div>
+  </motion.div>
 );
 
 export const Toast = ({ message, type, onClose }) => {

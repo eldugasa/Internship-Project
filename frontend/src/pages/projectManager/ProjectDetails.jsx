@@ -1,25 +1,63 @@
 // src/components/projectManager/ProjectDetails.jsx
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Edit, Trash2, Plus, CheckSquare, User, Calendar, FolderKanban } from 'lucide-react';
-import { getProjectById, deleteProject as deleteProjectApi } from '../../services/projectsService';
+import { getProjectById, deleteProject as deleteProjectApi, resolveProjectProgress } from '../../services/projectsService';
 import { getTasksByProject, deleteTask } from '../../services/tasksService';
 import { getProjectMembers } from '../../services/projectsService';
 import { useAuth } from '../../context/AuthContext';
 import { PERMISSIONS } from '../../config/permissions';
 
+const resolveCanManageProjects = (user = {}, isAdminView = false) => {
+  const normalizedRole = (user?.role || 'guest').toLowerCase().replace(/_/g, '-');
+  const effectivePermissions = Array.isArray(user?.effectivePermissions)
+    ? user.effectivePermissions
+    : [];
+  const permissionOverrides = Array.isArray(user?.permissionOverrides)
+    ? user.permissionOverrides
+    : [];
+  const hasExplicitGrant = permissionOverrides.includes(PERMISSIONS.MANAGE_PROJECTS);
+  const hasExplicitRevoke = permissionOverrides.includes(`!${PERMISSIONS.MANAGE_PROJECTS}`);
+
+  if (effectivePermissions.includes('*')) {
+    return true;
+  }
+
+  if (normalizedRole === 'project-manager') {
+    return !hasExplicitRevoke;
+  }
+
+  if (normalizedRole === 'admin') {
+    return hasExplicitGrant;
+  }
+
+  if (isAdminView) {
+    return normalizedRole === 'super-admin' || hasExplicitGrant;
+  }
+
+  return effectivePermissions.includes(PERMISSIONS.MANAGE_PROJECTS);
+};
+
 const ProjectDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { hasPermission, hasRole } = useAuth();
-  const canManageProjects = hasPermission(PERMISSIONS.MANAGE_PROJECTS);
+  const location = useLocation();
+  const { user, hasPermission } = useAuth();
+  const isAdminView = location.pathname.startsWith('/admin');
+  const canManageProjects = resolveCanManageProjects(user, isAdminView);
   const canAssignTasks = hasPermission(PERMISSIONS.ASSIGN_TASKS);
-  const isProjectManager = hasRole(['project-manager', 'project_manager']);
+  const canManageProjectTasks = canManageProjects && canAssignTasks;
+  const projectsPath = isAdminView ? '/admin/projects' : '/manager/projects';
+  const editProjectPath = isAdminView
+    ? `/admin/projects/edit/${id}`
+    : `/manager/projects/edit/${id}`;
 
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState(null);
   const [projectTasks, setProjectTasks] = useState([]);
   const [teamMembers, setTeamMembers] = useState([]);
+
+  const projectProgress = resolveProjectProgress(project, projectTasks);
 
   useEffect(() => {
     fetchProjectData();
@@ -40,7 +78,7 @@ const ProjectDetails = () => {
     } catch (error) {
       console.error('Error fetching project details:', error);
       alert('Failed to fetch project details.');
-      navigate('/manager/projects');
+      navigate(projectsPath);
     } finally {
       setLoading(false);
     }
@@ -66,7 +104,7 @@ const ProjectDetails = () => {
 
     try {
       await deleteProjectApi(id);
-      navigate('/manager/projects');
+      navigate(projectsPath);
     } catch (error) {
       console.error('Error deleting project:', error);
       alert(error.message || 'Failed to delete project.');
@@ -89,7 +127,7 @@ const ProjectDetails = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <button 
-          onClick={() => navigate('/manager/projects')} 
+          onClick={() => navigate(projectsPath)} 
           className="flex items-center text-gray-600 hover:text-gray-900"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
@@ -98,7 +136,7 @@ const ProjectDetails = () => {
         {canManageProjects && (
           <div className="flex space-x-3">
             <button 
-              onClick={() => navigate(`/manager/projects/edit/${id}`)} 
+              onClick={() => navigate(editProjectPath)} 
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center"
             >
               <Edit className="w-4 h-4 mr-2" /> Edit Project
@@ -113,7 +151,7 @@ const ProjectDetails = () => {
         )}
       </div>
 
-      {!canManageProjects && isProjectManager && (
+      {!canManageProjects && (
         <div className="mb-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
           View-only mode. You can still see existing project details, but project-management actions are hidden because the
           <span className="mx-1 font-semibold">manage_projects</span>
@@ -141,7 +179,7 @@ const ProjectDetails = () => {
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="text-center p-4 bg-gray-50 rounded-lg">
-            <div className="text-3xl font-bold text-gray-900">{project.progress || 0}%</div>
+            <div className="text-3xl font-bold text-gray-900">{projectProgress}%</div>
             <div className="text-sm text-gray-600">Progress</div>
           </div>
           <div className="text-center p-4 bg-gray-50 rounded-lg">
@@ -183,7 +221,7 @@ const ProjectDetails = () => {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-bold text-gray-900">Project Tasks ({projectTasks.length})</h2>
-            {canAssignTasks && (
+            {canManageProjectTasks && (
               <button 
                 onClick={addTask} 
                 className="px-3 py-1 text-sm bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93] flex items-center"
@@ -205,7 +243,7 @@ const ProjectDetails = () => {
                         <span>{task.assigneeName || task.assignee || 'Unassigned'}</span>
                       </div>
                     </div>
-                    {canAssignTasks && (
+                    {canManageProjectTasks && (
                       <button 
                         onClick={(e) => {
                           e.stopPropagation();
@@ -245,7 +283,7 @@ const ProjectDetails = () => {
             <div className="text-center py-8">
               <CheckSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">No tasks assigned to this project yet.</p>
-              {canAssignTasks && (
+              {canManageProjectTasks && (
                 <button 
                   onClick={addTask} 
                   className="mt-3 px-4 py-2 text-sm bg-[#4DA5AD] text-white rounded-lg hover:bg-[#3D8B93]"
