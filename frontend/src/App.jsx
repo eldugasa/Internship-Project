@@ -437,11 +437,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings",
-        element: (
-          <ProtectedRoute requiredPermissions={[PERMISSIONS.MANAGE_SETTINGS]}>
-            <Settings />
-          </ProtectedRoute>
-        ),
+        element: <Settings />,
         loader: settingspmLoader,
       },
       {

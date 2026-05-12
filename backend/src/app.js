@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import path from "path";
+import { fileURLToPath } from "url";
 import adminRoutes from "./routes/admin.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";   
@@ -8,10 +10,13 @@ import taskRoutes from "./routes/task.routes.js";
 import projectRoutes from "./routes/project.routes.js";
 import notificationRoutes from './routes/notification.routes.js';
 import notificationPrefsRoutes from './routes/notificationPrefs.routes.js';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const app = express();
 
 app.use(cors()); // 👈 IMPORTANT
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+app.use("/uploads", express.static(path.resolve(__dirname, "../uploads")));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);

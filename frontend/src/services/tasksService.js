@@ -1,5 +1,5 @@
 // src/services/tasksService.js
-import { apiClient } from './apiClient';
+import { API_URL, apiClient } from './apiClient';
  
 // Status mapping helper
 const statusMap = {
@@ -41,6 +41,16 @@ const reversePriorityMap = {
   'critical': 'CRITICAL'
 };
 
+const resolveAttachmentUrl = (attachmentUrl) => {
+  if (!attachmentUrl) return null;
+  if (attachmentUrl.startsWith("http://") || attachmentUrl.startsWith("https://")) {
+    return attachmentUrl;
+  }
+
+  const baseUrl = API_URL.replace(/\/api$/, "");
+  return `${baseUrl}${attachmentUrl}`;
+};
+
 const doneStatuses = new Set(['completed', 'passed']);
 
 const normalizeProgress = (task) => {
@@ -69,6 +79,9 @@ const normalizeTask = (task) => {
     id: task.id,
     title: task.title,
     description: task.description || '',
+    attachmentName: task.attachmentName || '',
+    attachmentMimeType: task.attachmentMimeType || '',
+    attachmentUrl: resolveAttachmentUrl(task.attachmentUrl),
     status: normalizedStatus,
     priority: priorityMap[task.priority] || task.priority?.toLowerCase() || 'medium',
     progress: normalizeProgress(task),
@@ -93,6 +106,8 @@ const normalizeTask = (task) => {
     
     dueDate: task.dueDate ? new Date(task.dueDate).toLocaleDateString() : null,
     rawDueDate: task.dueDate,
+    rawCreatedAt: task.createdAt || null,
+    rawUpdatedAt: task.updatedAt || null,
 
     tags: task.tags || [],
     comments: task.comments || [],
@@ -130,7 +145,8 @@ export const createTask = async (taskData, { signal } = {}) => {
     assignedTo: parseInt(taskData.assigneeId || taskData.assignedTo),
     qaTesterId: taskData.qaTesterId ? parseInt(taskData.qaTesterId) : null,
     dueDate: taskData.dueDate,
-    priority: reversePriorityMap[taskData.priority] || 'MEDIUM'
+    priority: reversePriorityMap[taskData.priority] || 'MEDIUM',
+    attachment: taskData.attachment,
   };
  
   const response = await apiClient('/tasks', {
@@ -180,6 +196,8 @@ export const updateTask = async (id, taskData, { signal } = {}) => {
       ...taskData,
       assigneeId: taskData.assigneeId || taskData.assignedTo,
       qaTesterId: taskData.qaTesterId ?? null,
+      attachment: taskData.attachment,
+      removeAttachment: taskData.removeAttachment,
       status: backendStatus,
       priority: backendPriority
     }),

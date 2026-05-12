@@ -1,5 +1,5 @@
 // src/services/projectsService.js
-import { apiClient } from "./apiClient";
+import { API_URL, apiClient } from "./apiClient";
 
 // Status mapping helper
 const statusMap = {
@@ -26,6 +26,16 @@ const clampProgress = (value) => {
   if (numericValue > 100) return 100;
 
   return numericValue;
+};
+
+const resolveAttachmentUrl = (attachmentUrl) => {
+  if (!attachmentUrl) return null;
+  if (attachmentUrl.startsWith("http://") || attachmentUrl.startsWith("https://")) {
+    return attachmentUrl;
+  }
+
+  const baseUrl = API_URL.replace(/\/api$/, "");
+  return `${baseUrl}${attachmentUrl}`;
 };
 
 export const resolveProjectProgress = (project, tasks = null) => {
@@ -61,6 +71,9 @@ const normalizeProject = (project) => ({
   id: project.id,
   name: project.name,
   description: project.description || "",
+  attachmentName: project.attachmentName || "",
+  attachmentMimeType: project.attachmentMimeType || "",
+  attachmentUrl: resolveAttachmentUrl(project.attachmentUrl),
   status:
     statusMap[project.status] || project.status?.toLowerCase() || "planned",
   progress: resolveProjectProgress(project),
@@ -146,6 +159,8 @@ export const updateProject = async (id, projectData, { signal } = {}) => {
     const payload = {
       name: projectData.name,
       description: projectData.description,
+      attachment: projectData.attachment,
+      removeAttachment: projectData.removeAttachment,
       startDate: projectData.startDate,
       endDate: projectData.endDate,
       status: backendStatus,

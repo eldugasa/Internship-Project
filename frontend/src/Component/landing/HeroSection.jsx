@@ -1,7 +1,48 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { motion, useScroll, useTransform } from 'motion/react';
 
 const HeroSection = () => {
+    const { scrollY } = useScroll();
+    const yHerobox = useTransform(scrollY, [0, 200, 300, 500], [0, -50, -80, -100]);
+  const opacityHerobox = useTransform(
+    scrollY,
+    [0, 200, 300, 500],
+    [1, 0.8, 0.6, 0.1]
+  );
+
+   const yText = useTransform(scrollY, [0, 200, 300, 500], [0, 50, 50, 50]);
+  const scaleText = useTransform(scrollY, [0, 300], [1, 0.8]);
+ 
+
+  
+
+  const featureIntroVariants = {
+    hidden: { opacity: 0, y: 24 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.6, ease: 'easeOut' }
+    }
+  };
+
+  const featureGridVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { staggerChildren: 0.16, delayChildren: 0.15 }
+    }
+  };
+
+  const featureCardVariants = {
+    hidden: { opacity: 0, y: 48, scale: 0.96 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: { duration: 0.55, ease: 'easeOut' }
+    }
+  };
   return (
     <>
       {/* HERO SECTION */}
@@ -10,13 +51,17 @@ const HeroSection = () => {
           
           {/* Hero Content */}
           <div className="flex-1 text-center lg:text-left order-2 lg:order-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-[#4DA5AD]/10 to-[#2D4A6B]/10 border border-[#4DA5AD]/20 mb-4 sm:mb-6">
+            <div
+            
+             className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-gradient-to-r from-[#4DA5AD]/10 to-[#2D4A6B]/10 border border-[#4DA5AD]/20 mb-4 sm:mb-6">
               <span className="flex h-2 w-2 rounded-full bg-[#4DA5AD]"></span>
               <span className="text-[10px] font-bold uppercase tracking-widest text-[#4DA5AD]">
                 Built for Engineering Excellence
               </span>
             </div>
-            
+            <motion.div
+            id='hero text'
+            style={{ scale: scaleText, y: yText }}>
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black text-[#2D4A6B] leading-tight mb-4 sm:mb-6">
               Precision Projects
               <br />
@@ -24,19 +69,24 @@ const HeroSection = () => {
               <br />
               Companies
             </h1>
-            
+            </motion.div>
             <p className="text-base sm:text-lg text-slate-500 mb-6 sm:mb-8 max-w-xl mx-auto lg:mx-0 leading-relaxed">
               The all-in-one platform for engineering companies to plan work, 
               manage teams, assign tasks, and track progress.
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start mb-8 sm:mb-10">
+              <motion.button
+                whileHover={{ scale: 1.05, boxShadow: '0px 8px 15px rgba(77, 165, 173, 0.3)' }}
+                transition={{ type: 'spring', stiffness: 400, damping: 10 }}
+              >
               <Link 
                 to="/login"
                 className="px-6 py-3 text-sm font-semibold text-white bg-gradient-to-r from-[#4DA5AD] to-[#2D4A6B] rounded-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 shadow-lg"
               >
                 Sign In
               </Link>
+              </motion.button>
             </div>
 
             {/* Stats */}
@@ -57,7 +107,10 @@ const HeroSection = () => {
           </div>
 
           {/* Hero Image */}
-          <div className="flex-1 relative w-full max-w-2xl lg:max-w-none order-1 lg:order-2 mb-8 lg:mb-0">
+          <motion.div 
+          id='hero image'
+          style={{opacity: opacityHerobox, y: yHerobox}}
+          className="flex-1 relative w-full max-w-2xl lg:max-w-none order-1 lg:order-2 mb-8 lg:mb-0">
             <div className="absolute -top-10 -right-10 w-48 sm:w-64 h-48 sm:h-64 bg-[#4DA5AD]/20 rounded-full blur-3xl opacity-60"></div>
             <div className="absolute -bottom-10 -left-10 w-32 sm:w-48 h-32 sm:h-48 bg-[#2D4A6B]/20 rounded-full blur-3xl opacity-40"></div>
             
@@ -141,159 +194,310 @@ const HeroSection = () => {
                 </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </header>
 
       {/* FEATURES SECTION */}
-      <section id="features" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-white scroll-mt-20 w-full">
-        <div className="max-w-7xl mx-auto text-center mb-12 sm:mb-16 w-full">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
-            <span className="text-xs sm:text-sm font-bold uppercase tracking-widest text-[#4DA5AD]">Features</span>
-            <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
+<section id="features" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-white scroll-mt-20 w-full overflow-hidden">
+  <div className="max-w-7xl mx-auto text-center mb-12 sm:mb-16 w-full">
+    <motion.div
+      variants={featureIntroVariants}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: false, amount: 0.15 }}
+      className="inline-flex items-center gap-2 mb-4"
+    >
+      <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
+      <span className="text-xs sm:text-sm font-bold uppercase tracking-widest text-[#4DA5AD]">Features</span>
+      <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
+    </motion.div>
+    
+    <motion.h2 
+      variants={featureIntroVariants}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: false, amount: 0.15 }}
+      transition={{ delay: 0.1 }}
+      className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-[#2D4A6B] mb-4 sm:mb-6"
+    >
+      Engineered for <span className="text-[#4DA5AD]">Precision</span>
+    </motion.h2>
+    
+    <motion.p 
+      variants={featureIntroVariants}
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: false, amount: 0.15 }}
+      transition={{ delay: 0.2 }}
+      className="text-sm sm:text-base md:text-lg text-slate-500 max-w-2xl mx-auto px-4"
+    >
+      Everything you need to manage projects with accuracy and efficiency
+    </motion.p>
+  </div>
+  
+  <motion.div
+    initial="hidden"
+    whileInView="visible"
+    viewport={{ once: false, amount: 0.1 }}
+    variants={featureGridVariants}
+    className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto px-4 sm:px-0 w-full"
+  >
+    <motion.div
+      variants={featureCardVariants}
+      className='h-full'
+    >
+      <FeatureCard 
+        icon={
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/10 to-[#2D4A6B]/10 flex items-center justify-center ">
+            <span className="text-xl sm:text-2xl">👑</span>
           </div>
-          <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-[#2D4A6B] mb-4 sm:mb-6">
-            Engineered for <span className="text-[#4DA5AD]">Precision</span>
-          </h2>
-          <p className="text-sm sm:text-base md:text-lg text-slate-500 max-w-2xl mx-auto px-4">
-            Everything you need to manage projects with accuracy and efficiency
-          </p>
-        </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto px-4 sm:px-0 w-full">
-          <FeatureCard 
-            icon={
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/10 to-[#2D4A6B]/10 flex items-center justify-center">
-                <span className="text-xl sm:text-2xl">👑</span>
-              </div>
-            }
-            title="Role Control" 
-            desc="Define Admins, Managers, and Members with granular access permissions." 
-          />
-          <FeatureCard 
-            icon={
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/20 via-[#4DA5AD]/10 to-[#2D4A6B]/20 flex items-center justify-center">
-                <span className="text-xl sm:text-2xl">📊</span>
-              </div>
-            }
-            title="Live Progress" 
-            desc="Track task completion in real-time with interactive dashboards." 
-          />
-          <FeatureCard 
-            icon={
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/10 to-[#2D4A6B]/10 flex items-center justify-center">
-                <span className="text-xl sm:text-2xl">👥</span>
-              </div>
-            }
-            title="Team Hubs" 
-            desc="Create specialized teams for specific engineering projects." 
-          />
-          <FeatureCard 
-            icon={
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/10 to-[#2D4A6B]/10 flex items-center justify-center">
-                <span className="text-xl sm:text-2xl">🚀</span>
-              </div>
-            }
-            title="Automated Workflows" 
-            desc="Streamline processes with automated notifications and tracking." 
-          />
-        </div>
-      </section>
+        }
+        title="Role Control" 
+        desc="Define Admins, Managers, and Members with granular access permissions." 
+      />
+    </motion.div>
+    
+    <motion.div
+      variants={featureCardVariants}
+       className='h-full'
+    >
+      <FeatureCard 
+        icon={
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/20 via-[#4DA5AD]/10 to-[#2D4A6B]/20 flex items-center justify-center">
+            <span className="text-xl sm:text-2xl">📊</span>
+          </div>
+        }
+        title="Live Progress" 
+        desc="Track task completion in real-time with interactive dashboards." 
+      />
+    </motion.div>
+    
+    <motion.div
+      variants={featureCardVariants}
+       className='h-full'
+    >
+      <FeatureCard 
+        icon={
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/10 to-[#2D4A6B]/10 flex items-center justify-center">
+            <span className="text-xl sm:text-2xl">👥</span>
+          </div>
+        }
+        title="Team Hubs" 
+        desc="Create specialized teams for specific engineering projects." 
+      />
+    </motion.div>
+    
+    <motion.div
+      variants={featureCardVariants}
+       className='h-full'
+    >
+      <FeatureCard 
+        icon={
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-gradient-to-br from-[#4DA5AD]/10 to-[#2D4A6B]/10 flex items-center justify-center">
+            <span className="text-xl sm:text-2xl">🚀</span>
+          </div>
+        }
+        title="Automated Workflows" 
+        desc="Streamline processes with automated notifications and tracking." 
+      />
+    </motion.div>
+  </motion.div>
+</section>
 
-      {/* SOLUTIONS SECTION */}
-      <section id="solutions" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-gradient-to-b from-white to-slate-50 scroll-mt-20 w-full relative">
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-16 w-full relative">
-          <div className="flex-1 px-4 sm:px-0">
-            <div className="inline-flex items-center gap-2 mb-4">
-              <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
-              <span className="text-xs sm:text-sm font-bold uppercase tracking-widest text-[#4DA5AD]">Solutions</span>
-              <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
-            </div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#2D4A6B] mb-4 sm:mb-6">
-              Standardize Your Engineering Workflow
-            </h2>
-            <p className="text-sm sm:text-base text-slate-600 mb-6 sm:mb-8 leading-relaxed">
-              Replace manual tools with a unified digital platform designed specifically for engineering organizations.
-            </p>
-            <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
-              {[
-                'Define clear user roles and permissions',
-                'Monitor task deadlines and dependencies',
-                'Update status and progress in real-time',
-                'Generate comprehensive project reports',
-                'Collaborate across multiple engineering teams'
-              ].map((item, index) => (
-                <li key={index} className="flex items-center gap-2 sm:gap-3 text-sm sm:text-base font-medium text-[#2D4A6B]">
-                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-[#4DA5AD]/10 flex items-center justify-center flex-shrink-0">
-                    <span className="text-[#4DA5AD] text-xs sm:text-sm">✓</span>
-                  </div> 
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
+    {/* SOLUTIONS SECTION */}
+<section id="solutions" className="px-4 sm:px-6 md:px-16 py-16 sm:py-20 md:py-24 bg-gradient-to-b from-white to-slate-50 scroll-mt-20 w-full relative overflow-hidden">
+  <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-8 lg:gap-16 w-full relative">
+    
+    {/* Left Content - Slides in from left */}
+    <motion.div 
+      initial={{ opacity: 0, x: -50 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: false, amount: 0.3 }}
+      transition={{ duration: 0.6 }}
+      className="flex-1 px-4 sm:px-0"
+    >
+      <motion.div 
+        initial={{ opacity: 0, x: -30 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: false }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="inline-flex items-center gap-2 mb-4"
+      >
+        <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
+        <span className="text-xs sm:text-sm font-bold uppercase tracking-widest text-[#4DA5AD]">Solutions</span>
+        <span className="h-px w-6 sm:w-8 bg-[#4DA5AD]"></span>
+      </motion.div>
+      
+      <motion.h2 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="text-2xl sm:text-3xl md:text-4xl font-black text-[#2D4A6B] mb-4 sm:mb-6"
+      >
+        Standardize Your Engineering Workflow
+      </motion.h2>
+      
+      <motion.p 
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: false }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="text-sm sm:text-base text-slate-600 mb-6 sm:mb-8 leading-relaxed"
+      >
+        Replace manual tools with a unified digital platform designed specifically for engineering organizations.
+      </motion.p>
+      
+      <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-10">
+        {[
+          'Define clear user roles and permissions',
+          'Monitor task deadlines and dependencies',
+          'Update status and progress in real-time',
+          'Generate comprehensive project reports',
+          'Collaborate across multiple engineering teams'
+        ].map((item, index) => (
+          <motion.li 
+            key={index}
+            initial={{ opacity: 0, x: -20 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: false }}
+            transition={{ duration: 0.4, delay: 0.4 + (index * 0.1) }}
+            className="flex items-center gap-2 sm:gap-3 text-sm sm:text-base font-medium text-[#2D4A6B]"
+          >
+            <motion.div 
+              whileHover={{ scale: 1.2, rotate: 90 }}
+              className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-[#4DA5AD]/10 flex items-center justify-center flex-shrink-0"
+            >
+              <span className="text-[#4DA5AD] text-xs sm:text-sm">✓</span>
+            </motion.div> 
+            {item}
+          </motion.li>
+        ))}
+      </ul>
+    </motion.div>
+    
+    {/* Right Content - Metrics Card - Slides in from right */}
+    <motion.div 
+      initial={{ opacity: 0, x: 50 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: false, amount: 0.3 }}
+      transition={{ duration: 0.6, delay: 0.2 }}
+      className="flex-1 w-full px-4 sm:px-0 relative"
+    >
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: false }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+        whileHover={{ scale: 1.02 }}
+        className="relative bg-gradient-to-br from-[#2D4A6B] via-[#2D4A6B]/90 to-[#4DA5AD] rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-2xl overflow-hidden"
+      >
+        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent"></div>
+        
+        <div className="relative z-10 text-white">
+          <motion.h3 
+            initial={{ opacity: 0, y: -20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: false }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="text-lg sm:text-xl md:text-2xl font-bold mb-6 sm:mb-8"
+          >
+            Team Performance Metrics
+          </motion.h3>
           
-          {/* Metrics Card */}
-          <div className="flex-1 w-full px-4 sm:px-0 relative">
-            <div className="relative bg-gradient-to-br from-[#2D4A6B] via-[#2D4A6B]/90 to-[#4DA5AD] rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-2xl overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent"></div>
-              
-              <div className="relative z-10 text-white">
-                <h3 className="text-lg sm:text-xl md:text-2xl font-bold mb-6 sm:mb-8">Team Performance Metrics</h3>
-                
-                <div className="space-y-4 sm:space-y-6 md:space-y-8">
-                  <div>
-                    <div className="flex justify-between items-center mb-2 text-xs sm:text-sm">
-                      <span className="text-slate-300">Project Delivery</span>
-                      <span className="text-[#4DA5AD] font-bold">+32%</span>
-                    </div>
-                    <div className="h-1.5 sm:h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-[#4DA5AD] to-teal-400 w-4/5"></div>
-                    </div>
-                  </div>
+          <div className="space-y-4 sm:space-y-6 md:space-y-8">
+            {/* Metric 1 */}
+            <div 
+             
+            >
+              <div className="flex justify-between items-center mb-2 text-xs sm:text-sm">
+                <span className="text-slate-300">Project Delivery</span>
+                <span 
+                 
+                  className="text-[#4DA5AD] font-bold"
+                >
+                  +32%
+                </span>
+              </div>
+              <div className="h-1.5 sm:h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                <div 
                   
-                  <div>
-                    <div className="flex justify-between items-center mb-2 text-xs sm:text-sm">
-                      <span className="text-slate-300">Code Quality</span>
-                      <span className="text-[#4DA5AD] font-bold">+18%</span>
-                    </div>
-                    <div className="h-1.5 sm:h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-[#4DA5AD] to-teal-400 w-3/4"></div>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between items-center mb-2 text-xs sm:text-sm">
-                      <span className="text-slate-300">Team Efficiency</span>
-                      <span className="text-[#4DA5AD] font-bold">+45%</span>
-                    </div>
-                    <div className="h-1.5 sm:h-2 w-full bg-white/10 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-[#4DA5AD] to-teal-400 w-5/6"></div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/10">
-                  <p className="text-xs sm:text-sm text-slate-300 text-center">
-                    Average improvement across 50+ engineering teams
-                  </p>
-                </div>
+                  className="h-full bg-gradient-to-r from-[#4DA5AD] to-teal-400 rounded-full"
+                />
               </div>
             </div>
             
-            {/* Floating Element */}
-            <div className="hidden lg:block absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-[#4DA5AD] to-teal-300 rounded-xl -rotate-12 shadow-lg"></div>
+            {/* Metric 2 */}
+            <div 
+             
+            >
+              <div className="flex justify-between items-center mb-2 text-xs sm:text-sm">
+                <span className="text-slate-300">Code Quality</span>
+                <span 
+                  
+                  className="text-[#4DA5AD] font-bold"
+                >
+                  +18%
+                </span>
+              </div>
+              <div className="h-1.5 sm:h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                <div 
+                 
+                  className="h-full bg-gradient-to-r from-[#4DA5AD] to-teal-400 rounded-full"
+                />
+              </div>
+            </div>
+            
+            {/* Metric 3 */}
+            <div 
+             
+            >
+              <div className="flex justify-between items-center mb-2 text-xs sm:text-sm">
+                <span className="text-slate-300">Team Efficiency</span>
+                <span 
+                  className="text-[#4DA5AD] font-bold"
+                >
+                  +45%
+                </span>
+              </div>
+              <div className="h-1.5 sm:h-2 w-full bg-white/10 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-[#4DA5AD] to-teal-400 rounded-full"
+                />
+              </div>
+            </div>
           </div>
+          
+          <motion.div 
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5, delay: 1.1 }}
+            className="mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-white/10"
+          >
+            <p className="text-xs sm:text-sm text-slate-300 text-center">
+              Average improvement across 50+ engineering teams
+            </p>
+          </motion.div>
         </div>
-      </section>
+      </motion.div>
+      
+      {/* Floating Element with animation */}
+      <motion.div 
+       
+        className="hidden lg:block absolute -top-4 -right-4 w-12 h-12 bg-gradient-to-br from-[#4DA5AD] to-teal-300 rounded-xl shadow-lg"
+      />
+    </motion.div>
+  </div>
+</section>
     </>
   );
 };
 
 // Feature Card Component (kept inside since it's only used here)
 const FeatureCard = ({ icon, title, desc }) => (
-  <div className="p-4 sm:p-6 md:p-6 border border-slate-100 bg-gradient-to-br from-[#4DA5AD]/20 via-[#4DA5AD]/10 to-[#2D4A6B]/20 rounded-xl sm:rounded-2xl hover:shadow-xl hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 bg-white group">
+  <div className="p-4 sm:p-6 md:p-6 border border-slate-100 bg-gradient-to-br from-[#4DA5AD]/20 via-[#4DA5AD]/10 to-[#2D4A6B]/20 rounded-xl sm:rounded-2xl hover:shadow-xl hover:-translate-y-1 sm:hover:-translate-y-2 transition-all duration-300 bg-white group h-full">  {/* ADD h-full HERE */}
     <div className="mb-3 sm:mb-4 md:mb-6 group-hover:scale-110 transition-transform duration-300">
       {icon}
     </div>

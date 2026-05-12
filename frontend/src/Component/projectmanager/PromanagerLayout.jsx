@@ -42,6 +42,9 @@ const ProjectManagerLayout = () => {
     normalizedRole === "project-manager" ||
     hasPermission(PERMISSIONS.MANAGE_PROJECTS);
   const canTestTasks = hasPermission(PERMISSIONS.TEST_TASKS);
+  const canAccessSettings =
+    normalizedRole === "project-manager" ||
+    hasPermission(PERMISSIONS.MANAGE_SETTINGS);
 
   const userInitials = useMemo(() => {
     if (!userName) return "PM";
@@ -69,7 +72,7 @@ const ProjectManagerLayout = () => {
     { path: "/qa-tester/dashboard", icon: FlaskConical, label: "QA Workspace", visible: canTestTasks },
     { path: "/manager/progress", icon: TrendingUp, label: "Progress", visible: hasPermission(PERMISSIONS.VIEW_REPORTS) },
     { path: "/manager/reports", icon: FileText, label: "Reports", visible: hasPermission(PERMISSIONS.VIEW_REPORTS) },
-    { path: "/manager/settings", icon: Settings, label: "Settings", visible: hasPermission(PERMISSIONS.MANAGE_SETTINGS) },
+    { path: "/manager/settings", icon: Settings, label: "Settings", visible: canAccessSettings },
   ].filter((item) => item.visible);
 
   // Close mobile menu when screen size changes to large
