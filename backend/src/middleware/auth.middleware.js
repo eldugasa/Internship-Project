@@ -1,18 +1,22 @@
-import jwt from "jsonwebtoken";
 import { prisma } from "../config/db.js";
 import { getEffectivePermissions } from "../utils/permissionResolver.js";
+import { verifyAccessToken } from "../utils/jwt.js";
+import { ACCESS_TOKEN_COOKIE } from "../utils/authCookies.js";
 
 const authenticate = async (req, res, next) => {
   const authHeader = req.headers.authorization;
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.split(" ")[1]
+    : null;
+  const cookieToken = req.cookies?.[ACCESS_TOKEN_COOKIE];
+  const token = cookieToken || bearerToken;
 
-  if (!authHeader) {
+  if (!token) {
     return res.status(401).json({ message: "No token provided" });
   }
 
-  const token = authHeader.split(" ")[1];
-
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = verifyAccessToken(token);
     const dbUser = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: {

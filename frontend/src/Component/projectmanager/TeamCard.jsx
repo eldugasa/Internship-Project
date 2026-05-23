@@ -2,6 +2,7 @@
 import React from "react";
 import { Trash2, Settings } from "lucide-react";
 import { useNavigation } from "react-router-dom";
+import { motion } from "framer-motion";
 
 const TeamCard = ({
   team,
@@ -13,7 +14,10 @@ const TeamCard = ({
   const navigation = useNavigation();
   const isSubmitting = navigation.state === "submitting"; // You can replace this with actual state if needed
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0, y: -30 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -30 }}
       className="bg-gray-50 rounded-xl p-5 border border-gray-200 hover:shadow-sm transition cursor-pointer"
       onClick={onClick} // ← Add onClick handler here
     >
@@ -66,7 +70,7 @@ const TeamCard = ({
       >
         {isSubmitting ? "Loading..." : primaryActionLabel}
       </button>
-    </div>
+    </motion.div>
   );
 };
 

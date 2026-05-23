@@ -1,11 +1,24 @@
 import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
 
-export function generateToken(payload) {
-  return jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: "7d",
+const buildAuthPayload = (user = {}) => ({
+  id: user.id,
+  email: user.email,
+  role: user.role,
+});
+
+export const generateAccessToken = (user) =>
+  jwt.sign(buildAuthPayload(user), env.jwtSecret, {
+    expiresIn: env.accessTokenTtl,
   });
-}
 
-export function verifyToken(token) {
-  return jwt.verify(token, process.env.JWT_SECRET);
-}
+export const generateRefreshToken = (user) =>
+  jwt.sign(buildAuthPayload(user), env.refreshTokenSecret, {
+    expiresIn: env.refreshTokenTtl,
+  });
+
+export const verifyAccessToken = (token) =>
+  jwt.verify(token, env.jwtSecret);
+
+export const verifyRefreshToken = (token) =>
+  jwt.verify(token, env.refreshTokenSecret);

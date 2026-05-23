@@ -5,6 +5,10 @@ import {
   createBulkNotifications,
   NOTIFICATION_TYPES,
 } from "../utils/notificationHelper.js";
+import {
+  deleteStoredAttachment,
+  saveBase64Attachment,
+} from "../utils/attachment.js";
 
 // Normalize role values like "super-admin" and "project_manager" to "SUPER_ADMIN".
 const normalizeRole = (role = "") =>
@@ -14,7 +18,7 @@ const normalizeRole = (role = "") =>
 export const createProject = async (req, res) => {
   console.log("REQ.USER:", req.user);
   try {
-    const { name, description, teamId, startDate, endDate } = req.body;
+    const { name, description, teamId, startDate, endDate, attachment } = req.body;
     const managerId = req.user.id;
     const role = normalizeRole(req.user.role);
 
@@ -26,10 +30,15 @@ export const createProject = async (req, res) => {
       return res.status(403).json({ message: "Forbidden" });
     }
 
+    const savedAttachment = attachment
+      ? await saveBase64Attachment(attachment, "projects")
+      : null;
+
     const project = await prisma.project.create({
       data: {
         name,
         description,
+        ...(savedAttachment || {}),
         status: "PLANNED",
         teamId: Number(teamId),
         managerId,
@@ -71,7 +80,16 @@ export const createProject = async (req, res) => {
 export const updateProject = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, description, startDate, endDate, status, teamId } = req.body;
+    const {
+      name,
+      description,
+      startDate,
+      endDate,
+      status,
+      teamId,
+      attachment,
+      removeAttachment,
+    } = req.body;
 
     console.log("=== UPDATE PROJECT CONTROLLER ===");
     console.log("Project ID:", id);
@@ -94,6 +112,15 @@ export const updateProject = async (req, res) => {
     if (endDate !== undefined) updateData.endDate = new Date(endDate);
     if (status !== undefined) updateData.status = status;
     if (teamId !== undefined) updateData.teamId = parseInt(teamId);
+    if (removeAttachment) {
+      updateData.attachmentName = null;
+      updateData.attachmentMimeType = null;
+      updateData.attachmentUrl = null;
+    }
+    if (attachment) {
+      const savedAttachment = await saveBase64Attachment(attachment, "projects");
+      Object.assign(updateData, savedAttachment);
+    }
 
     console.log("Update data:", updateData);
 
@@ -108,6 +135,10 @@ export const updateProject = async (req, res) => {
     });
 
     console.log("Project updated successfully");
+
+    if ((removeAttachment || attachment) && existingProject.attachmentUrl) {
+      await deleteStoredAttachment(existingProject.attachmentUrl);
+    }
 
     // Check if project status changed to COMPLETED
     if (status === "COMPLETED" && existingProject.status !== "COMPLETED") {
@@ -176,6 +207,9 @@ export const updateProject = async (req, res) => {
       id: updatedProject.id,
       name: updatedProject.name,
       description: updatedProject.description,
+      attachmentName: updatedProject.attachmentName,
+      attachmentMimeType: updatedProject.attachmentMimeType,
+      attachmentUrl: updatedProject.attachmentUrl,
       status: updatedProject.status,
       startDate: updatedProject.startDate,
       endDate: updatedProject.endDate,
@@ -221,6 +255,9 @@ export const getAllProjects = async (req, res) => {
       id: project.id,
       name: project.name,
       description: project.description,
+      attachmentName: project.attachmentName,
+      attachmentMimeType: project.attachmentMimeType,
+      attachmentUrl: project.attachmentUrl,
       status: project.status,
       progress: project.progress || 0,
       startDate: project.startDate,
@@ -357,6 +394,10 @@ export const deleteProject = async (req, res) => {
     await prisma.project.delete({
       where: { id: projectIdNumber },
     });
+
+    if (project.attachmentUrl) {
+      await deleteStoredAttachment(project.attachmentUrl);
+    }
 
     res.json({ message: "Project deleted successfully" });
   } catch (err) {

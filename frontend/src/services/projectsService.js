@@ -1,5 +1,5 @@
 // src/services/projectsService.js
-import { apiClient } from "./apiClient";
+import { API_URL, apiClient } from "./apiClient";
 
 // Status mapping helper
 const statusMap = {
@@ -18,15 +18,65 @@ const reverseStatusMap = {
   cancelled: "CANCELLED",
 };
 
+const clampProgress = (value) => {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue)) return 0;
+  if (numericValue < 0) return 0;
+  if (numericValue > 100) return 100;
+
+  return numericValue;
+};
+
+const resolveAttachmentUrl = (attachmentUrl) => {
+  if (!attachmentUrl) return null;
+  if (attachmentUrl.startsWith("http://") || attachmentUrl.startsWith("https://")) {
+    return attachmentUrl;
+  }
+
+  const baseUrl = API_URL.replace(/\/api$/, "");
+  return `${baseUrl}${attachmentUrl}`;
+};
+
+export const resolveProjectProgress = (project, tasks = null) => {
+  const normalizedStatus =
+    statusMap[project?.status] || project?.status?.toLowerCase() || "planned";
+
+  if (normalizedStatus === "completed") {
+    return 100;
+  }
+
+  if (Array.isArray(tasks) && tasks.length > 0) {
+    const completedTasks = tasks.filter(
+      (task) => task.status === "completed" || task.status === "passed",
+    ).length;
+
+    return Math.round((completedTasks / tasks.length) * 100);
+  }
+
+  const taskSummary = project?.tasks;
+  const totalTasks = Number(taskSummary?.total ?? 0);
+  const completedTasks = Number(taskSummary?.completed ?? 0);
+
+  if (Number.isFinite(totalTasks) && totalTasks > 0) {
+    return Math.round((completedTasks / totalTasks) * 100);
+  }
+
+  return clampProgress(project?.progress);
+};
+
 // Helper to normalize project data
 const normalizeProject = (project) => ({
   ...project,
   id: project.id,
   name: project.name,
   description: project.description || "",
+  attachmentName: project.attachmentName || "",
+  attachmentMimeType: project.attachmentMimeType || "",
+  attachmentUrl: resolveAttachmentUrl(project.attachmentUrl),
   status:
     statusMap[project.status] || project.status?.toLowerCase() || "planned",
-  progress: project.progress || 0,
+  progress: resolveProjectProgress(project),
   startDate: project.startDate
     ? new Date(project.startDate).toLocaleDateString()
     : null,
@@ -50,6 +100,10 @@ const normalizeProject = (project) => ({
   spent: project.spent || 0,
   manager: project.manager?.name || project.leadName || "Unassigned",
   managerName: project.manager?.name || project.leadName || "Unassigned",
+  rawStartDate: project.startDate || null,
+  rawEndDate: project.endDate || null,
+  rawCreatedAt: project.createdAt || null,
+  rawUpdatedAt: project.updatedAt || null,
   createdAt: project.createdAt
     ? new Date(project.createdAt).toLocaleDateString()
     : null,
@@ -109,6 +163,8 @@ export const updateProject = async (id, projectData, { signal } = {}) => {
     const payload = {
       name: projectData.name,
       description: projectData.description,
+      attachment: projectData.attachment,
+      removeAttachment: projectData.removeAttachment,
       startDate: projectData.startDate,
       endDate: projectData.endDate,
       status: backendStatus,

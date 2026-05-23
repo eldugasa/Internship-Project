@@ -36,14 +36,19 @@ model User {
   notifications Notification[]
 
   // ✅ ADD THESE TWO FIELDS FOR PASSWORD RESET
-  resetToken       String?   @unique
-  resetTokenExpiry DateTime?
+  resetToken         String?   @unique
+  resetTokenExpiry   DateTime?
+  refreshTokenHash   String?
+  refreshTokenExpiry DateTime?
 }
 
 model Project {
   id          Int      @id @default(autoincrement())
   name        String
   description String
+  attachmentName String?
+  attachmentUrl String?
+  attachmentMimeType String?
   status      String   @default("PLANNED")
   startDate   DateTime
   endDate     DateTime
@@ -70,6 +75,9 @@ model Task {
   id             Int       @id @default(autoincrement())
   title          String
   description    String?
+  attachmentName String?
+  attachmentUrl  String?
+  attachmentMimeType String?
   status         String    @default("PENDING")
   progress       Int       @default(0)
   previousProgress Int     @default(0)

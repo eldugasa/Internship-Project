@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLoaderData } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import {motion, AnimatePresence} from 'framer-motion';
 import { 
   FolderKanban, TrendingUp, CheckCircle, AlertCircle,
   Calendar, Clock, Users, Plus, Eye,
@@ -234,6 +235,7 @@ const ManagerDashboard = () => {
 
   const chartData = loaderData?.chartData || { statusData: [], taskData: [], weeklyData: [] };
   const recentActivities = loaderData?.recentActivities || [];
+  const displayedRecentActivities = recentActivities.slice(0, 5);
 
   const getTeamName = (project) => {
     return project.teamName || project.team?.name || project.team?.teamName || 'Unassigned';
@@ -241,6 +243,7 @@ const ManagerDashboard = () => {
 
   const safeProjects = Array.isArray(projects) ? projects : [];
   const safeTasks = Array.isArray(tasks) ? tasks : [];
+  const displayedRecentTasks = safeTasks.slice(0, 3);
   const activeProjects = safeProjects.filter(p => p.status !== 'completed');
 
   // Show skeleton on initial load
@@ -278,13 +281,7 @@ const ManagerDashboard = () => {
                   <RefreshCw className="w-5 h-5 text-gray-600" />
                 )}
               </button>
-              <button
-                onClick={() => navigate('/manager/projects/create')}
-                className="px-4 py-2 bg-gradient-to-r from-[#0f5841] to-[#194f87] text-white rounded-lg hover:shadow-lg transition-all flex items-center gap-2"
-              >
-                <Plus className="w-5 h-5" />
-                <span>New Project</span>
-              </button>
+             
             </div>
           </div>
         </div>
@@ -458,68 +455,17 @@ const ManagerDashboard = () => {
         )}
 
         {/* Active Projects */}
-        {activeProjects.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                <Rocket className="w-5 h-5 text-[#0f5841]" />
-                Active Projects
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">
-                  {activeProjects.length}
-                </span>
-              </h2>
-              <button
-                onClick={() => navigate('/manager/projects')}
-                className="text-sm text-[#0f5841] hover:underline flex items-center gap-1"
-              >
-                View All
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="space-y-4">
-              {activeProjects.slice(0, 5).map(project => (
-                <div 
-                  key={project.id} 
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition cursor-pointer"
-                  onClick={() => navigate(`/manager/projects/${project.id}`)}
-                >
-                  <div className="flex-1">
-                    <h3 className="font-medium text-gray-900">{project.name}</h3>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <span className="text-xs text-gray-500 flex items-center gap-1">
-                        <Users className="w-3 h-3" />
-                        {getTeamName(project)}
-                      </span>
-                      <span className="text-xs text-gray-500 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {formatDate(project.dueDate || project.endDate)}
-                      </span>
-                      {project.progress === 100 && (
-                        <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                          Complete
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-semibold text-[#0f5841]">{project.progress || 0}%</div>
-                    <div className="w-24 bg-gray-200 h-2 rounded-full mt-1">
-                      <div 
-                        className="bg-gradient-to-r from-[#0f5841] to-[#194f87] h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${project.progress || 0}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+       
 
         {/* Two Column Layout for Recent Activities and Tasks */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          {recentActivities.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          {displayedRecentActivities.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6"
+            >
               <h2 className="font-bold text-gray-900 flex items-center gap-2 mb-4">
                 <Activity className="w-5 h-5 text-[#0f5841]" />
                 Recent Activities
@@ -528,7 +474,7 @@ const ManagerDashboard = () => {
                 </span>
               </h2>
               <div className="space-y-3">
-                {recentActivities.slice(0, 5).map(activity => (
+                {displayedRecentActivities.map(activity => (
                   <ActivityItem 
                     key={activity.id} 
                     activity={activity} 
@@ -536,11 +482,16 @@ const ManagerDashboard = () => {
                   />
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
 
-          {safeTasks.length > 0 && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+          {displayedRecentTasks.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+
+              className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="font-bold text-gray-900 flex items-center gap-2">
                   <Briefcase className="w-5 h-5 text-[#0f5841]" />
@@ -569,7 +520,7 @@ const ManagerDashboard = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {safeTasks.slice(0, 5).map(task => (
+                    {displayedRecentTasks.map(task => (
                       <tr key={task.id} className="hover:bg-gray-50 transition">
                         <td className="px-4 py-3">
                           <div className="font-medium text-gray-900">{task.title}</div>
@@ -614,7 +565,7 @@ const ManagerDashboard = () => {
                   </tbody>
                 </table>
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
 

@@ -1,123 +1,24 @@
 // src/pages/teamMember/Dashboard.jsx
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
-import { getMyTasks, updateTaskStatus } from '../../services/tasksService';
+import { getMyTasks } from '../../services/tasksService';
 import { 
-  CheckSquare, Clock, AlertCircle, TrendingUp, 
-  Calendar, FileText, ChevronRight,
-  PlayCircle, CheckCircle, Users, Target,
-  Award, Zap, CalendarDays, BellRing,
-  BarChart3, Filter, Search, User, Eye, Loader2
+  CheckSquare, AlertCircle, TrendingUp, 
+  FileText, PlayCircle, CheckCircle, Users,
+  Award, Search, User, Loader2
 } from 'lucide-react';
 import {
+  calculateTeamMemberTaskStats,
+  formatDate,
   getTeamMemberTaskProgress,
-  MY_TASKS_QUERY_KEY,
-  TEAM_MEMBER_ACTIVE_STATUSES,
-  getNextTeamMemberStatus,
-  isTeamMemberTaskDone,
+  getPriorityColor,
+  getStatusColor,
+  isTaskDueWithinDays,
+  isTaskOverdue,
   myTasksQuery,
 } from './taskShared';
-
-// 2. HELPER FUNCTIONS
-
-const parseDate = (dateStr) => {
-  if (!dateStr) return null;
-  try {
-    if (typeof dateStr === 'string' && dateStr.includes('/')) {
-      const [day, month, year] = dateStr.split('/');
-      return new Date(`${year}-${month}-${day}`);
-    }
-    const date = new Date(dateStr);
-    return isNaN(date.getTime()) ? null : date;
-  } catch {
-    return null;
-  }
-};
-
-const formatDate = (dateStr) => {
-  if (!dateStr) return 'No deadline';
-  try {
-    if (typeof dateStr === 'string' && dateStr.includes('/')) {
-      const [day, month, year] = dateStr.split('/');
-      const date = new Date(`${year}-${month}-${day}`);
-      if (!isNaN(date.getTime())) {
-        return date.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        });
-      }
-    }
-    const date = new Date(dateStr);
-    if (!isNaN(date.getTime())) {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric'
-      });
-    }
-    return dateStr;
-  } catch {
-    return dateStr;
-  }
-};
-
-const isOverdue = (dateStr, status) => {
-  if (isTeamMemberTaskDone({ status }) || !dateStr) return false;
-  const dueDate = parseDate(dateStr);
-  if (!dueDate) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  dueDate.setHours(0, 0, 0, 0);
-  return dueDate < today;
-};
-
-const isInNextWeek = (dateStr, status) => {
-  if (isTeamMemberTaskDone({ status }) || !dateStr) return false;
-  const dueDate = parseDate(dateStr);
-  if (!dueDate) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const nextWeek = new Date();
-  nextWeek.setDate(nextWeek.getDate() + 7);
-  nextWeek.setHours(23, 59, 59, 999);
-  dueDate.setHours(0, 0, 0, 0);
-  return dueDate >= today && dueDate <= nextWeek;
-};
-
-const isUrgent = (dateStr, priority, status) => {
-  if (isTeamMemberTaskDone({ status }) || priority !== 'high' || !dateStr) return false;
-  const dueDate = parseDate(dateStr);
-  if (!dueDate) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const threeDays = new Date();
-  threeDays.setDate(threeDays.getDate() + 3);
-  threeDays.setHours(23, 59, 59, 999);
-  dueDate.setHours(0, 0, 0, 0);
-  return dueDate >= today && dueDate <= threeDays;
-};
-
-const calculateStats = (tasks, efficiency = 95) => {
-  const completedTasks = tasks.filter((t) => isTeamMemberTaskDone(t)).length;
-  const inProgressTasks = tasks.filter(t => TEAM_MEMBER_ACTIVE_STATUSES.has(t.status)).length;
-  const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-  const overdueTasks = tasks.filter(t => isOverdue(t.dueDate || t.deadline, t.status)).length;
-
-  return {
-    totalTasks: tasks.length,
-    completedTasks,
-    inProgressTasks,
-    pendingTasks,
-    overdueTasks,
-    efficiency,
-    completionRate: tasks.length > 0 
-      ? Math.round((completedTasks / tasks.length) * 100) 
-      : 0
-  };
-};
 
 // 3. LOADER (React Router v7)
 
@@ -220,11 +121,9 @@ const DashboardSkeleton = () => (
 const TeamMemberDashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [updatingTaskId, setUpdatingTaskId] = useState(null);
 
   // Use React Query for tasks
   const { 
@@ -235,44 +134,6 @@ const TeamMemberDashboard = () => {
   } = useQuery({
     ...myTasksQuery(),
     refetchInterval: 30000, // Refetch every 30 seconds
-  });
-
-  // Mutation for updating task status
-  const updateTaskMutation = useMutation({
-    mutationFn: ({ taskId, status, progress }) => 
-      updateTaskStatus(taskId, status, progress),
-    onMutate: async ({ taskId, progress, status }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: MY_TASKS_QUERY_KEY });
-      
-      // Snapshot the previous value
-      const previousTasks = queryClient.getQueryData(MY_TASKS_QUERY_KEY);
-      
-      // Optimistically update
-      queryClient.setQueryData(MY_TASKS_QUERY_KEY, (old) => {
-        if (!old) return old;
-        return old.map(task => 
-          task.id === taskId 
-            ? { ...task, progress, status }
-            : task
-        );
-      });
-      
-      return { previousTasks };
-    },
-    onError: (err, variables, context) => {
-      // Rollback on error
-      if (context?.previousTasks) {
-        queryClient.setQueryData(MY_TASKS_QUERY_KEY, context.previousTasks);
-      }
-      console.error('Error updating task:', err);
-      alert('Failed to update task progress');
-    },
-    onSettled: () => {
-      // Refetch after mutation
-      queryClient.invalidateQueries({ queryKey: MY_TASKS_QUERY_KEY });
-      setUpdatingTaskId(null);
-    },
   });
 
   // Employee data from auth context
@@ -292,7 +153,10 @@ const TeamMemberDashboard = () => {
   }, [user]);
 
   // Calculate stats
-  const stats = useMemo(() => calculateStats(tasks, employee?.efficiency || 95), [tasks, employee]);
+  const stats = useMemo(
+    () => calculateTeamMemberTaskStats(tasks, employee?.efficiency || 95),
+    [tasks, employee],
+  );
 
   // Filter tasks
   const filteredTasks = useMemo(() => {
@@ -316,40 +180,8 @@ const TeamMemberDashboard = () => {
   // Helper functions using filtered tasks
   const getUpcomingDeadlines = () => {
     return filteredTasks
-      .filter(task => isInNextWeek(task.dueDate || task.deadline, task.status))
+      .filter((task) => isTaskDueWithinDays(task, 7))
       .slice(0, 3);
-  };
-
-  const handleUpdateProgress = async (taskId, progress) => {
-    const task = tasks.find((item) => item.id === taskId);
-    if (!task) return;
-
-    const status = getNextTeamMemberStatus(task, progress);
-    setUpdatingTaskId(taskId);
-    updateTaskMutation.mutate({ taskId, status, progress });
-  };
-
-  const handleStartTask = (taskId) => {
-    handleUpdateProgress(taskId, 0);
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'completed': return 'text-green-700 bg-green-50';
-      case 'passed': return 'text-green-700 bg-green-50';
-      case 'in-progress': return 'text-blue-700 bg-blue-50';
-      case 'pending': return 'text-yellow-700 bg-yellow-50';
-      default: return 'text-gray-700 bg-gray-50';
-    }
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'low': return 'bg-green-100 text-green-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
   };
 
   // Show skeleton immediately while loading
@@ -510,11 +342,8 @@ const TeamMemberDashboard = () => {
             <div className="space-y-4">
               {filteredTasks.length > 0 ? (
                 filteredTasks.map(task => {
-                  const isUpdating = updatingTaskId === task.id;
-                  const taskProgress = getTeamMemberTaskProgress(task);
-                  
                   return (
-                    <div key={task.id} className={`border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow ${isUpdating ? 'opacity-75' : ''}`}>
+                    <div key={task.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow">
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
                           <h3 className="font-medium text-gray-900">{task.title}</h3>
@@ -533,8 +362,8 @@ const TeamMemberDashboard = () => {
                       {/* Action Buttons */}
                       <div className="flex justify-between items-center">
                         <div className="text-sm text-gray-500">
-                          Due: {formatDate(task.dueDate || task.deadline)}
-                          {isOverdue(task.dueDate || task.deadline, task.status) && (
+                          Due: {formatDate(task.dueDate || task.deadline, 'No deadline')}
+                          {isTaskOverdue(task) && (
                             <span className="ml-2 text-red-600 font-medium">(Overdue!)</span>
                           )}
                         </div>
@@ -572,7 +401,7 @@ const TeamMemberDashboard = () => {
                     </span>
                   </div>
                   <div className="flex justify-between text-xs text-gray-500 mt-2">
-                    <span>Due: {formatDate(task.dueDate || task.deadline)}</span>
+                    <span>Due: {formatDate(task.dueDate || task.deadline, 'No deadline')}</span>
                     <span>{taskProgress}%</span>
                   </div>
                       </>

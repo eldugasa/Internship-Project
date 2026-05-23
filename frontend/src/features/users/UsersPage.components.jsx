@@ -1,4 +1,5 @@
 import React, { useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Check, Download, Edit, Eye, Trash2, UserPlus, X } from "lucide-react";
 import {
   ROLE_OPTIONS,
@@ -45,36 +46,36 @@ const PermissionSelector = ({
     : [];
 
   return (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-2">
-      Extra Permissions
-    </label>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 p-3">
-      {options.map((permission) => {
-        const checked = normalizedSelectedPermissions.includes(permission.value);
-        return (
-          <label
-            key={permission.value}
-            className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
-              disabled ? "opacity-60" : "cursor-pointer hover:bg-gray-50"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={checked}
-              onChange={() => onToggle(permission.value)}
-              disabled={disabled}
-              className="h-4 w-4 rounded border-gray-300 text-[#194f87] focus:ring-[#194f87]"
-            />
-            <span>{permission.label}</span>
-          </label>
-        );
-      })}
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Extra Permissions
+      </label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto rounded-lg border border-gray-200 p-3">
+        {options.map((permission) => {
+          const checked = normalizedSelectedPermissions.includes(permission.value);
+          return (
+            <label
+              key={permission.value}
+              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                disabled ? "opacity-60" : "cursor-pointer hover:bg-gray-50"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={() => onToggle(permission.value)}
+                disabled={disabled}
+                className="h-4 w-4 rounded border-gray-300 text-[#194f87] focus:ring-[#194f87]"
+              />
+              <span>{permission.label}</span>
+            </label>
+          );
+        })}
+      </div>
+      <p className="mt-2 text-xs text-gray-500">
+        The user keeps their main role and gains these abilities in addition.
+      </p>
     </div>
-    <p className="mt-2 text-xs text-gray-500">
-      The user keeps their main role and gains these abilities in addition.
-    </p>
-  </div>
   );
 };
 
@@ -192,24 +193,20 @@ export const UsersManagementContent = ({
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={onExport}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
-          >
-            <Download className="w-5 h-5" />
-            Export CSV
-          </button>
-          <button
+         
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            transition={{ type: "spring", stiffness: 500 }}
             onClick={onShowAddUser}
             disabled={isAddingUser}
-            className="px-4 py-2 rounded-lg text-white flex items-center gap-2 hover:shadow-lg transition disabled:opacity-50"
+            className="px-4 py-2 rounded-lg text-white flex items-center cursor-pointer gap-2 hover:shadow-lg transition disabled:opacity-50"
             style={{
               background: "linear-gradient(to right, #0f5841, #194f87)",
             }}
           >
             <UserPlus className="w-5 h-5" />
             Add User
-          </button>
+          </motion.button>
         </div>
       </div>
 
@@ -292,96 +289,96 @@ export const UsersManagementContent = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {paginatedUsers.length > 0 ? (
-                paginatedUsers.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <div className="flex items-center">
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold mr-3"
-                          style={{
-                            background:
-                              "linear-gradient(to bottom right, #0f5841, #194f87)",
-                          }}
-                        >
-                          {(user.name || "U")
-                            .split(" ")
-                            .map((name) => name[0])
-                            .join("")
-                            .toUpperCase()
-                            .substring(0, 2)}
-                        </div>
-                        <div>
-                          <div className="font-medium text-gray-900">
-                            {user.name}
+              <AnimatePresence mode="wait">
+                {paginatedUsers.length > 0 ? (
+                  paginatedUsers.map((user) => (
+                    <motion.tr
+                      layout
+                      key={user.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ type: "spring", stiffness: 200, damping: 25 }}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold mr-3"
+                            style={{
+                              background:
+                                "linear-gradient(to bottom right, #0f5841, #194f87)",
+                            }}
+                          >
+                            {(user.name || "U")
+                              .split(" ")
+                              .map((name) => name[0])
+                              .join("")
+                              .toUpperCase()
+                              .substring(0, 2)}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {user.email}
+                          <div>
+                            <div className="font-medium text-gray-900">{user.name}</div>
+                            <div className="text-sm text-gray-500">{user.email}</div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}
-                      >
-                        {toDisplayRole(user.role)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
-                        {user.team?.name || user.team || "Unassigned"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(user.status)}`}
-                      >
-                        {user.status || "active"}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => onViewUser(user)}
-                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                          title="View"
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleColor(user.role)}`}
                         >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onEditUser(user)}
-                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
-                          title="Edit"
-                          style={{ color: "#194f87" }}
+                          {toDisplayRole(user.role)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-xs font-medium">
+                          {user.team?.name || user.team || "Unassigned"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(user.status)}`}
                         >
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => onDeleteUser(user.id)}
-                          disabled={isDeletingUser}
-                          className="p-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition disabled:opacity-50"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                          {user.status || "active"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => onViewUser(user)}
+                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                            title="View"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onEditUser(user)}
+                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                            title="Edit"
+                            style={{ color: "#194f87" }}
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => onDeleteUser(user.id)}
+                            disabled={isDeletingUser}
+                            className="p-2 text-gray-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition disabled:opacity-50"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))
+                ) : (
+                  <motion.tr layout key="empty-state">
+                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                      No users found matching your criteria
                     </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td
-                    colSpan="5"
-                    className="px-6 py-12 text-center text-gray-500"
-                  >
-                    No users found matching your criteria
-                  </td>
-                </tr>
-              )}
+                  </motion.tr>
+                )}
+              </AnimatePresence>
             </tbody>
           </table>
         </div>
@@ -390,8 +387,8 @@ export const UsersManagementContent = ({
       <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-sm text-gray-500">
           Showing {paginatedUsers.length ? (page - 1) * pageSize + 1 : 0} to{" "}
-          {Math.min(page * pageSize, filteredUsers.length)} of{" "}
-          {filteredUsers.length} filtered users ({users.length} total)
+          {Math.min(page * pageSize, filteredUsers.length)} of {filteredUsers.length}{" "}
+          filtered users ({users.length} total)
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -415,23 +412,27 @@ export const UsersManagementContent = ({
 
           {totalPages > 1 && (
             <div className="flex items-center gap-2">
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 500 }}
                 onClick={() => onPageChange(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-gray-300 px-3 py-2 bg-green-800 text-white text-sm transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Previous
-              </button>
+              </motion.button>
               <span className="text-sm text-gray-600">
                 Page {page} of {totalPages}
               </span>
-              <button
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                transition={{ type: "spring", stiffness: 500 }}
                 onClick={() => onPageChange(Math.min(totalPages, page + 1))}
                 disabled={page === totalPages}
-                className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-gray-300 px-3 py-2 bg-green-800 text-white text-sm transition disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Next
-              </button>
+              </motion.button>
             </div>
           )}
         </div>
@@ -441,7 +442,12 @@ export const UsersManagementContent = ({
 );
 
 export const ViewUserPopup = ({ user, onClose }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 bg-opacity-50">
+  <motion.div
+    initial={{ opacity: 0, y: -30 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -30 }}
+    className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 bg-opacity-50"
+  >
     <div className="bg-white rounded-xl shadow-2xl w-full max-w-[90%] sm:max-w-md mx-auto max-h-[90vh] overflow-y-auto">
       <div className="p-4 sm:p-6">
         <div className="flex justify-between items-center mb-4 sm:mb-6">
@@ -580,7 +586,7 @@ export const ViewUserPopup = ({ user, onClose }) => (
         </button>
       </div>
     </div>
-  </div>
+  </motion.div>
 );
 
 export const EditUserPopup = ({
@@ -595,7 +601,12 @@ export const EditUserPopup = ({
   roleLocked = false,
   lockMessage = "",
 }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 bg-opacity-50">
+  <motion.div
+    initial={{ opacity: 0, y: -30 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -30 }}
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 bg-opacity-50"
+  >
     <div className="bg-white rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden">
       <div className="flex items-center justify-between p-6 border-b border-gray-200">
         <h2 className="text-xl font-bold text-gray-900">Edit User Access</h2>
@@ -713,7 +724,7 @@ export const EditUserPopup = ({
         </div>
       </div>
     </div>
-  </div>
+  </motion.div>
 );
 
 export const AddUserPopup = ({
@@ -727,7 +738,12 @@ export const AddUserPopup = ({
   availablePermissionOptions,
   showPermissionAssignment = true,
 }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50">
+  <motion.div
+    initial={{ opacity: 0, y: -30 }}
+    animate={{ opacity: 1, y: 0 }}
+    exit={{ opacity: 0, y: -30 }}
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 bg-opacity-50"
+  >
     <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
       <div className="flex items-center justify-between p-6 border-b border-gray-200">
         <h2 className="text-xl font-bold text-gray-900">Add New User</h2>
@@ -846,7 +862,7 @@ export const AddUserPopup = ({
         </div>
       </form>
     </div>
-  </div>
+  </motion.div>
 );
 
 export const Toast = ({ message, type, onClose }) => {

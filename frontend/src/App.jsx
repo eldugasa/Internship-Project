@@ -1,9 +1,8 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import React from "react";
-
+import React, { lazy, Suspense } from "react";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import ErrorPage from "./pages/ErrorPage";
-import LandingPage from "./LandingPage";
+const LandingPage = lazy(() => import("./LandingPage"));
 import Login from "./auth/Login";
 import ForgetPassword from "./auth/ForgetPassword";
 import ResetPassword from "./auth/ResetPassword";
@@ -15,8 +14,6 @@ import { usersLoader } from "./loader/admin/UsersManagement.loader";
 import TeamsManagement, {
   loader as teamsLoader,
 } from "./pages/projectManager/TeamsManagement";
-import ProjectsManagement from "./pages/admin/ProjectsManagement";
-import { projectsLoader } from "./loader/admin/ProjectsManagement.loader";
 import Reports from "./pages/admin/Reports";
 import { reportsLoader } from "./loader/admin/Reports.loader";
 import SettingsPage from "./pages/admin/SettingsPage";
@@ -74,67 +71,22 @@ import QATesterNotificationsPage from "./Component/qaTester/QATesterNotification
 
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import { PERMISSIONS } from "./config/permissions";
-import { useAuth } from "./context/AuthContext";
-
-const AdminAreaGuard = ({ children }) => (
-  <ProtectedRoute
-    allowedRoles={["admin", "super-admin"]}
-    requiredPermissions={[
-      PERMISSIONS.MANAGE_USERS,
-      PERMISSIONS.MANAGE_TEAMS,
-      PERMISSIONS.MANAGE_PROJECTS,
-      PERMISSIONS.VIEW_REPORTS,
-      PERMISSIONS.MANAGE_SETTINGS,
-    ]}
-  >
-    {children}
-  </ProtectedRoute>
-);
-
-const ManagerAreaGuard = ({ children }) => (
-  <ProtectedRoute
-    allowedRoles={["project-manager", "project_manager", "admin", "super-admin"]}
-    requiredPermissions={[
-      PERMISSIONS.MANAGE_TEAMS,
-      PERMISSIONS.MANAGE_PROJECTS,
-      PERMISSIONS.ASSIGN_TASKS,
-      PERMISSIONS.VIEW_REPORTS,
-    ]}
-  >
-    {children}
-  </ProtectedRoute>
-);
-
-const QAAreaGuard = ({ children }) => (
-  <ProtectedRoute
-    allowedRoles={["qa-tester", "qa_tester", "admin", "super-admin"]}
-    requiredPermissions={[PERMISSIONS.TEST_TASKS]}
-  >
-    {children}
-  </ProtectedRoute>
-);
-
-const ProjectWorkspaceGuard = ({ children }) => {
-  const { hasPermission, hasRole } = useAuth();
-  const canViewProjects =
-    hasRole(["project-manager", "project_manager"]) ||
-    hasPermission(PERMISSIONS.MANAGE_PROJECTS);
-
-  return canViewProjects ? children : <Navigate to="/login" replace />;
-};
-
-const ProjectManagementGuard = ({ children }) => {
-  const { hasPermission } = useAuth();
-
-  return hasPermission(PERMISSIONS.MANAGE_PROJECTS)
-    ? children
-    : <Navigate to="/login" replace />;
-};
+import {
+  AdminAreaGuard,
+  ManagerAreaGuard,
+  ProjectManagementGuard,
+  ProjectWorkspaceGuard,
+  QAAreaGuard,
+} from "./AppGuards";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <LandingPage />,
+     element: (
+    <Suspense fallback={<div>Loading...</div>}>
+      <LandingPage />
+    </Suspense>
+  ),
     errorElement: <ErrorPage />,
   },
   {
@@ -220,12 +172,41 @@ export const router = createBrowserRouter([
       },
       {
         path: "projects",
-        element: (
-          <ProtectedRoute requiredPermissions={[PERMISSIONS.MANAGE_PROJECTS]}>
-            <ProjectsManagement />
-          </ProtectedRoute>
-        ),
-        loader: projectsLoader,
+        children: [
+          {
+            index: true,
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "super-admin"]}>
+                <Projects />
+              </ProtectedRoute>
+            ),
+            loader: pmprojectsLoader,
+          },
+          {
+            path: ":id",
+            element: (
+              <ProtectedRoute allowedRoles={["admin", "super-admin"]}>
+                <ProjectDetails />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "edit/:id",
+            element: (
+              <ProtectedRoute requiredPermissions={[PERMISSIONS.MANAGE_PROJECTS]}>
+                <EditProject />
+              </ProtectedRoute>
+            ),
+          },
+          {
+            path: "create",
+            element: (
+              <ProtectedRoute requiredPermissions={[PERMISSIONS.MANAGE_PROJECTS]}>
+                <CreateProject />
+              </ProtectedRoute>
+            ),
+          },
+        ],
       },
       {
         path: "reports",
@@ -410,11 +391,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "settings",
-        element: (
-          <ProtectedRoute requiredPermissions={[PERMISSIONS.MANAGE_SETTINGS]}>
-            <Settings />
-          </ProtectedRoute>
-        ),
+        element: <Settings />,
         loader: settingspmLoader,
       },
       {
@@ -426,7 +403,7 @@ export const router = createBrowserRouter([
   {
     path: "/team-member",
     element: (
-      <ProtectedRoute allowedRoles={["team-member", "team_member", "admin", "super-admin"]}>
+      <ProtectedRoute allowedRoles={["team-member", "admin", "super-admin"]}>
         <TeamMemberLayout />
       </ProtectedRoute>
     ),

@@ -1,5 +1,8 @@
 import { prisma } from "../config/db.js";
 
+const normalizeRole = (role = "") =>
+  role.toString().trim().toUpperCase().replace(/-/g, "_");
+
 // Map notification types to preference keys
 const typeToPrefMap = {
   // Admin notifications
@@ -30,7 +33,7 @@ const typeToPrefMap = {
   'member_removed': 'memberRemoved' // ADD THIS
 };
 
-const ADMIN_LEVEL_ROLES = new Set(['admin', 'super-admin']);
+const ADMIN_LEVEL_ROLES = new Set(["ADMIN", "SUPER_ADMIN"]);
 const TASK_NOTIFICATION_TYPES = new Set([
   'task_assigned',
   'task_completed',
@@ -43,7 +46,7 @@ const TASK_NOTIFICATION_TYPES = new Set([
 ]);
 
 const shouldSkipTaskNotificationForRole = (role, type) =>
-  ADMIN_LEVEL_ROLES.has(role) && TASK_NOTIFICATION_TYPES.has(type);
+  ADMIN_LEVEL_ROLES.has(normalizeRole(role)) && TASK_NOTIFICATION_TYPES.has(type);
 
 // Create single notification with preference check
 export const createNotification = async ({

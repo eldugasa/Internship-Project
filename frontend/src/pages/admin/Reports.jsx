@@ -422,14 +422,7 @@ const Reports = () => {
               {new Date(dateRange.end).toLocaleDateString()}
             </p>
           </div>
-          <div className="flex gap-2">
-            <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition">
-              <Share2 className="w-5 h-5" />
-            </button>
-            <button className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition">
-              <DownloadCloud className="w-5 h-5" />
-            </button>
-          </div>
+          
         </div>
 
         {/* Report Content based on selection */}
@@ -563,8 +556,7 @@ const Reports = () => {
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
                             user.role === "admin"
                               ? "bg-purple-100 text-purple-800"
-                              : user.role === "project-manager" ||
-                                  user.role === "project_manager"
+                              : user.role === "project-manager"
                                 ? "bg-blue-100 text-blue-800"
                                 : "bg-green-100 text-green-800"
                           }`}

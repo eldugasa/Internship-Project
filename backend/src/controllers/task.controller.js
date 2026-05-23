@@ -4,8 +4,15 @@ import {
   createNotification,
   NOTIFICATION_TYPES,
 } from "../utils/notificationHelper.js";
+import {
+  deleteStoredAttachment,
+  saveBase64Attachment,
+} from "../utils/attachment.js";
 
 const DONE_TASK_STATUSES = new Set(["COMPLETED", "PASSED"]);
+
+const normalizeRole = (role = "") =>
+  role.toString().trim().toUpperCase().replace(/-/g, "_");
 
 const clampProgress = (value) => {
   const numericValue = Number(value);
@@ -53,48 +60,98 @@ const resolveFallbackQaTesterId = (projectManagerId, requestedQaTesterId) => {
   return Number(requestedQaTesterId);
 };
 
+const isMissingAttachmentColumnError = (error) =>
+  error?.message?.includes("Task.attachmentName") ||
+  error?.message?.includes("Task.attachmentUrl") ||
+  error?.message?.includes("Task.attachmentMimeType");
+
+const buildTaskSelect = (includeAttachmentFields = true) => ({
+  id: true,
+  title: true,
+  description: true,
+  ...(includeAttachmentFields
+    ? {
+        attachmentName: true,
+        attachmentMimeType: true,
+        attachmentUrl: true,
+      }
+    : {}),
+  status: true,
+  progress: true,
+  previousProgress: true,
+  priority: true,
+  dueDate: true,
+  assigneeId: true,
+  qaTesterId: true,
+  projectId: true,
+  createdAt: true,
+  updatedAt: true,
+  assignee: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    },
+  },
+  qaTester: {
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+    },
+  },
+  project: {
+    select: {
+      id: true,
+      name: true,
+      description: true,
+      status: true,
+      managerId: true,
+      teamId: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+    },
+  },
+});
+
+const buildTaskDetailsSelect = (includeAttachmentFields = true) => ({
+  ...buildTaskSelect(includeAttachmentFields),
+  comments: {
+    include: {
+      user: { select: { id: true, name: true, email: true, role: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  },
+});
+
 // Get task by ID
 const getTaskById = async (req, res) => {
   try {
     const { id } = req.params;
-    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const normalizedRole = normalizeRole(req.user.role);
 
-    const task = await prisma.task.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-        qaTester: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
-        },
-        project: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            status: true,
-            managerId: true,
-          },
-        },
-        comments: {
-          include: {
-            user: { select: { id: true, name: true, email: true, role: true } },
-          },
-          orderBy: { createdAt: "desc" },
-        },
-      },
-    });
+    let task;
+    try {
+      task = await prisma.task.findUnique({
+        where: { id: parseInt(id) },
+        select: buildTaskDetailsSelect(true),
+      });
+    } catch (error) {
+      if (!isMissingAttachmentColumnError(error)) {
+        throw error;
+      }
+
+      task = await prisma.task.findUnique({
+        where: { id: parseInt(id) },
+        select: buildTaskDetailsSelect(false),
+      });
+    }
 
     if (!task) {
       return res.status(404).json({ message: "Task not found" });
@@ -116,6 +173,9 @@ const getTaskById = async (req, res) => {
       title: task.title,
       description: task.description,
       status: task.status,
+      attachmentName: task.attachmentName || null,
+      attachmentMimeType: task.attachmentMimeType || null,
+      attachmentUrl: task.attachmentUrl || null,
       progress: getNormalizedTaskProgress(task),
       previousProgress: task.previousProgress || 0,
       priority: task.priority || "MEDIUM",
@@ -147,6 +207,7 @@ const createTask = async (req, res) => {
       qaTesterId,
       dueDate,
       priority,
+      attachment,
     } = req.body;
 
     // Check if assigned user exists
@@ -193,11 +254,16 @@ const createTask = async (req, res) => {
       qaTesterId,
     );
 
+    const savedAttachment = attachment
+      ? await saveBase64Attachment(attachment, "tasks")
+      : null;
+
     // Create the task
     const task = await prisma.task.create({
       data: {
         title,
         description: description || "",
+        ...(savedAttachment || {}),
         status: "PENDING",
         progress: 0,
         priority: priority || "MEDIUM",
@@ -219,11 +285,7 @@ const createTask = async (req, res) => {
     // Create notifications
     try {
       // Notify project manager
-      const managerRole = project.manager?.role
-        ?.toString()
-        .trim()
-        .toUpperCase()
-        .replace(/-/g, "_");
+      const managerRole = normalizeRole(project.manager?.role);
 
       if (project.managerId && managerRole !== "ADMIN") {
         await createNotification({
@@ -306,54 +368,40 @@ const getTasksByProject = async (req, res) => {
 // Get tasks assigned to the current user (for Team Members)
 const getMyTasks = async (req, res) => {
   try {
-    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const normalizedRole = normalizeRole(req.user.role);
     const isQaTester = normalizedRole === "QA_TESTER";
 
-    const tasks = await prisma.task.findMany({
-      where: {
-        ...(isQaTester ? { qaTesterId: req.user.id } : { assigneeId: req.user.id }),
-      },
-      include: {
-        assignee: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
+    let tasks;
+    try {
+      tasks = await prisma.task.findMany({
+        where: {
+          ...(isQaTester ? { qaTesterId: req.user.id } : { assigneeId: req.user.id }),
         },
-        qaTester: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-          },
+        select: buildTaskSelect(true),
+        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+      });
+    } catch (error) {
+      if (!isMissingAttachmentColumnError(error)) {
+        throw error;
+      }
+
+      tasks = await prisma.task.findMany({
+        where: {
+          ...(isQaTester ? { qaTesterId: req.user.id } : { assigneeId: req.user.id }),
         },
-        project: {
-          select: {
-            id: true,
-            name: true,
-            description: true,
-            status: true,
-            teamId: true,
-            team: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
-      orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-    });
+        select: buildTaskSelect(false),
+        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+      });
+    }
 
     // Format tasks
     const formattedTasks = tasks.map((task) => ({
       id: task.id,
       title: task.title,
       description: task.description,
+      attachmentName: task.attachmentName || null,
+      attachmentMimeType: task.attachmentMimeType || null,
+      attachmentUrl: task.attachmentUrl || null,
       status: task.status,
       progress: getNormalizedTaskProgress(task),
       previousProgress: task.previousProgress || 0,
@@ -384,7 +432,7 @@ const updateTaskStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, progress } = req.body;
-    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const normalizedRole = normalizeRole(req.user.role);
 
     const task = await prisma.task.findUnique({
       where: { id: Number(id) },
@@ -584,7 +632,7 @@ const updateTaskProgress = async (req, res) => {
   try {
     const { id } = req.params;
     const { progress } = req.body;
-    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const normalizedRole = normalizeRole(req.user.role);
 
     const task = await prisma.task.findUnique({
       where: { id: parseInt(id) },
@@ -803,8 +851,9 @@ const deleteComment = async (req, res) => {
 
     // Security: Only the author, an ADMIN, or a PROJECT_MANAGER can delete
     const isAuthor = comment.userId === req.user.id;
+    const normalizedRole = normalizeRole(req.user.role);
     const isPrivileged =
-      req.user.role === "ADMIN" || req.user.role === "PROJECT_MANAGER";
+      normalizedRole === "ADMIN" || normalizedRole === "PROJECT_MANAGER";
 
     if (!isAuthor && !isPrivileged) {
       return res
@@ -838,6 +887,8 @@ const updateTask = async (req, res) => {
       dueDate,
       status,
       progress,
+      attachment,
+      removeAttachment,
     } = req.body;
 
     // Check if task exists
@@ -858,6 +909,15 @@ const updateTask = async (req, res) => {
     };
     if (title !== undefined) updateData.title = title;
     if (description !== undefined) updateData.description = description;
+    if (removeAttachment) {
+      updateData.attachmentName = null;
+      updateData.attachmentMimeType = null;
+      updateData.attachmentUrl = null;
+    }
+    if (attachment) {
+      const savedAttachment = await saveBase64Attachment(attachment, "tasks");
+      Object.assign(updateData, savedAttachment);
+    }
     if (assigneeId !== undefined) updateData.assigneeId = parseInt(assigneeId);
     const resolvedQaTesterId = resolveFallbackQaTesterId(
       existingTask.project?.managerId,
@@ -880,6 +940,10 @@ const updateTask = async (req, res) => {
         project: { select: { id: true, name: true } },
       },
     });
+
+    if ((removeAttachment || attachment) && existingTask.attachmentUrl) {
+      await deleteStoredAttachment(existingTask.attachmentUrl);
+    }
 
     res.json({
       message: "Task updated successfully",
@@ -904,7 +968,8 @@ const deleteTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    if (req.user.role !== "ADMIN" && req.user.role !== "PROJECT_MANAGER") {
+    const normalizedRole = normalizeRole(req.user.role);
+    if (normalizedRole !== "ADMIN" && normalizedRole !== "PROJECT_MANAGER") {
       return res
         .status(403)
         .json({ message: "Not authorized to delete tasks" });
@@ -919,6 +984,10 @@ const deleteTask = async (req, res) => {
     await prisma.task.delete({
       where: { id: parseInt(id) },
     });
+
+    if (task.attachmentUrl) {
+      await deleteStoredAttachment(task.attachmentUrl);
+    }
 
     res.json({ message: "Task deleted successfully" });
   } catch (err) {

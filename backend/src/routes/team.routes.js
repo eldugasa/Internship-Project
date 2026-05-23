@@ -13,6 +13,12 @@ import {
   assignUserToTeam,
   removeUserFromTeam
 } from "../controllers/team.controller.js";
+import { validateRequest } from "../middleware/validate.middleware.js";
+import {
+  createTeamValidation,
+  teamIdValidation,
+  teamMemberValidation,
+} from "../validation/team.validation.js";
 
 const router = express.Router();
 
@@ -30,6 +36,8 @@ router.get(
 router.get(
   "/:teamId",
   requireAnyPermission(PERMISSIONS.MANAGE_TEAMS, PERMISSIONS.MANAGE_USERS),
+  teamIdValidation,
+  validateRequest,
   getTeamById,
 );
 
@@ -37,6 +45,8 @@ router.get(
 router.post(
   "/",
   requirePermission(PERMISSIONS.MANAGE_TEAMS),
+  createTeamValidation,
+  validateRequest,
   createTeam
 );
 
@@ -44,6 +54,8 @@ router.post(
 router.delete(
   "/:teamId",
   requirePermission(PERMISSIONS.MANAGE_TEAMS),
+  teamIdValidation,
+  validateRequest,
   deleteTeam
 );
 
@@ -51,6 +63,8 @@ router.delete(
 router.put(
   "/:teamId/add-member",
   requirePermission(PERMISSIONS.MANAGE_TEAMS),
+  teamMemberValidation,
+  validateRequest,
   assignUserToTeam
 );
 
@@ -58,6 +72,8 @@ router.put(
 router.put(
   "/:teamId/remove-member",
   requirePermission(PERMISSIONS.MANAGE_TEAMS),
+  teamMemberValidation,
+  validateRequest,
   removeUserFromTeam
 );
 

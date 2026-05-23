@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { TEAM_MEMBER_ACTIVE_STATUSES, myTasksQuery } from './taskShared';
+import { getTaskProjectLabel } from '../../features/tasks/taskShared';
 
 //  2. HELPER COMPONENTS
 
@@ -281,7 +282,7 @@ const TeamMemberProgress = () => {
     // Project breakdown
     const projectMap = {};
     tasks.forEach(task => {
-      const name = task.projectName || task.project || 'Unassigned';
+      const name = getTaskProjectLabel(task);
       if (!projectMap[name]) {
         projectMap[name] = { 
           total: 0, 

@@ -23,6 +23,7 @@ import {
   getStatusConfig,
   getCompletionPercentage,
 } from "../../loader/admin/DashboardOverview.loader";
+import { isOverdue } from "../../loader/manager/Projects.loader";
 import { getProjects } from "../../services/projectsService";
 import { getUsers } from "../../services/usersService";
 import { getTeams } from "../../services/teamsService";
@@ -74,6 +75,37 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
   const normalizeValue = (value = "") =>
     value.toString().trim().toUpperCase().replace(/-/g, "_");
 
+  const formatTaskStatusLabel = (status) =>
+    status
+      .toString()
+      .trim()
+      .split(/[-_\s]+/)
+      .filter(Boolean)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(" ");
+
+  const getTaskStatusColor = (status) => {
+    const normalizedStatus = normalizeValue(status);
+
+    const statusColors = {
+      PENDING: DASHBOARD_COLORS.pending,
+      TODO: DASHBOARD_COLORS.pending,
+      IN_PROGRESS: DASHBOARD_COLORS.in_progress,
+      COMPLETED: DASHBOARD_COLORS.completed,
+      DONE: DASHBOARD_COLORS.done || DASHBOARD_COLORS.completed,
+      PASSED: "#059669",
+      BLOCKED: "#EF4444",
+      REVIEW: "#8B5CF6",
+      IN_TEST: "#06B6D4",
+      FAILED: "#DC2626",
+      PENDING_RETEST: "#F97316",
+    };
+
+    return statusColors[normalizedStatus] || "#64748B";
+  };
+
+  const isValidDate = (date) => !Number.isNaN(date.getTime());
+
   useEffect(() => {
     const handleResize = () => {
       setViewportWidth(window.innerWidth);
@@ -119,9 +151,7 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
     const inProgressTasks = tasks.filter(
       (t) => normalizeValue(t.status) === "IN_PROGRESS",
     ).length;
-    const overdueProjects = projects.filter(
-      (p) => normalizeValue(p.status) === "OVERDUE",
-    ).length;
+    const overdueProjects = projects.filter((project) => isOverdue(project)).length;
 
     return {
       totalUsers: users.length,
@@ -152,7 +182,7 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
       completed: projects.filter(
         (p) => normalizeValue(p.status) === "COMPLETED",
       ).length,
-      overdue: projects.filter((p) => normalizeValue(p.status) === "OVERDUE").length,
+      overdue: projects.filter((project) => isOverdue(project)).length,
       "on-hold": projects.filter(
         (p) => normalizeValue(p.status) === "ON_HOLD",
       ).length,
@@ -191,29 +221,37 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
   const taskStatusData = useMemo(() => {
     if (isSuperAdmin) return [];
 
-    const completedTasks = tasks.filter(
-      (t) => ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
-    ).length;
-    const pendingTasks = tasks.filter(
-      (t) => ["PENDING", "TODO"].includes(normalizeValue(t.status)),
-    ).length;
-    const inProgressTasks = tasks.filter(
-      (t) => normalizeValue(t.status) === "IN_PROGRESS",
-    ).length;
+    const statusCounts = tasks.reduce((acc, task) => {
+      const normalizedStatus = normalizeValue(task.status || "PENDING");
+      acc[normalizedStatus] = (acc[normalizedStatus] || 0) + 1;
+      return acc;
+    }, {});
 
-    return [
-      { name: "Pending", value: pendingTasks, color: DASHBOARD_COLORS.pending },
-      {
-        name: "In Progress",
-        value: inProgressTasks,
-        color: DASHBOARD_COLORS.in_progress,
-      },
-      {
-        name: "Completed",
-        value: completedTasks,
-        color: DASHBOARD_COLORS.completed,
-      },
-    ].filter((item) => item.value > 0);
+    const preferredOrder = [
+      "PENDING",
+      "IN_PROGRESS",
+      "REVIEW",
+      "IN_TEST",
+      "PENDING_RETEST",
+      "BLOCKED",
+      "FAILED",
+      "COMPLETED",
+      "DONE",
+      "PASSED",
+    ];
+
+    const orderedStatuses = [
+      ...preferredOrder.filter((status) => statusCounts[status] > 0),
+      ...Object.keys(statusCounts)
+        .filter((status) => !preferredOrder.includes(status))
+        .sort(),
+    ];
+
+    return orderedStatuses.map((status) => ({
+      name: formatTaskStatusLabel(status),
+      value: statusCounts[status],
+      color: getTaskStatusColor(status),
+    }));
   }, [isSuperAdmin, tasks]);
 
   // Memoized user role data
@@ -263,14 +301,21 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
       const tasksInMonth = isSuperAdmin
         ? 0
         : tasks.filter((task) => {
-            const taskDate = new Date(task.createdAt);
+            const taskDate = new Date(task.rawCreatedAt || task.createdAt);
+            if (!isValidDate(taskDate)) return false;
             return taskDate.getMonth() === month && taskDate.getFullYear() === year;
           }).length;
 
       const projectsInMonth = projects.filter((project) => {
         const projectDate = new Date(
-          project.createdAt || project.startDate || new Date(),
+          project.rawCreatedAt ||
+            project.rawStartDate ||
+            project.rawEndDate ||
+            project.createdAt ||
+            project.startDate ||
+            project.endDate,
         );
+        if (!isValidDate(projectDate)) return false;
         return (
           projectDate.getMonth() === month && projectDate.getFullYear() === year
         );
@@ -320,13 +365,29 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
 
   // Memoized filtered projects (only recalculates when filter or projects change)
   const filteredProjects = useMemo(() => {
-    if (filter === "all") return projects;
-    if (filter === "active") {
-      return projects.filter((p) =>
-        ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
-      );
-    }
-    return projects.filter((p) => normalizeValue(p.status) === normalizeValue(filter));
+    const matchedProjects =
+      filter === "all"
+        ? projects
+        : filter === "active"
+          ? projects.filter((p) =>
+              ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
+            )
+          : projects.filter(
+              (p) => normalizeValue(p.status) === normalizeValue(filter),
+            );
+
+    return [...matchedProjects]
+      .sort((a, b) => {
+        const dateA = new Date(
+          a.createdAt || a.updatedAt || a.startDate || a.dueDate || 0,
+        ).getTime();
+        const dateB = new Date(
+          b.createdAt || b.updatedAt || b.startDate || b.dueDate || 0,
+        ).getTime();
+
+        return dateB - dateA;
+      })
+      .slice(0, 5);
   }, [projects, filter]);
 
   const renderWrappedLegend = ({ payload }) => {
@@ -720,7 +781,7 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
           <div>
             <h2 className="text-sm sm:text-base lg:text-lg font-bold text-gray-900">
-              All Projects Overview
+              Recent Projects Overview
             </h2>
             <p className="text-xs sm:text-sm text-gray-500 mt-1">
               View and manage project status across all teams

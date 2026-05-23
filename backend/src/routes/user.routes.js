@@ -1,4 +1,3 @@
-// src/routes/user.routes.js
 import express from "express";
 import authenticate from "../middleware/auth.middleware.js";
 import {
@@ -11,16 +10,20 @@ import {
   createUser,
   updateUserRole,
   getMe,
-  updateCurrentUser, // ✅ fixed name
+  updateCurrentUser,
   changePassword,
   deleteUser,
 } from "../controllers/user.controller.js";
+import { validateRequest } from "../middleware/validate.middleware.js";
+import {
+  changePasswordValidation,
+  createUserValidation,
+  updateCurrentUserValidation,
+  updateUserAccessValidation,
+} from "../validation/user.validation.js";
 
 const router = express.Router();
 
-// -------------------- Admin Endpoints --------------------
-
-// Get all users (Admin and Project Manager)
 router.get(
   "/",
   authenticate,
@@ -28,28 +31,47 @@ router.get(
   getAllUsers,
 );
 
-// Create a new user (Admin only)
-router.post("/", authenticate, requirePermission(PERMISSIONS.MANAGE_USERS), createUser);
+router.post(
+  "/",
+  authenticate,
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  createUserValidation,
+  validateRequest,
+  createUser,
+);
 
-// Update a user's role (Admin only)
 router.put(
   "/:id/role",
   authenticate,
   requireAnyPermission(PERMISSIONS.MANAGE_USERS, PERMISSIONS.MANAGE_ROLES),
+  updateUserAccessValidation,
+  validateRequest,
   updateUserRole,
 );
 
-// -------------------- Logged-in User Endpoints --------------------
-
-// Get logged-in user info
 router.get("/me", authenticate, getMe);
 
-// Update logged-in user's profile
-router.put("/me/profile", authenticate, updateCurrentUser); // ✅ fixed here
+router.put(
+  "/me/profile",
+  authenticate,
+  updateCurrentUserValidation,
+  validateRequest,
+  updateCurrentUser,
+);
 
-// Change logged-in user's password
-router.put("/me/password", authenticate, changePassword);
+router.put(
+  "/me/password",
+  authenticate,
+  changePasswordValidation,
+  validateRequest,
+  changePassword,
+);
 
-router.delete("/:id", authenticate, requirePermission(PERMISSIONS.MANAGE_USERS), deleteUser); // to delete user....
+router.delete(
+  "/:id",
+  authenticate,
+  requirePermission(PERMISSIONS.MANAGE_USERS),
+  deleteUser,
+);
 
 export default router;

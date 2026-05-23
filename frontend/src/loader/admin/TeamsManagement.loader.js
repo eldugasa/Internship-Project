@@ -1,34 +1,9 @@
 // src/loader/admin/TeamsManagement.loader.js
 import { getTeams } from '../../services/teamsService';
 import { getCurrentUserProfile, getUsers } from '../../services/usersService';
+import { resolveCanManageTeams } from '../../features/teams/teamAccess';
 
 const normalizeRole = (role = "") => role.toLowerCase().replace(/_/g, "-");
-
-const resolveCanManageTeams = (user = {}) => {
-  const normalizedRole = normalizeRole(user.role || "guest");
-  const effectivePermissions = Array.isArray(user.effectivePermissions)
-    ? user.effectivePermissions
-    : [];
-  const permissionOverrides = Array.isArray(user.permissionOverrides)
-    ? user.permissionOverrides
-    : [];
-  const hasExplicitManageTeamsGrant = permissionOverrides.includes("manage_teams");
-  const hasExplicitManageTeamsRevoke = permissionOverrides.includes("!manage_teams");
-
-  if (effectivePermissions.includes("*")) {
-    return true;
-  }
-
-  if (normalizedRole === "project-manager") {
-    return !hasExplicitManageTeamsRevoke;
-  }
-
-  if (normalizedRole === "admin") {
-    return hasExplicitManageTeamsGrant;
-  }
-
-  return effectivePermissions.includes("manage_teams");
-};
 
 // Define Query Keys and Functions
 export const teamsQuery = () => ({
@@ -57,7 +32,7 @@ export const teamsLoader = (queryClient) => async () => {
         ? { role: fallbackUser.role || "guest", permissions: [], effectivePermissions: [] }
         : fallbackUser;
   }
-  const canManageTeams = resolveCanManageTeams(user);
+  const canManageTeams = resolveCanManageTeams(user, true);
   
   // Prefetch both teams and users into the cache
   await Promise.all([
