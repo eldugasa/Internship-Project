@@ -59,11 +59,11 @@ export const calculateStats = (users, projects, teams, tasks) => {
   ).length;
 
   const projectManagers = users.filter(
-    (u) => u.role === "project-manager" || u.role === "project_manager",
+    (u) => u.role === "project-manager",
   ).length;
 
   const teamMembers = users.filter(
-    (u) => u.role === "team-member" || u.role === "team_member",
+    (u) => u.role === "team-member",
   ).length;
 
   // Project status breakdown
@@ -91,10 +91,10 @@ export const calculateStats = (users, projects, teams, tasks) => {
   const userRoles = {
     admins: users.filter((u) => u.role === "admin").length,
     projectManagers: users.filter(
-      (u) => u.role === "project-manager" || u.role === "project_manager",
+      (u) => u.role === "project-manager",
     ).length,
     teamMembers: users.filter(
-      (u) => u.role === "team-member" || u.role === "team_member",
+      (u) => u.role === "team-member",
     ).length,
   };
 

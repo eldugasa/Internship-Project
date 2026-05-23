@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   AlertCircle,
   Calendar,
@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
-import {motion, AnimatePresence} from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAuth } from "../../context/AuthContext";
 import {
   deleteTask,
@@ -104,6 +104,43 @@ const getQaStatusIcon = (status) => {
   }
 };
 
+const TEAM_PROGRESS_STEPS = [25, 50, 75, 100];
+const TEAM_PROGRESS_UPDATE_STATUSES = ["in-progress", "pending-retest", "failed"];
+const EMPTY_TASKS = [];
+const EMPTY_PROJECTS = [];
+
+const getTaskDueDate = (task) => task.rawDueDate || task.dueDate || task.deadline;
+
+const formatTaskStatus = (status) => status?.replace(/-/g, " ") || "unknown";
+
+const downloadTasksCsv = (tasks) => {
+  const csvData = tasks.map((task) => ({
+    "Task Title": task.title,
+    Project: getTaskProjectLabel(task),
+    Status: task.status,
+    Priority: task.priority,
+    "Due Date": formatDate(getTaskDueDate(task), "N/A"),
+    Progress: `${getTeamMemberTaskProgress(task)}%`,
+  }));
+
+  const headers = Object.keys(csvData[0]);
+  const escapeCsvValue = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+  const csv = [
+    headers.join(","),
+    ...csvData.map((row) =>
+      headers.map((header) => escapeCsvValue(row[header])).join(","),
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `my-tasks-${new Date().toISOString().split("T")[0]}.csv`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+};
+
 const TasksSkeleton = () => (
   <div className="p-4 sm:p-6">
     <div className="animate-pulse">
@@ -172,7 +209,7 @@ const ManagerTaskRow = ({
         <div
           className={`text-sm ${overdue ? "text-red-600 font-bold" : "text-gray-600"}`}
         >
-          {formatDate(task.rawDueDate || task.dueDate)}
+          {formatDate(getTaskDueDate(task))}
         </div>
       </td>
       <td className="px-4 py-3">
@@ -269,7 +306,7 @@ const ManagerMobileTaskCard = ({
         <div className="flex justify-between">
           <span className="text-gray-500">Deadline:</span>
           <span className={overdue ? "text-red-600 font-bold" : "text-gray-900"}>
-            {formatDate(task.rawDueDate || task.dueDate)}
+            {formatDate(getTaskDueDate(task))}
           </span>
         </div>
         <div className="flex justify-between items-center">
@@ -351,10 +388,10 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
   const [showFilters, setShowFilters] = useState(false);
   const [updatingTaskId, setUpdatingTaskId] = useState(null);
 
-  const safeTasks = Array.isArray(loaderData?.tasks) ? loaderData.tasks : [];
+  const safeTasks = Array.isArray(loaderData?.tasks) ? loaderData.tasks : EMPTY_TASKS;
   const safeProjects = Array.isArray(loaderData?.projects)
     ? loaderData.projects
-    : [];
+    : EMPTY_PROJECTS;
 
   const managerTasksQuery = useQuery({
     ...tasksQuery(),
@@ -401,7 +438,9 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
   });
 
   const managerDisplayTasks = managerTasksQuery.data || safeTasks;
-  const teamTasks = Array.isArray(memberTasksQuery.data) ? memberTasksQuery.data : [];
+  const teamTasks = Array.isArray(memberTasksQuery.data)
+    ? memberTasksQuery.data
+    : EMPTY_TASKS;
   const isLoading = mode === TASK_MODES.MANAGER
     ? managerTasksQuery.isLoading && safeTasks.length === 0
     : memberTasksQuery.isLoading && teamTasks.length === 0;
@@ -600,9 +639,14 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           {qaFilteredTasks.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="p-8 text-center text-gray-500"
+            >
               No tasks found matching your criteria.
-            </div>
+            </motion.div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
@@ -625,7 +669,11 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <motion.tbody
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                 className="divide-y divide-gray-100">
                   {qaFilteredTasks.map((task) => {
                     const taskProgress = getTeamMemberTaskProgress(task);
 
@@ -652,7 +700,7 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                           <div className="flex items-center gap-2">
                             {getQaStatusIcon(task.status)}
                             <span className="text-sm uppercase font-medium text-gray-700">
-                              {task.status?.replace("-", " ")}
+                              {formatTaskStatus(task.status)}
                             </span>
                           </div>
                         </td>
@@ -670,12 +718,12 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-600">
-                          {formatDate(task.rawDueDate || task.dueDate, "No date")}
+                          {formatDate(getTaskDueDate(task), "No date")}
                         </td>
                       </tr>
                     );
                   })}
-                </tbody>
+                </motion.tbody>
               </table>
             </div>
           )}
@@ -708,30 +756,7 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
         return;
       }
 
-      const csvData = teamFilteredTasks.map((task) => ({
-        "Task Title": task.title,
-        Project: getTaskProjectLabel(task),
-        Status: task.status,
-        Priority: task.priority,
-        "Due Date": formatDate(task.rawDueDate || task.dueDate, "N/A"),
-        Progress: `${getTeamMemberTaskProgress(task)}%`,
-      }));
-
-      const headers = Object.keys(csvData[0]);
-      const csv = [
-        headers.join(","),
-        ...csvData.map((row) =>
-          headers.map((header) => `"${row[header] || ""}"`).join(","),
-        ),
-      ].join("\n");
-
-      const blob = new Blob([csv], { type: "text/csv" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `my-tasks-${new Date().toISOString().split("T")[0]}.csv`;
-      anchor.click();
-      URL.revokeObjectURL(url);
+      downloadTasksCsv(teamFilteredTasks);
     };
 
     return (
@@ -890,7 +915,7 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
             </button>
           )}
         </div>
-           <AnimatePresence>
+        <AnimatePresence>
         {teamFilteredTasks.length > 0 ? (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
@@ -901,12 +926,7 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
               const isTaskDone = isTeamMemberTaskDone(task);
 
               return (
-                <motion.div
-                  key={task.id}
-                  initial={{ opacity: 0 , y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  transition={{ duration: 0.3 }}
+                <div
                   key={task.id}
                   className={`bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow ${isTaskUpdating ? "opacity-75" : ""}`}
                 >
@@ -931,7 +951,7 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                             <span className="mx-2">•</span>
                             <span className="flex items-center">
                               <Calendar className="w-3 h-3 mr-1" />
-                              Due: {formatDate(task.rawDueDate || task.dueDate)}
+                              Due: {formatDate(getTaskDueDate(task))}
                             </span>
                           </>
                         )}
@@ -1006,10 +1026,10 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                           Start
                         </button>
                       )}
-                      {["in-progress", "pending-retest", "failed"].includes(task.status) &&
+                      {TEAM_PROGRESS_UPDATE_STATUSES.includes(task.status) &&
                         taskProgress !== 100 && (
                           <div className="flex gap-1">
-                            {[25, 50, 75, 100].map((percent) => (
+                            {TEAM_PROGRESS_STEPS.map((percent) => (
                               <button
                                 key={percent}
                                 onClick={() =>
@@ -1044,18 +1064,12 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                       )}
                     </div>
                   </div>
-                </motion.div>
+                </div>
               );
             })}
           </div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200"
-          >
+          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
             <div className="text-gray-400 text-4xl mb-4">Tasks</div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">
               No tasks found
@@ -1065,9 +1079,9 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                 ? "No tasks match your filters"
                 : "You have no assigned tasks yet"}
             </p>
-          </motion.div>
+          </div>
         )}
-        </AnimatePresence >
+        </AnimatePresence>
       </div>
     );
   }
@@ -1187,9 +1201,9 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
           {managerSearchQuery}"
         </p>
       )}
-      <AnimatePresence mode="wait"> 
+      <AnimatePresence mode="wait">
       {managerFilteredTasks.length > 0 ? (
-         <motion.div key="task-list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+        <div key="task-list">
           <div className="hidden sm:block bg-white rounded-xl shadow-sm border overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1218,11 +1232,12 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                     </th>
                   </tr>
                 </thead>
-                <motion.tbody layout
-
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0, y: -20 }}
+                <motion.tbody
+                layout
+                mode="wait"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
                 >
                   {managerFilteredTasks.map((task) => (
                     <ManagerTaskRow
@@ -1258,16 +1273,16 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
               />
             ))}
           </div>
-        </motion.div>
+        </div>
       ) : (
-         <motion.div key="empty-state" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-        <ManagerEmptyState
-          searchQuery={managerSearchQuery}
-          onClearSearch={clearManagerSearch}
-          onCreateTask={() => navigate(getTaskCreatePath(TASK_MODES.MANAGER))}
-          canAssignTasks={canAssignTasks}
-        />
-        </motion.div>
+        <div key="empty-state">
+          <ManagerEmptyState
+            searchQuery={managerSearchQuery}
+            onClearSearch={clearManagerSearch}
+            onCreateTask={() => navigate(getTaskCreatePath(TASK_MODES.MANAGER))}
+            canAssignTasks={canAssignTasks}
+          />
+        </div>
       )}
       </AnimatePresence>
     </div>

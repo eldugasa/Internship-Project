@@ -7,16 +7,18 @@ import {
   TrendingUp,
   FileText,
   User,
-  LogOut,
   Search,
   X,
   Menu,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 import Sidebar from "./Sidebar";
+import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../LogoutConfirmModal";
 
 const TeamMemberLayout = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -44,7 +46,11 @@ const TeamMemberLayout = () => {
   }, [userName]);
 
   const navItems = [
-    { path: "/team-member/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+    {
+      path: "/team-member/dashboard",
+      icon: LayoutDashboard,
+      label: "Dashboard",
+    },
     { path: "/team-member/tasks", icon: CheckSquare, label: "My Tasks" },
     { path: "/team-member/progress", icon: TrendingUp, label: "My Progress" },
     { path: "/team-member/reports", icon: FileText, label: "Reports" },
@@ -58,21 +64,23 @@ const TeamMemberLayout = () => {
         setIsMobileMenuOpen(false);
       }
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   // Search handler
   const handleSearch = (e) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
-    navigate(`/team-member/tasks?search=${encodeURIComponent(searchQuery.trim())}`);
+    navigate(
+      `/team-member/tasks?search=${encodeURIComponent(searchQuery.trim())}`,
+    );
     setSearchQuery("");
   };
 
   // Logout logic
   const confirmLogout = () => {
-    localStorage.clear();
+    logout();
     navigate("/login");
   };
 
@@ -119,7 +127,7 @@ const TeamMemberLayout = () => {
             {/* Search */}
             <form
               onSubmit={handleSearch}
-              className={`flex-1 max-w-md ${isMobileMenuOpen ? 'ml-14' : 'ml-14 lg:ml-0'}`}
+              className={`flex-1 max-w-md ${isMobileMenuOpen ? "ml-14" : "ml-14 lg:ml-0"}`}
             >
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -150,15 +158,19 @@ const TeamMemberLayout = () => {
               {/* Desktop Profile */}
               <div className="hidden lg:flex items-center space-x-3 ml-2">
                 <div className="text-right">
-                  <p className="font-medium text-gray-900 text-sm">{userName}</p>
+                  <p className="font-medium text-gray-900 text-sm">
+                    {userName}
+                  </p>
                   <p className="text-xs text-gray-500 capitalize">
-                    {userRole.replace(/_/g, ' ')}
+                    {userRole.replace(/_/g, " ")}
                   </p>
                 </div>
 
                 <div
                   className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm cursor-pointer hover:shadow-md transition"
-                  style={{ background: `linear-gradient(to bottom right, #0f5841, #194f87)` }}
+                  style={{
+                    background: `linear-gradient(to bottom right, #0f5841, #194f87)`,
+                  }}
                   onClick={() => navigate("/team-member/profile")}
                 >
                   {userInitials}
@@ -174,34 +186,11 @@ const TeamMemberLayout = () => {
         </main>
       </div>
 
-      {/* Logout Modal */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="text-center">
-              <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-red-100 mb-4">
-                <LogOut className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Confirm Logout</h3>
-              <p className="text-sm text-gray-500 mb-6">Are you sure you want to logout?</p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmLogout}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <LogoutConfirmModal
+        open={showLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 };

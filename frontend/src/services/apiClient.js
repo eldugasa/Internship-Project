@@ -1,33 +1,92 @@
-// frontend/src/services/apiClient.js
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient } from "@tanstack/react-query";
 
 export const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
 
 export const queryClient = new QueryClient();
 
-// List of auth endpoints that should NOT redirect on 401
 const AUTH_ENDPOINTS = [
   "/auth/login",
   "/auth/forgot-password",
   "/auth/reset-password",
+  "/auth/refresh",
+  "/auth/logout",
 ];
 
-export const apiClient = async (endpoint, options = {}) => {
-  // Get token from localStorage
-  const userStr = localStorage.getItem("user");
-  let token = null;
+const getFriendlyErrorMessage = (status, message, endpoint) => {
+  const normalizedMessage = (message || "").toLowerCase().trim();
+  const isAuthEndpoint = AUTH_ENDPOINTS.some((ep) => endpoint.includes(ep));
 
-  try {
-    const user = JSON.parse(userStr);
-    token = user?.token;
-  } catch (e) {
-    console.error("Error parsing user from localStorage:", e);
+  if (status === 401) {
+    if (isAuthEndpoint) {
+      if (normalizedMessage.includes("invalid") || normalizedMessage.includes("credential")) {
+        return "Email or password is incorrect.";
+      }
+
+      return "We couldn't verify your account. Please try again.";
+    }
+
+    if (
+      normalizedMessage.includes("no token provided") ||
+      normalizedMessage.includes("invalid token") ||
+      normalizedMessage.includes("unauthorized") ||
+      normalizedMessage.includes("session")
+    ) {
+      return "Your session has expired. Please log in again.";
+    }
   }
 
+  if (status === 403) {
+    return "You do not have permission to perform this action.";
+  }
+
+  if (status >= 500) {
+    return "Something went wrong on our side. Please try again in a moment.";
+  }
+
+  return message || "Something went wrong";
+};
+
+const clearClientSession = () => {
+  localStorage.removeItem("user");
+  try {
+    localStorage.removeItem("userData");
+  } catch (e) {
+    console.error("Error removing userData from localStorage:", e);
+  }
+};
+
+let refreshPromise = null;
+
+const refreshSession = async () => {
+  if (!refreshPromise) {
+    refreshPromise = fetch(`${API_URL}/auth/refresh`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(data.message || "Failed to refresh session");
+          error.code = response.status;
+          throw error;
+        }
+        return data;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
+};
+
+export const apiClient = async (endpoint, options = {}) => {
   const method = (options.method || "GET").toUpperCase();
   let url = `${API_URL}${endpoint}`;
 
-  // Add cache-busting for GET requests
   if (method === "GET" && !options.skipCacheBust) {
     const separator = url.includes("?") ? "&" : "?";
     url += `${separator}_=${Date.now()}`;
@@ -37,15 +96,14 @@ export const apiClient = async (endpoint, options = {}) => {
     ...options,
     method,
     cache: options.cache || "no-store",
-    signal: options.signal, // Pass abort signal
+    signal: options.signal,
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },
   });
 
-  // Handle 204 No Content
   if (response.status === 204) {
     return {};
   }
@@ -53,33 +111,29 @@ export const apiClient = async (endpoint, options = {}) => {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    // Handle 401 Unauthorized
-    if (response.status === 401) {
-      const isAuthEndpoint = AUTH_ENDPOINTS.some((ep) => endpoint.includes(ep));
+    const isAuthEndpoint = AUTH_ENDPOINTS.some((ep) => endpoint.includes(ep));
+    const rawMessage = data.message || data.error || "Something went wrong";
 
-      if (!isAuthEndpoint) {
-        localStorage.removeItem("user");
-        try {
-          localStorage.removeItem("userData");
-        } catch (e) {
-          console.error("Error removing userData from localStorage:", e);
-        }
-
-        const error = new Error(data.message || data.error || "Unauthorized");
-        error.code = 401;
-        error.info = data;
-        throw error;
+    if (response.status === 401 && !isAuthEndpoint && !options._retriedAfterRefresh) {
+      try {
+        await refreshSession();
+        return apiClient(endpoint, { ...options, _retriedAfterRefresh: true });
+      } catch {
+        clearClientSession();
       }
-
-      const error = new Error(data.message || data.error || "Invalid credentials");
-      error.code = 401;
-      error.info = data;
-      throw error;
     }
 
-    const error = new Error(data.message || data.error || "Something went wrong");
+    const error = new Error(
+      getFriendlyErrorMessage(response.status, rawMessage, endpoint),
+    );
     error.code = response.status;
     error.info = data;
+    error.rawMessage = rawMessage;
+
+    if (response.status === 401 && !isAuthEndpoint) {
+      clearClientSession();
+    }
+
     throw error;
   }
 

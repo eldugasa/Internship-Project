@@ -29,11 +29,14 @@ export const AuthProvider = ({ children }) => {
         const storedUser = getCurrentUser();
         if (storedUser) {
           setUser(storedUser);
-          const freshUser = await fetchCurrentUserApi();
-          setUser(freshUser);
         }
+
+        const freshUser = await fetchCurrentUserApi();
+        setUser(freshUser);
       } catch (error) {
-        console.error('Error initializing auth:', error);
+        if (error?.code !== 401) {
+          console.error('Error initializing auth:', error);
+        }
         if (error?.code === 401) {
           clearAuthState();
         }
@@ -79,10 +82,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateStoredUser = (nextUser) => {
-    const normalizedUser = persistCurrentUser({
-      ...nextUser,
-      token: nextUser?.token || user?.token,
-    });
+    const normalizedUser = persistCurrentUser(nextUser);
     setUser(normalizedUser);
     return normalizedUser;
   };
@@ -98,13 +98,10 @@ export const AuthProvider = ({ children }) => {
       case 'admin':
         return '/admin/dashboard';
       case 'project-manager':
-      case 'project_manager':
         return '/manager/dashboard';
       case 'qa-tester':
-      case 'qa_tester':
         return '/qa-tester/dashboard';
       case 'team-member':
-      case 'team_member':
         return '/team-member/dashboard';
       default:
         return '/login';
@@ -145,18 +142,18 @@ export const AuthProvider = ({ children }) => {
   // Check if user is project manager
   const isProjectManager = () => {
     const role = user?.role?.toLowerCase();
-    return role === 'project-manager' || role === 'project_manager';
+    return role === 'project-manager';
   };
 
   // Check if user is team member
   const isTeamMember = () => {
     const role = user?.role?.toLowerCase();
-    return role === 'team-member' || role === 'team_member';
+    return role === 'team-member';
   };
 
   const isQATester = () => {
     const role = user?.role?.toLowerCase();
-    return role === 'qa-tester' || role === 'qa_tester';
+    return role === 'qa-tester';
   };
 
   const isSuperAdmin = () => {

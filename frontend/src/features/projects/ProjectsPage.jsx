@@ -536,14 +536,7 @@ const SharedProjectsPage = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleExport}
-                disabled={!safeProjects.length}
-                className="rounded-lg border border-gray-200 bg-white p-2 transition-colors hover:bg-gray-50 disabled:opacity-50"
-                title="Export to CSV"
-              >
-                <Download className="h-5 w-5 text-gray-600" />
-              </button>
+             
               <button
                 onClick={() => refetch()}
                 disabled={isFetching}

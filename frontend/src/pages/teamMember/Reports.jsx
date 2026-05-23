@@ -609,22 +609,7 @@ const TeamMemberReports = () => {
             </div>
           </ReportCard>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ExportCard
-              title="Print Report"
-              desc="Open print-friendly version"
-              color="text-[#4DA5AD]"
-              icon={Printer}
-              onClick={handlePrint}
-            />
-            <ExportCard
-              title="Excel Data"
-              desc="Download CSV for analysis"
-              color="text-green-600"
-              icon={BarChart3}
-              onClick={exportToExcel}
-            />
-          </div>
+         
         </>
       )}
     </div>

@@ -29,28 +29,26 @@ export const resolveCanManageProjects = (user = {}, pathname = "") => {
   const effectivePermissions = Array.isArray(user?.effectivePermissions)
     ? user.effectivePermissions
     : [];
-  const permissionOverrides = Array.isArray(user?.permissionOverrides)
-    ? user.permissionOverrides
-    : [];
-  const hasExplicitGrant = permissionOverrides.includes(PERMISSIONS.MANAGE_PROJECTS);
-  const hasExplicitRevoke = permissionOverrides.includes(`!${PERMISSIONS.MANAGE_PROJECTS}`);
   const isAdminView = isAdminProjectsView(pathname);
+  const hasManageProjectsPermission = effectivePermissions.includes(
+    PERMISSIONS.MANAGE_PROJECTS,
+  );
 
   if (effectivePermissions.includes("*")) {
     return true;
   }
 
   if (normalizedRole === "project-manager") {
-    return !hasExplicitRevoke;
+    return hasManageProjectsPermission;
   }
 
   if (normalizedRole === "admin") {
-    return hasExplicitGrant;
+    return hasManageProjectsPermission;
   }
 
   if (isAdminView) {
-    return normalizedRole === "super-admin" || hasExplicitGrant;
+    return normalizedRole === "super-admin" || hasManageProjectsPermission;
   }
 
-  return effectivePermissions.includes(PERMISSIONS.MANAGE_PROJECTS);
+  return hasManageProjectsPermission;
 };

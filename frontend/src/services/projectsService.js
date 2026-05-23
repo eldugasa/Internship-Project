@@ -100,6 +100,10 @@ const normalizeProject = (project) => ({
   spent: project.spent || 0,
   manager: project.manager?.name || project.leadName || "Unassigned",
   managerName: project.manager?.name || project.leadName || "Unassigned",
+  rawStartDate: project.startDate || null,
+  rawEndDate: project.endDate || null,
+  rawCreatedAt: project.createdAt || null,
+  rawUpdatedAt: project.updatedAt || null,
   createdAt: project.createdAt
     ? new Date(project.createdAt).toLocaleDateString()
     : null,

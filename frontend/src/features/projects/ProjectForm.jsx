@@ -67,6 +67,16 @@ const fileToDataUrl = (file) =>
     reader.readAsDataURL(file);
   });
 
+const MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "text/plain",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+
 const defaultFormValues = {
   description: "",
   endDate: "",
@@ -221,6 +231,14 @@ const SharedProjectForm = ({ mode = "create" }) => {
     }
 
     try {
+      if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+        throw new Error("Unsupported file type. Please upload PDF, JPG, PNG, TXT, DOCX, or XLSX.");
+      }
+
+      if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+        throw new Error("Attachment must be 5 MB or smaller.");
+      }
+
       const content = await fileToDataUrl(file);
       setFormValues((current) => ({
         ...current,

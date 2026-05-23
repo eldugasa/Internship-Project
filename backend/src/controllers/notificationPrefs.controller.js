@@ -45,7 +45,7 @@ const getDefaultPrefs = (role) => {
   let roleKey = 'TEAM_MEMBER'; // default
   if (normalizedRole === 'ADMIN') {
     roleKey = 'ADMIN';
-  } else if (normalizedRole === 'PROJECT_MANAGER' || normalizedRole === 'PROJECT_MANAGER') {
+  } else if (normalizedRole === 'PROJECT_MANAGER') {
     roleKey = 'PROJECT_MANAGER';
   }
 

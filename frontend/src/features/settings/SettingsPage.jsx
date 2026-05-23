@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "../../services/apiClient";
 import { getCurrentUserProfile } from "../../services/usersService";
+import { useAuth } from "../../context/AuthContext";
 import {
   getDefaultNotificationPrefs,
   getVisibleNotificationFields,
@@ -64,6 +65,7 @@ const SettingsSkeleton = () => (
 const SharedSettingsPage = ({ mode = "manager" }) => {
   const loaderData = useLoaderData();
   const navigate = useNavigate();
+  const { logout: clearAuth } = useAuth();
   const initialUser = useMemo(
     () => normalizeSettingsUser(loaderData?.profile || loaderData?.user || {}),
     [loaderData],
@@ -135,8 +137,7 @@ const SharedSettingsPage = ({ mode = "manager" }) => {
   );
 
   const logout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+    clearAuth();
     navigate("/login");
   };
 

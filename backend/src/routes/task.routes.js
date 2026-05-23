@@ -4,126 +4,137 @@ import authenticate from "../middleware/auth.middleware.js";
 import { authorize } from "../middleware/role.middleware.js";
 import { requirePermission } from "../middleware/permission.middleware.js";
 import { PERMISSIONS } from "../config/permissions.js";
-import { 
-  createTask, 
-  getTasksByProject, 
-  updateTaskStatus, 
+import {
+  createTask,
+  getTasksByProject,
+  updateTaskStatus,
   getAllTasks,
   getTaskById,
-  updateTaskProgress,
   updateTask,
   assignTask,
   addTaskComment,
   deleteTask,
-   getMyTasks ,
-    deleteComment
+  getMyTasks,
+  deleteComment,
 } from "../controllers/task.controller.js";
+import { validateRequest } from "../middleware/validate.middleware.js";
+import {
+  addCommentValidation,
+  assignTaskValidation,
+  createTaskValidation,
+  updateTaskStatusValidation,
+  updateTaskValidation,
+} from "../validation/task.validation.js";
+import { requiredIntParam } from "../validation/common.validation.js";
 
 const router = express.Router();
 
-// All routes require authentication
 router.use(authenticate);
 
-router.post("/", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+router.post(
+  "/",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER"),
   requirePermission(PERMISSIONS.ASSIGN_TASKS),
-  createTask
+  createTaskValidation,
+  validateRequest,
+  createTask,
 );
 
+router.get("/", authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER"), getAllTasks);
 
-router.get("/", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"), 
-  getAllTasks
+router.get(
+  "/project/:projectId",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER"),
+  requiredIntParam("projectId"),
+  validateRequest,
+  getTasksByProject,
 );
 
-// GET /api/tasks/project/:projectId - Get tasks by project (All roles)
-router.get("/project/:projectId",
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
-  getTasksByProject
+router.get("/my-tasks", authorize("TEAM_MEMBER", "QA_TESTER"), getMyTasks);
+
+router.get(
+  "/:id",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER"),
+  requiredIntParam("id"),
+  validateRequest,
+  getTaskById,
 );
 
-// GET /api/tasks/my-tasks - Get tasks for current user (Team Member)
-router.get("/my-tasks",
-  authorize("TEAM_MEMBER", "QA_TESTER", "team-member", "team_member", "qa-tester", "qa_tester"),
-  getMyTasks
-);
-
-
-router.get("/:id", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
-  getTaskById
-);
-
-
-router.put("/:id", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+router.put(
+  "/:id",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER"),
   requirePermission(PERMISSIONS.ASSIGN_TASKS),
-  updateTask
+  updateTaskValidation,
+  validateRequest,
+  updateTask,
 );
 
-// PUT /api/tasks/:id/status - Update task status
-router.put("/:id/status",
-  authorize("SUPER_ADMIN", "TEAM_MEMBER", "QA_TESTER", "PROJECT_MANAGER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
-  updateTaskStatus
+router.put(
+  "/:id/status",
+  authorize("SUPER_ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER"),
+  updateTaskStatusValidation,
+  validateRequest,
+  updateTaskStatus,
 );
 
-
-
-// GET /api/tasks/my-tasks - Get tasks for current user (Team Member)
-router.get("/my-tasks", 
-  authenticate,
-  authorize("TEAM_MEMBER", "QA_TESTER", "team-member", "team_member", "qa-tester", "qa_tester"),
-  getMyTasks
-);
-
-
-router.put("/:id/assign", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+router.put(
+  "/:id/assign",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER"),
   requirePermission(PERMISSIONS.ASSIGN_TASKS),
-  assignTask
+  assignTaskValidation,
+  validateRequest,
+  assignTask,
 );
 
-
-router.delete("/:id", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "project-manager", "project_manager"),
+router.delete(
+  "/:id",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER"),
   requirePermission(PERMISSIONS.ASSIGN_TASKS),
-  deleteTask
+  requiredIntParam("id"),
+  validateRequest,
+  deleteTask,
 );
 
-// ===== COMMENT ROUTES =====
-
-//  GET /api/tasks/:id/comments - Get all comments
-router.get("/:id/comments", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
+router.get(
+  "/:id/comments",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER"),
+  requiredIntParam("id"),
+  validateRequest,
   async (req, res) => {
     try {
       const { id } = req.params;
-      
+
       const comments = await prisma.comment.findMany({
-        where: { taskId: parseInt(id) },
+        where: { taskId: parseInt(id, 10) },
         include: {
-          user: { select: { id: true, name: true, email: true, role: true } }
+          user: { select: { id: true, name: true, email: true, role: true } },
         },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: "desc" },
       });
-      
+
       res.json(comments);
     } catch (err) {
       console.error("Error fetching comments:", err);
-      res.status(500).json({ message: err.message });
+      res.status(500).json({ message: "Failed to fetch comments" });
     }
-  }
+  },
 );
 
-//  Add a comment
-router.post("/:id/comments", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
-  addTaskComment
+router.post(
+  "/:id/comments",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER"),
+  addCommentValidation,
+  validateRequest,
+  addTaskComment,
 );
 
-router.delete("/:id/comments/:commentId", 
-  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER", "project-manager", "project_manager", "qa-tester", "qa_tester"),
-  deleteComment // Use the controller function created above
+router.delete(
+  "/:id/comments/:commentId",
+  authorize("SUPER_ADMIN", "ADMIN", "PROJECT_MANAGER", "TEAM_MEMBER", "QA_TESTER"),
+  requiredIntParam("id"),
+  requiredIntParam("commentId"),
+  validateRequest,
+  deleteComment,
 );
 
 export default router;

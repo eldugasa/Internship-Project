@@ -193,13 +193,7 @@ export const UsersManagementContent = ({
         </div>
 
         <div className="flex gap-2">
-          <button
-            onClick={onExport}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
-          >
-            <Download className="w-5 h-5" />
-            Export CSV
-          </button>
+         
           <motion.button
             whileHover={{ scale: 1.05 }}
             transition={{ type: "spring", stiffness: 500 }}

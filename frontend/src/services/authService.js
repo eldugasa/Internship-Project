@@ -62,10 +62,7 @@ export const loginApi = async (email, password, { signal } = {}) => {
     signal,
   });
  
-  const user = persistCurrentUser({
-    ...data.user,
-    token: data.token,
-  });
+  const user = persistCurrentUser(data.user);
   
   return user;
 };
@@ -99,6 +96,11 @@ export const resetPasswordApi = async (token, newPassword, { signal } = {}) => {
 };
  
 export const logoutApi = () => {
+  fetch(`${import.meta.env.VITE_API_URL || "http://localhost:5000/api"}/auth/logout`, {
+    method: "POST",
+    credentials: "include",
+  }).catch(() => undefined);
+  localStorage.removeItem("token");
   localStorage.removeItem("user");
   try { localStorage.removeItem("userData"); } catch (e) {
     console.error("Error removing userData from localStorage:", e);
@@ -107,10 +109,7 @@ export const logoutApi = () => {
 
 export const fetchCurrentUserApi = async ({ signal } = {}) => {
   const user = await apiClient("/users/me", { signal });
-  return persistCurrentUser({
-    ...user,
-    token: getCurrentUser()?.token,
-  });
+  return persistCurrentUser(user);
 };
  
 export const getCurrentUser = () => {

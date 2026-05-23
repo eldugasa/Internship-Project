@@ -11,6 +11,9 @@ import {
 
 const DONE_TASK_STATUSES = new Set(["COMPLETED", "PASSED"]);
 
+const normalizeRole = (role = "") =>
+  role.toString().trim().toUpperCase().replace(/-/g, "_");
+
 const clampProgress = (value) => {
   const numericValue = Number(value);
   if (!Number.isFinite(numericValue)) return 0;
@@ -131,7 +134,7 @@ const buildTaskDetailsSelect = (includeAttachmentFields = true) => ({
 const getTaskById = async (req, res) => {
   try {
     const { id } = req.params;
-    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const normalizedRole = normalizeRole(req.user.role);
 
     let task;
     try {
@@ -282,11 +285,7 @@ const createTask = async (req, res) => {
     // Create notifications
     try {
       // Notify project manager
-      const managerRole = project.manager?.role
-        ?.toString()
-        .trim()
-        .toUpperCase()
-        .replace(/-/g, "_");
+      const managerRole = normalizeRole(project.manager?.role);
 
       if (project.managerId && managerRole !== "ADMIN") {
         await createNotification({
@@ -369,7 +368,7 @@ const getTasksByProject = async (req, res) => {
 // Get tasks assigned to the current user (for Team Members)
 const getMyTasks = async (req, res) => {
   try {
-    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const normalizedRole = normalizeRole(req.user.role);
     const isQaTester = normalizedRole === "QA_TESTER";
 
     let tasks;
@@ -433,7 +432,7 @@ const updateTaskStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, progress } = req.body;
-    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const normalizedRole = normalizeRole(req.user.role);
 
     const task = await prisma.task.findUnique({
       where: { id: Number(id) },
@@ -633,7 +632,7 @@ const updateTaskProgress = async (req, res) => {
   try {
     const { id } = req.params;
     const { progress } = req.body;
-    const normalizedRole = req.user.role?.toString().trim().toUpperCase().replace(/-/g, "_");
+    const normalizedRole = normalizeRole(req.user.role);
 
     const task = await prisma.task.findUnique({
       where: { id: parseInt(id) },
@@ -852,8 +851,9 @@ const deleteComment = async (req, res) => {
 
     // Security: Only the author, an ADMIN, or a PROJECT_MANAGER can delete
     const isAuthor = comment.userId === req.user.id;
+    const normalizedRole = normalizeRole(req.user.role);
     const isPrivileged =
-      req.user.role === "ADMIN" || req.user.role === "PROJECT_MANAGER";
+      normalizedRole === "ADMIN" || normalizedRole === "PROJECT_MANAGER";
 
     if (!isAuthor && !isPrivileged) {
       return res
@@ -968,7 +968,8 @@ const deleteTask = async (req, res) => {
       return res.status(404).json({ message: "Task not found" });
     }
 
-    if (req.user.role !== "ADMIN" && req.user.role !== "PROJECT_MANAGER") {
+    const normalizedRole = normalizeRole(req.user.role);
+    if (normalizedRole !== "ADMIN" && normalizedRole !== "PROJECT_MANAGER") {
       return res
         .status(403)
         .json({ message: "Not authorized to delete tasks" });

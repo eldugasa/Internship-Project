@@ -11,7 +11,6 @@ import {
   FileText,
   Settings,
   Users,
-  LogOut,
   Search,
   X,
   Menu,
@@ -20,10 +19,11 @@ import NotificationBell from "./NotificationBell";
 import Sidebar from "./Sidebar";
 import { PERMISSIONS } from "../../config/permissions";
 import { useAuth } from "../../context/AuthContext";
+import LogoutConfirmModal from "../LogoutConfirmModal";
 
 const ProjectManagerLayout = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -37,7 +37,8 @@ const ProjectManagerLayout = () => {
   const normalizedRole = userRole.toLowerCase().replace(/_/g, "-");
   const effectivePermissions = userData?.effectivePermissions || [];
   const hasPermission = (permission) =>
-    effectivePermissions.includes("*") || effectivePermissions.includes(permission);
+    effectivePermissions.includes("*") ||
+    effectivePermissions.includes(permission);
   const canViewProjects =
     normalizedRole === "project-manager" ||
     hasPermission(PERMISSIONS.MANAGE_PROJECTS);
@@ -65,14 +66,49 @@ const ProjectManagerLayout = () => {
         hasPermission(PERMISSIONS.ASSIGN_TASKS) ||
         hasPermission(PERMISSIONS.VIEW_REPORTS),
     },
-    { path: "/manager/users", icon: Users, label: "Users", visible: hasPermission(PERMISSIONS.MANAGE_USERS) },
-    { path: "/manager/projects", icon: FolderKanban, label: "Projects", visible: canViewProjects },
+    {
+      path: "/manager/users",
+      icon: Users,
+      label: "Users",
+      visible: hasPermission(PERMISSIONS.MANAGE_USERS),
+    },
+    {
+      path: "/manager/projects",
+      icon: FolderKanban,
+      label: "Projects",
+      visible: canViewProjects,
+    },
     { path: "/manager/teams", icon: UsersRound, label: "Teams", visible: true },
-    { path: "/manager/tasks", icon: CheckSquare, label: "Tasks", visible: hasPermission(PERMISSIONS.ASSIGN_TASKS) },
-    { path: "/qa-tester/dashboard", icon: FlaskConical, label: "QA Workspace", visible: canTestTasks },
-    { path: "/manager/progress", icon: TrendingUp, label: "Progress", visible: hasPermission(PERMISSIONS.VIEW_REPORTS) },
-    { path: "/manager/reports", icon: FileText, label: "Reports", visible: hasPermission(PERMISSIONS.VIEW_REPORTS) },
-    { path: "/manager/settings", icon: Settings, label: "Settings", visible: canAccessSettings },
+    {
+      path: "/manager/tasks",
+      icon: CheckSquare,
+      label: "Tasks",
+      visible: hasPermission(PERMISSIONS.ASSIGN_TASKS),
+    },
+    {
+      path: "/qa-tester/dashboard",
+      icon: FlaskConical,
+      label: "QA Workspace",
+      visible: canTestTasks,
+    },
+    {
+      path: "/manager/progress",
+      icon: TrendingUp,
+      label: "Progress",
+      visible: hasPermission(PERMISSIONS.VIEW_REPORTS),
+    },
+    {
+      path: "/manager/reports",
+      icon: FileText,
+      label: "Reports",
+      visible: hasPermission(PERMISSIONS.VIEW_REPORTS),
+    },
+    {
+      path: "/manager/settings",
+      icon: Settings,
+      label: "Settings",
+      visible: canAccessSettings,
+    },
   ].filter((item) => item.visible);
 
   // Close mobile menu when screen size changes to large
@@ -98,7 +134,7 @@ const ProjectManagerLayout = () => {
 
   // Logout logic
   const confirmLogout = () => {
-    localStorage.clear();
+    logout();
     navigate("/login");
   };
 
@@ -203,38 +239,11 @@ const ProjectManagerLayout = () => {
         </main>
       </div>
 
-      {/* Logout Modal */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black/80 bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <div className="text-center">
-              <div className="mx-auto h-12 w-12 flex items-center justify-center rounded-full bg-red-100 mb-4">
-                <LogOut className="w-6 h-6 text-red-600" />
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Confirm Logout
-              </h3>
-              <p className="text-sm text-gray-500 mb-6">
-                Are you sure you want to logout?
-              </p>
-              <div className="flex space-x-3">
-                <button
-                  onClick={() => setShowLogoutConfirm(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmLogout}
-                  className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <LogoutConfirmModal
+        open={showLogoutConfirm}
+        onCancel={() => setShowLogoutConfirm(false)}
+        onConfirm={confirmLogout}
+      />
     </div>
   );
 };

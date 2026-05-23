@@ -22,7 +22,7 @@ const isFutureDate = (dateString) => {
 };
 
 const isValidPriority = (priority) =>
-  ["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(priority?.toUpperCase());
+  ["LOW", "MEDIUM", "HIGH", "URGENT"].includes(priority?.toUpperCase());
 
 const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {
@@ -31,6 +31,16 @@ const fileToDataUrl = (file) =>
     reader.onerror = () => reject(new Error("Failed to read the selected file."));
     reader.readAsDataURL(file);
   });
+
+const MAX_ATTACHMENT_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "text/plain",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
 
 const createInitialValues = (projectId = "") => ({
   title: "",
@@ -164,7 +174,7 @@ const TaskForm = ({ formMode = "create" }) => {
   const qaTesters = useMemo(
     () =>
       availableQaTesters.filter((member) =>
-        ["qa-tester", "qa_tester"].includes(member.role?.toLowerCase()),
+        member.role?.toLowerCase() === "qa-tester",
       ),
     [availableQaTesters],
   );
@@ -173,7 +183,7 @@ const TaskForm = ({ formMode = "create" }) => {
     () =>
       availableMembers.filter(
         (member) =>
-          !["qa-tester", "qa_tester"].includes(member.role?.toLowerCase()),
+          member.role?.toLowerCase() !== "qa-tester",
       ),
     [availableMembers],
   );
@@ -195,6 +205,14 @@ const TaskForm = ({ formMode = "create" }) => {
     }
 
     try {
+      if (!ALLOWED_ATTACHMENT_TYPES.has(file.type)) {
+        throw new Error("Unsupported file type. Please upload PDF, JPG, PNG, TXT, DOCX, or XLSX.");
+      }
+
+      if (file.size > MAX_ATTACHMENT_SIZE_BYTES) {
+        throw new Error("Attachment must be 5 MB or smaller.");
+      }
+
       const content = await fileToDataUrl(file);
       setValues((current) => ({
         ...current,
@@ -245,7 +263,7 @@ const TaskForm = ({ formMode = "create" }) => {
       assigneeId: Number(values.assigneeId),
       qaTesterId: values.qaTesterId ? Number(values.qaTesterId) : null,
       dueDate: new Date(values.dueDate).toISOString(),
-      priority: values.priority.toLowerCase(),
+      priority: values.priority.toUpperCase(),
       attachment: attachmentDirty ? values.attachment : undefined,
       removeAttachment:
         isEditMode &&
@@ -531,7 +549,7 @@ const TaskForm = ({ formMode = "create" }) => {
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
                   <option value="HIGH">High</option>
-                  <option value="CRITICAL">Critical</option>
+                  <option value="URGENT">Urgent</option>
                 </select>
               </div>
             </div>

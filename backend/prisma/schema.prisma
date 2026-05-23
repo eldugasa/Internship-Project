@@ -36,8 +36,10 @@ model User {
   notifications Notification[]
 
   // ✅ ADD THESE TWO FIELDS FOR PASSWORD RESET
-  resetToken       String?   @unique
-  resetTokenExpiry DateTime?
+  resetToken         String?   @unique
+  resetTokenExpiry   DateTime?
+  refreshTokenHash   String?
+  refreshTokenExpiry DateTime?
 }
 
 model Project {

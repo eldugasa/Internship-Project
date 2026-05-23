@@ -11,13 +11,24 @@ import {
   normalizePermissions,
   normalizeRole,
 } from "../utils/permissionResolver.js";
+import { clearAuthCookies } from "../utils/authCookies.js";
 
 const sanitizeUser = (user) => {
   const permissions = getEditablePermissions(user.role, user.permissions);
   const permissionOverrides = normalizePermissionOverrides(user.permissions);
 
   return {
-    ...user,
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    status: user.status,
+    phone: user.phone || null,
+    location: user.location || null,
+    skill: user.skill || null,
+    team: user.team || null,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
     permissionOverrides,
     permissions,
     effectivePermissions: getEffectivePermissions(user.role, user.permissions),
@@ -310,10 +321,15 @@ export const changePassword = async (req, res) => {
 
     await prisma.user.update({
       where: { id: req.user.id },
-      data: { password: hashedPassword },
+      data: {
+        password: hashedPassword,
+        refreshTokenHash: null,
+        refreshTokenExpiry: null,
+      },
     });
 
-    res.json({ message: "Password updated successfully" });
+    clearAuthCookies(res);
+    res.json({ message: "Password updated successfully. Please log in again." });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: error.message });
