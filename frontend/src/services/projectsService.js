@@ -30,7 +30,10 @@ const clampProgress = (value) => {
 
 const resolveAttachmentUrl = (attachmentUrl) => {
   if (!attachmentUrl) return null;
-  if (attachmentUrl.startsWith("http://") || attachmentUrl.startsWith("https://")) {
+  if (
+    attachmentUrl.startsWith("http://") ||
+    attachmentUrl.startsWith("https://")
+  ) {
     return attachmentUrl;
   }
 
@@ -65,52 +68,66 @@ export const resolveProjectProgress = (project, tasks = null) => {
   return clampProgress(project?.progress);
 };
 
+const extractTeamName = (teamValue) => {
+  if (!teamValue) return "Unassigned";
+  if (typeof teamValue === "string") return teamValue;
+  if (typeof teamValue === "object") return teamValue.name || "Unassigned";
+  return "Unassigned";
+};
+
 // Helper to normalize project data
-const normalizeProject = (project) => ({
-  ...project,
-  id: project.id,
-  name: project.name,
-  description: project.description || "",
-  attachmentName: project.attachmentName || "",
-  attachmentMimeType: project.attachmentMimeType || "",
-  attachmentUrl: resolveAttachmentUrl(project.attachmentUrl),
-  status:
-    statusMap[project.status] || project.status?.toLowerCase() || "planned",
-  progress: resolveProjectProgress(project),
-  startDate: project.startDate
-    ? new Date(project.startDate).toLocaleDateString()
-    : null,
-  endDate: project.endDate
-    ? new Date(project.endDate).toLocaleDateString()
-    : null,
-  dueDate: project.endDate
-    ? new Date(project.endDate).toLocaleDateString()
-    : null,
-  teamId: project.teamId,
-  team: project.team?.name || project.teamName || "Unassigned",
-  teamName: project.team?.name || project.teamName || "Unassigned",
-  teamMembers: project.teamMembers || project.members || [],
-  tasks: project.tasks || {
-    total: 0,
-    completed: 0,
-    pending: 0,
-    overdue: 0,
-  },
-  budget: project.budget || 0,
-  spent: project.spent || 0,
-  manager: project.manager?.name || project.leadName || "Unassigned",
-  managerName: project.manager?.name || project.leadName || "Unassigned",
-  rawStartDate: project.startDate || null,
-  rawEndDate: project.endDate || null,
-  rawCreatedAt: project.createdAt || null,
-  rawUpdatedAt: project.updatedAt || null,
-  createdAt: project.createdAt
-    ? new Date(project.createdAt).toLocaleDateString()
-    : null,
-  updatedAt: project.updatedAt
-    ? new Date(project.updatedAt).toLocaleDateString()
-    : null,
-});
+const normalizeProject = (project) => {
+  const normalizedTeamName =
+    extractTeamName(project.teamName) || extractTeamName(project.team);
+  const normalizedTeamId =
+    project.team?.id || project.team?._id || project.teamId;
+
+  return {
+    ...project,
+    id: project.id,
+    name: project.name,
+    description: project.description || "",
+    attachmentName: project.attachmentName || "",
+    attachmentMimeType: project.attachmentMimeType || "",
+    attachmentUrl: resolveAttachmentUrl(project.attachmentUrl),
+    status:
+      statusMap[project.status] || project.status?.toLowerCase() || "planned",
+    progress: resolveProjectProgress(project),
+    startDate: project.startDate
+      ? new Date(project.startDate).toLocaleDateString()
+      : null,
+    endDate: project.endDate
+      ? new Date(project.endDate).toLocaleDateString()
+      : null,
+    dueDate: project.endDate
+      ? new Date(project.endDate).toLocaleDateString()
+      : null,
+    teamId: normalizedTeamId,
+    team: normalizedTeamName,
+    teamName: normalizedTeamName,
+    teamMembers: project.teamMembers || project.members || [],
+    tasks: project.tasks || {
+      total: 0,
+      completed: 0,
+      pending: 0,
+      overdue: 0,
+    },
+    budget: project.budget || 0,
+    spent: project.spent || 0,
+    manager: project.manager?.name || project.leadName || "Unassigned",
+    managerName: project.manager?.name || project.leadName || "Unassigned",
+    rawStartDate: project.startDate || null,
+    rawEndDate: project.endDate || null,
+    rawCreatedAt: project.createdAt || null,
+    rawUpdatedAt: project.updatedAt || null,
+    createdAt: project.createdAt
+      ? new Date(project.createdAt).toLocaleDateString()
+      : null,
+    updatedAt: project.updatedAt
+      ? new Date(project.updatedAt).toLocaleDateString()
+      : null,
+  };
+};
 
 // Get all projects
 export const getProjects = async ({ signal } = {}) => {

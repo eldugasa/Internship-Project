@@ -1,13 +1,22 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '../../context/AuthContext';
 import { getMyTasks } from '../../services/tasksService';
-import { LayoutDashboard, CheckCircle, AlertCircle, Clock, RefreshCw } from 'lucide-react';
+import { LayoutDashboard, CheckCircle, AlertCircle, Clock, RefreshCw, Users, Award, TrendingUp } from 'lucide-react';
+import DashboardWelcomeBanner from '../../Component/dashboard/DashboardWelcomeBanner';
 
 const QATesterDashboard = () => {
+  const { user } = useAuth();
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ['qa-tasks', 'dashboard'],
     queryFn: getMyTasks,
   });
+
+  const completedTasks = tasks.filter((task) =>
+    ['passed', 'completed', 'done'].includes(task.status?.toString().toLowerCase()),
+  ).length;
+  const totalTasks = tasks.length;
+  const completionRate = totalTasks ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   if (isLoading) {
     return <div className="p-6">Loading dashboard...</div>;
@@ -32,9 +41,18 @@ const QATesterDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">QA Dashboard</h1>
-      </div>
+      <DashboardWelcomeBanner
+        title={`Welcome back, ${user?.name || 'QA Tester'}!`}
+        subtitle="Your QA assignments and testing summary"
+        metaItems={[
+          { icon: Users, label: user?.team || 'QA Team' },
+          { icon: Award, label: `Success Rate: ${completionRate}%` },
+        ]}
+        summaryTitle="Tasks Completed"
+        summaryValue={`${completedTasks}/${totalTasks}`}
+        summarySubtitle={`${completionRate}% pass rate`}
+        accentIcon={TrendingUp}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {statCards.map((stat, index) => (

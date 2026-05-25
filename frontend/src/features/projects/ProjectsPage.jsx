@@ -45,7 +45,15 @@ import {
   projectsQuery,
 } from "../../loader/manager/Projects.loader";
 
-const StatCard = ({ title, value, icon: Icon, color, bgColor, onClick, loading }) => (
+const StatCard = ({
+  title,
+  value,
+  icon: Icon,
+  color,
+  bgColor,
+  onClick,
+  loading,
+}) => (
   <div
     onClick={onClick}
     className={`${bgColor} rounded-xl border border-gray-200/50 p-4 transition-all ${onClick ? "cursor-pointer hover:scale-105 hover:shadow-md" : ""}`}
@@ -103,7 +111,10 @@ const ProjectsSkeleton = () => (
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
         {[...Array(6)].map((_, index) => (
-          <div key={index} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div
+            key={index}
+            className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
+          >
             <div className="mb-3 h-6 w-32 animate-pulse rounded bg-gray-200" />
             <div className="mb-4 h-4 w-full animate-pulse rounded bg-gray-200" />
             <div className="h-2 w-full animate-pulse rounded bg-gray-200" />
@@ -185,10 +196,14 @@ const ProjectCard = ({
           <div className="flex-1">
             <div className="mb-2 flex items-center gap-2">
               <FolderKanban className="h-5 w-5 text-[#0f5841]" />
-              <h3 className="line-clamp-1 text-lg font-bold text-gray-900">{project.name}</h3>
+              <h3 className="line-clamp-1 text-lg font-bold text-gray-900">
+                {project.name}
+              </h3>
             </div>
             {project.description && (
-              <p className="line-clamp-2 text-sm text-gray-500">{project.description}</p>
+              <p className="line-clamp-2 text-sm text-gray-500">
+                {project.description}
+              </p>
             )}
           </div>
 
@@ -252,7 +267,9 @@ const ProjectCard = ({
         <div className="mb-4">
           <div className="mb-2 flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">Progress</span>
-            <span className="text-sm font-semibold text-[#0f5841]">{project.progress || 0}%</span>
+            <span className="text-sm font-semibold text-[#0f5841]">
+              {project.progress || 0}%
+            </span>
           </div>
           <div className="h-2.5 w-full overflow-hidden rounded-full bg-gray-200">
             <div
@@ -273,7 +290,10 @@ const ProjectCard = ({
           <div className="rounded-lg bg-gray-50 p-3">
             <Users className="mb-1 h-4 w-4 text-gray-400" />
             <div className="text-xs text-gray-500">Team</div>
-            <div className="truncate font-semibold text-gray-900" title={project.teamName}>
+            <div
+              className="truncate font-semibold text-gray-900"
+              title={project.teamName}
+            >
               {project.teamName || "Unassigned"}
             </div>
           </div>
@@ -305,16 +325,26 @@ const ProjectCard = ({
   );
 };
 
-const EmptyState = ({ canManageProjects, hasFilters, onClear, onCreate, searchQuery }) => (
+const EmptyState = ({
+  canManageProjects,
+  hasFilters,
+  onClear,
+  onCreate,
+  searchQuery,
+}) => (
   <div className="rounded-xl border border-gray-200 bg-white p-12 text-center shadow-sm">
     {searchQuery || hasFilters ? (
       <>
         <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gray-100">
           <Search className="h-12 w-12 text-gray-400" />
         </div>
-        <h3 className="mb-2 text-xl font-bold text-gray-900">No results found</h3>
+        <h3 className="mb-2 text-xl font-bold text-gray-900">
+          No results found
+        </h3>
         <p className="mb-6 text-gray-500">
-          {searchQuery ? `No projects match "${searchQuery}"` : "No projects match the selected filters"}
+          {searchQuery
+            ? `No projects match "${searchQuery}"`
+            : "No projects match the selected filters"}
         </p>
         <button
           onClick={onClear}
@@ -328,7 +358,9 @@ const EmptyState = ({ canManageProjects, hasFilters, onClear, onCreate, searchQu
         <div className="mx-auto mb-6 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-[#0f5841]/20 to-[#194f87]/20">
           <FolderKanban className="h-12 w-12 text-[#0f5841]" />
         </div>
-        <h3 className="mb-2 text-xl font-bold text-gray-900">No projects yet</h3>
+        <h3 className="mb-2 text-xl font-bold text-gray-900">
+          No projects yet
+        </h3>
         <p className="mb-6 text-gray-500">
           {canManageProjects
             ? "Get started by creating your first project"
@@ -357,7 +389,9 @@ const SharedProjectsPage = () => {
   const createProjectPath = getProjectCreatePath(location.pathname);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [viewMode, setViewMode] = useState(() => localStorage.getItem("projectsViewMode") || "grid");
+  const [viewMode, setViewMode] = useState(
+    () => localStorage.getItem("projectsViewMode") || "grid",
+  );
   const [sortBy, setSortBy] = useState("deadline");
   const [sortOrder, setSortOrder] = useState("asc");
   const [deletingId, setDeletingId] = useState(null);
@@ -373,8 +407,16 @@ const SharedProjectsPage = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const initialProjects = Array.isArray(loaderData?.projects) ? loaderData.projects : undefined;
-  const { data: projectsData = [], isLoading, error, isFetching, refetch } = useQuery({
+  const initialProjects = Array.isArray(loaderData?.projects)
+    ? loaderData.projects
+    : undefined;
+  const {
+    data: projectsData = [],
+    isLoading,
+    error,
+    isFetching,
+    refetch,
+  } = useQuery({
     ...projectsQuery(),
     initialData: initialProjects,
     refetchInterval: 30000,
@@ -384,13 +426,25 @@ const SharedProjectsPage = () => {
   const safeProjects = Array.isArray(projectsData) ? projectsData : [];
   const stats = useMemo(() => calculateStats(safeProjects), [safeProjects]);
 
+  const resolveTeamName = (project) => {
+    if (!project) return "Unassigned";
+    if (typeof project.teamName === "string") return project.teamName;
+    if (project.teamName && typeof project.teamName === "object")
+      return project.teamName.name || "Unassigned";
+    if (typeof project.team === "string") return project.team;
+    if (project.team && typeof project.team === "object")
+      return project.team.name || "Unassigned";
+    return "Unassigned";
+  };
+
   const filteredProjects = useMemo(() => {
     let filtered = safeProjects.filter((project) => {
       const matchesSearch =
         searchQuery === "" ||
         project.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         project.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === "all" || project.status === statusFilter;
+      const matchesStatus =
+        statusFilter === "all" || project.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -428,7 +482,11 @@ const SharedProjectsPage = () => {
   }, [safeProjects, searchQuery, sortBy, sortOrder, statusFilter]);
 
   const handleDeleteProject = async (projectId) => {
-    if (!window.confirm("Are you sure you want to delete this project? This action cannot be undone.")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to delete this project? This action cannot be undone.",
+      )
+    ) {
       return;
     }
 
@@ -447,18 +505,44 @@ const SharedProjectsPage = () => {
 
   const getStatusBadge = (status) => {
     const config = {
-      active: { color: "bg-green-100 text-green-800", icon: TrendingUp, label: "Active" },
-      "in-progress": { color: "bg-blue-100 text-blue-800", icon: TrendingUp, label: "In Progress" },
-      completed: { color: "bg-emerald-100 text-emerald-800", icon: CheckCircle, label: "Completed" },
-      planned: { color: "bg-purple-100 text-purple-800", icon: Calendar, label: "Planned" },
-      "on-hold": { color: "bg-yellow-100 text-yellow-800", icon: AlertCircle, label: "On Hold" },
-      cancelled: { color: "bg-red-100 text-red-800", icon: X, label: "Cancelled" },
+      active: {
+        color: "bg-green-100 text-green-800",
+        icon: TrendingUp,
+        label: "Active",
+      },
+      "in-progress": {
+        color: "bg-blue-100 text-blue-800",
+        icon: TrendingUp,
+        label: "In Progress",
+      },
+      completed: {
+        color: "bg-emerald-100 text-emerald-800",
+        icon: CheckCircle,
+        label: "Completed",
+      },
+      planned: {
+        color: "bg-purple-100 text-purple-800",
+        icon: Calendar,
+        label: "Planned",
+      },
+      "on-hold": {
+        color: "bg-yellow-100 text-yellow-800",
+        icon: AlertCircle,
+        label: "On Hold",
+      },
+      cancelled: {
+        color: "bg-red-100 text-red-800",
+        icon: X,
+        label: "Cancelled",
+      },
     };
     const statusConfig = config[status] || config.planned;
     const Icon = statusConfig.icon;
 
     return (
-      <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusConfig.color}`}>
+      <span
+        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusConfig.color}`}
+      >
         <Icon className="mr-1 h-3 w-3" /> {statusConfig.label}
       </span>
     );
@@ -475,7 +559,7 @@ const SharedProjectsPage = () => {
       Description: project.description || "",
       Status: project.status,
       Progress: `${project.progress || 0}%`,
-      Team: project.teamName || "Unassigned",
+      Team: resolveTeamName(project),
       "Start Date": project.startDate || "N/A",
       Deadline: project.dueDate || project.endDate || "N/A",
       "Tasks Completed": `${project.tasks?.completed || 0}/${project.tasks?.total || 0}`,
@@ -484,7 +568,9 @@ const SharedProjectsPage = () => {
     const headers = Object.keys(csvData[0]);
     const csv = [
       headers.join(","),
-      ...csvData.map((row) => headers.map((header) => JSON.stringify(row[header] || "")).join(",")),
+      ...csvData.map((row) =>
+        headers.map((header) => JSON.stringify(row[header] || "")).join(","),
+      ),
     ].join("\n");
 
     const blob = new Blob([csv], { type: "text/csv" });
@@ -511,14 +597,18 @@ const SharedProjectsPage = () => {
   }
 
   if (error && !initialProjects) {
-    return <ProjectsError error={error} onRetry={() => window.location.reload()} />;
+    return (
+      <ProjectsError error={error} onRetry={() => window.location.reload()} />
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
       {toast && (
         <div className="fixed right-4 top-4 z-50">
-          <div className={`rounded-lg p-4 text-white shadow-lg ${toast.type === "success" ? "bg-green-500" : "bg-red-500"}`}>
+          <div
+            className={`rounded-lg p-4 text-white shadow-lg ${toast.type === "success" ? "bg-green-500" : "bg-red-500"}`}
+          >
             {toast.message}
           </div>
         </div>
@@ -528,7 +618,9 @@ const SharedProjectsPage = () => {
         <div className="mb-8">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Projects Dashboard</h1>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Projects Dashboard
+              </h1>
               <p className="mt-1 text-gray-600">
                 {canManageProjects
                   ? "Manage and monitor all your projects in one place"
@@ -536,14 +628,15 @@ const SharedProjectsPage = () => {
               </p>
             </div>
             <div className="flex items-center gap-3">
-             
               <button
                 onClick={() => refetch()}
                 disabled={isFetching}
                 className="rounded-lg border border-gray-200 bg-white p-2 transition-colors hover:bg-gray-50 disabled:opacity-50"
                 title="Refresh"
               >
-                <RefreshCw className={`h-5 w-5 text-gray-600 ${isFetching ? "animate-spin" : ""}`} />
+                <RefreshCw
+                  className={`h-5 w-5 text-gray-600 ${isFetching ? "animate-spin" : ""}`}
+                />
               </button>
               {canManageProjects && (
                 <motion.button
@@ -559,11 +652,51 @@ const SharedProjectsPage = () => {
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-5">
-            <StatCard title="Total Projects" value={stats.total} icon={FolderKanban} color="bg-blue-500" bgColor="bg-blue-50" onClick={() => setStatusFilter("all")} loading={isLoading} />
-            <StatCard title="Active" value={stats.active} icon={TrendingUp} color="bg-green-500" bgColor="bg-green-50" onClick={() => setStatusFilter("active")} loading={isLoading} />
-            <StatCard title="Completed" value={stats.completed} icon={CheckCircle} color="bg-emerald-500" bgColor="bg-emerald-50" onClick={() => setStatusFilter("completed")} loading={isLoading} />
-            <StatCard title="Planned" value={stats.planned} icon={Calendar} color="bg-purple-500" bgColor="bg-purple-50" onClick={() => setStatusFilter("planned")} loading={isLoading} />
-            <StatCard title="Overdue" value={stats.overdue} icon={AlertCircle} color="bg-red-500" bgColor="bg-red-50" onClick={() => setStatusFilter("active")} loading={isLoading} />
+            <StatCard
+              title="Total Projects"
+              value={stats.total}
+              icon={FolderKanban}
+              color="bg-blue-500"
+              bgColor="bg-blue-50"
+              onClick={() => setStatusFilter("all")}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Active"
+              value={stats.active}
+              icon={TrendingUp}
+              color="bg-green-500"
+              bgColor="bg-green-50"
+              onClick={() => setStatusFilter("active")}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Completed"
+              value={stats.completed}
+              icon={CheckCircle}
+              color="bg-emerald-500"
+              bgColor="bg-emerald-50"
+              onClick={() => setStatusFilter("completed")}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Planned"
+              value={stats.planned}
+              icon={Calendar}
+              color="bg-purple-500"
+              bgColor="bg-purple-50"
+              onClick={() => setStatusFilter("planned")}
+              loading={isLoading}
+            />
+            <StatCard
+              title="Overdue"
+              value={stats.overdue}
+              icon={AlertCircle}
+              color="bg-red-500"
+              bgColor="bg-red-50"
+              onClick={() => setStatusFilter("active")}
+              loading={isLoading}
+            />
           </div>
         </div>
 
@@ -573,7 +706,9 @@ const SharedProjectsPage = () => {
               ? "View-only mode. Admins can still see existing projects, but project-management actions are hidden unless the "
               : "View-only mode. Project managers can still see existing projects, but project-management actions are hidden because the "}
             <span className="font-semibold">manage_projects</span>
-            {isAdminView ? " permission is granted." : " permission has been revoked for this account."}
+            {isAdminView
+              ? " permission is granted."
+              : " permission has been revoked for this account."}
           </div>
         )}
 
@@ -606,7 +741,9 @@ const SharedProjectsPage = () => {
                 <Filter className="h-4 w-4" /> Filters
               </button>
 
-              <div className={`${showFilters ? "flex" : "hidden"} flex-wrap gap-3 lg:flex`}>
+              <div
+                className={`${showFilters ? "flex" : "hidden"} flex-wrap gap-3 lg:flex`}
+              >
                 <select
                   value={statusFilter}
                   onChange={(event) => setStatusFilter(event.target.value)}
@@ -630,10 +767,16 @@ const SharedProjectsPage = () => {
                 </select>
 
                 <button
-                  onClick={() => setSortOrder((value) => (value === "asc" ? "desc" : "asc"))}
+                  onClick={() =>
+                    setSortOrder((value) => (value === "asc" ? "desc" : "asc"))
+                  }
                   className="flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 hover:bg-gray-50"
                 >
-                  {sortOrder === "asc" ? <SortAsc className="h-4 w-4" /> : <SortDesc className="h-4 w-4" />}
+                  {sortOrder === "asc" ? (
+                    <SortAsc className="h-4 w-4" />
+                  ) : (
+                    <SortDesc className="h-4 w-4" />
+                  )}
                   {sortOrder === "asc" ? "Ascending" : "Descending"}
                 </button>
               </div>
@@ -659,10 +802,15 @@ const SharedProjectsPage = () => {
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-gray-600">
             Showing {filteredProjects.length} of {safeProjects.length} projects
-            {isFetching && <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />}
+            {isFetching && (
+              <Loader2 className="ml-2 inline h-4 w-4 animate-spin" />
+            )}
           </p>
           {hasActiveFilters && (
-            <button onClick={clearFilters} className="flex items-center gap-1 text-sm text-[#0f5841] hover:underline">
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 text-sm text-[#0f5841] hover:underline"
+            >
               <X className="h-3 w-3" /> Clear all filters
             </button>
           )}
@@ -670,7 +818,10 @@ const SharedProjectsPage = () => {
 
         {filteredProjects.length > 0 ? (
           viewMode === "grid" ? (
-            <motion.div layout className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <motion.div
+              layout
+              className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3"
+            >
               <AnimatePresence>
                 {filteredProjects.map((project, index) => (
                   <ProjectCard
@@ -680,8 +831,16 @@ const SharedProjectsPage = () => {
                     canManageProjects={canManageProjects}
                     getStatusBadge={getStatusBadge}
                     onDelete={handleDeleteProject}
-                    onEdit={() => navigate(getProjectEditPath(location.pathname, project.id))}
-                    onView={() => navigate(getProjectDetailsPath(location.pathname, project.id))}
+                    onEdit={() =>
+                      navigate(
+                        getProjectEditPath(location.pathname, project.id),
+                      )
+                    }
+                    onView={() =>
+                      navigate(
+                        getProjectDetailsPath(location.pathname, project.id),
+                      )
+                    }
                   />
                 ))}
               </AnimatePresence>
@@ -692,13 +851,27 @@ const SharedProjectsPage = () => {
                 <table className="w-full">
                   <thead className="border-b border-gray-200 bg-gray-50">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Project</th>
-                      <th className="hidden px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell">Team</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Status</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Progress</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Deadline</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Tasks</th>
-                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">Actions</th>
+                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        Project
+                      </th>
+                      <th className="hidden px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500 sm:table-cell">
+                        Team
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        Status
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        Progress
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        Deadline
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        Tasks
+                      </th>
+                      <th className="px-6 py-4 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <motion.tbody
@@ -710,17 +883,28 @@ const SharedProjectsPage = () => {
                     className="divide-y divide-gray-200"
                   >
                     {filteredProjects.map((project) => (
-                      <tr key={project.id} className="transition-colors hover:bg-gray-50">
+                      <tr
+                        key={project.id}
+                        className="transition-colors hover:bg-gray-50"
+                      >
                         <td className="px-6 py-4">
-                          <div className="font-medium text-gray-900">{project.name}</div>
-                          {project.description && <div className="max-w-xs truncate text-sm text-gray-500">{project.description}</div>}
+                          <div className="font-medium text-gray-900">
+                            {project.name}
+                          </div>
+                          {project.description && (
+                            <div className="max-w-xs truncate text-sm text-gray-500">
+                              {project.description}
+                            </div>
+                          )}
                         </td>
                         <td className="hidden px-6 py-4 sm:table-cell">
                           <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
-                            {project.teamName || "Unassigned"}
+                            {resolveTeamName(project)}
                           </span>
                         </td>
-                        <td className="px-6 py-4">{getStatusBadge(project.status)}</td>
+                        <td className="px-6 py-4">
+                          {getStatusBadge(project.status)}
+                        </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
                             <div className="h-2 w-24 overflow-hidden rounded-full bg-gray-200">
@@ -729,13 +913,17 @@ const SharedProjectsPage = () => {
                                 style={{ width: `${project.progress || 0}%` }}
                               />
                             </div>
-                            <span className="text-sm text-gray-600">{project.progress || 0}%</span>
+                            <span className="text-sm text-gray-600">
+                              {project.progress || 0}%
+                            </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-gray-400" />
-                            <span className={`text-sm ${isOverdue(project) ? "font-bold text-red-600" : "text-gray-600"}`}>
+                            <span
+                              className={`text-sm ${isOverdue(project) ? "font-bold text-red-600" : "text-gray-600"}`}
+                            >
                               {formatDate(project.dueDate || project.endDate)}
                               {isOverdue(project) ? " (Overdue)" : ""}
                             </span>
@@ -745,14 +933,22 @@ const SharedProjectsPage = () => {
                           <div className="flex items-center gap-1">
                             <CheckCircle className="h-4 w-4 text-gray-400" />
                             <span className="text-sm text-gray-600">
-                              {project.tasks?.completed || 0}/{project.tasks?.total || 0}
+                              {project.tasks?.completed || 0}/
+                              {project.tasks?.total || 0}
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <button
-                              onClick={() => navigate(getProjectDetailsPath(location.pathname, project.id))}
+                              onClick={() =>
+                                navigate(
+                                  getProjectDetailsPath(
+                                    location.pathname,
+                                    project.id,
+                                  ),
+                                )
+                              }
                               className="rounded-lg p-2 text-[#0f5841] hover:bg-[#0f5841]/10"
                               title="View Details"
                             >
@@ -761,19 +957,32 @@ const SharedProjectsPage = () => {
                             {canManageProjects && (
                               <>
                                 <button
-                                  onClick={() => navigate(getProjectEditPath(location.pathname, project.id))}
+                                  onClick={() =>
+                                    navigate(
+                                      getProjectEditPath(
+                                        location.pathname,
+                                        project.id,
+                                      ),
+                                    )
+                                  }
                                   className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
                                   title="Edit Project"
                                 >
                                   <Edit className="h-5 w-5" />
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteProject(project.id)}
+                                  onClick={() =>
+                                    handleDeleteProject(project.id)
+                                  }
                                   disabled={deletingId === project.id}
                                   className="rounded-lg p-2 text-red-500 hover:bg-red-50 disabled:opacity-50"
                                   title="Delete Project"
                                 >
-                                  {deletingId === project.id ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5" />}
+                                  {deletingId === project.id ? (
+                                    <Loader2 className="h-5 w-5 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-5 w-5" />
+                                  )}
                                 </button>
                               </>
                             )}
