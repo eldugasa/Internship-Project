@@ -18,6 +18,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
+import DashboardWelcomeBanner from '../../Component/dashboard/DashboardWelcomeBanner';
 import {
   DASHBOARD_COLORS,
   getStatusConfig,
@@ -62,7 +63,7 @@ const DashboardSkeleton = () => (
 );
 
 // Main Dashboard Content Component - Moved outside to prevent recreation
-const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false }) => {
+const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false, welcomeTitle, welcomeSubtitle }) => {
   const [filter, setFilter] = useState("all");
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth : 1280,
@@ -534,6 +535,12 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false 
 
   return (
     <>
+      {welcomeTitle && (
+        <div className="mb-6">
+          <DashboardWelcomeBanner title={welcomeTitle} subtitle={welcomeSubtitle} />
+        </div>
+      )}
+
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
         {visibleStatCards.map((stat, index) => (
@@ -939,6 +946,8 @@ const DashboardOverview = () => {
       teams={teams}
       tasks={tasks || []}
       isSuperAdmin={isSuperAdmin}
+      welcomeTitle={`Welcome back, ${user?.name || "Admin"}!`}
+      welcomeSubtitle={isSuperAdmin ? "Super Admin overview" : "Admin overview"}
     />
   );
 };
