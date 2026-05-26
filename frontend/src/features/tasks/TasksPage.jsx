@@ -852,7 +852,7 @@ const TasksPage = ({ mode = TASK_MODES.MANAGER, loaderData }) => {
                 >
                   <option value="all">All Status</option>
                   <option value="pending">Pending</option>
-                  <option value="in-progress">In Progress</option>
+                  <option value="in-progress" >In Progress</option>
                   <option value="in-test">In Test</option>
               
                   <option value="failed">Failed</option>

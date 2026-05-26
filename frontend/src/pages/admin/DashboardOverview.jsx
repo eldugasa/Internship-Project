@@ -18,7 +18,7 @@ import {
   AreaChart,
   Area,
 } from "recharts";
-import DashboardWelcomeBanner from '../../Component/dashboard/DashboardWelcomeBanner';
+import DashboardWelcomeBanner from "../../Component/dashboard/DashboardWelcomeBanner";
 import {
   DASHBOARD_COLORS,
   getStatusConfig,
@@ -63,7 +63,15 @@ const DashboardSkeleton = () => (
 );
 
 // Main Dashboard Content Component - Moved outside to prevent recreation
-const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false, welcomeTitle, welcomeSubtitle }) => {
+const DashboardContent = ({
+  projects,
+  users,
+  teams,
+  tasks,
+  isSuperAdmin = false,
+  welcomeTitle,
+  welcomeSubtitle,
+}) => {
   const [filter, setFilter] = useState("all");
   const [viewportWidth, setViewportWidth] = useState(() =>
     typeof window !== "undefined" ? window.innerWidth : 1280,
@@ -143,24 +151,26 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
       (u) => normalizeValue(u.role) === "PROJECT_MANAGER",
     ).length;
 
-    const completedTasks = tasks.filter(
-      (t) => ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
+    const completedTasks = tasks.filter((t) =>
+      ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
     ).length;
-    const pendingTasks = tasks.filter(
-      (t) => ["PENDING", "TODO"].includes(normalizeValue(t.status)),
+    const pendingTasks = tasks.filter((t) =>
+      ["PENDING", "TODO"].includes(normalizeValue(t.status)),
     ).length;
     const inProgressTasks = tasks.filter(
       (t) => normalizeValue(t.status) === "IN_PROGRESS",
     ).length;
-    const overdueProjects = projects.filter((project) => isOverdue(project)).length;
+    const overdueProjects = projects.filter((project) =>
+      isOverdue(project),
+    ).length;
 
     return {
       totalUsers: users.length,
       totalProjects: projects.length,
       totalTeams: teams.length,
       totalProjectManagers: projectManagers,
-      activeProjects: projects.filter(
-        (p) => ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
+      activeProjects: projects.filter((p) =>
+        ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
       ).length,
       completedProjects: projects.filter(
         (p) => normalizeValue(p.status) === "COMPLETED",
@@ -176,17 +186,17 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
   // Memoized project status data
   const projectStatusData = useMemo(() => {
     const statusCounts = {
-      planned: projects.filter((p) => normalizeValue(p.status) === "PLANNED").length,
-      active: projects.filter(
-        (p) => ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
+      planned: projects.filter((p) => normalizeValue(p.status) === "PLANNED")
+        .length,
+      active: projects.filter((p) =>
+        ["ACTIVE", "IN_PROGRESS"].includes(normalizeValue(p.status)),
       ).length,
       completed: projects.filter(
         (p) => normalizeValue(p.status) === "COMPLETED",
       ).length,
       overdue: projects.filter((project) => isOverdue(project)).length,
-      "on-hold": projects.filter(
-        (p) => normalizeValue(p.status) === "ON_HOLD",
-      ).length,
+      "on-hold": projects.filter((p) => normalizeValue(p.status) === "ON_HOLD")
+        .length,
     };
 
     return [
@@ -257,7 +267,9 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
 
   // Memoized user role data
   const userRoleData = useMemo(() => {
-    const adminCount = users.filter((u) => normalizeValue(u.role) === "ADMIN").length;
+    const adminCount = users.filter(
+      (u) => normalizeValue(u.role) === "ADMIN",
+    ).length;
     const pmCount = users.filter(
       (u) => normalizeValue(u.role) === "PROJECT_MANAGER",
     ).length;
@@ -304,7 +316,9 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
         : tasks.filter((task) => {
             const taskDate = new Date(task.rawCreatedAt || task.createdAt);
             if (!isValidDate(taskDate)) return false;
-            return taskDate.getMonth() === month && taskDate.getFullYear() === year;
+            return (
+              taskDate.getMonth() === month && taskDate.getFullYear() === year
+            );
           }).length;
 
       const projectsInMonth = projects.filter((project) => {
@@ -346,8 +360,8 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
           teamProjectIds.includes(t.projectId),
         );
 
-        const completedTeamTasks = teamTasks.filter(
-          (t) => ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
+        const completedTeamTasks = teamTasks.filter((t) =>
+          ["COMPLETED", "DONE"].includes(normalizeValue(t.status)),
         ).length;
         const totalTeamTasks = teamTasks.length;
         const completionRate =
@@ -414,7 +428,14 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
     );
   };
 
-  const renderResponsivePieLabel = ({ name, percent, x, y, textAnchor, fill }) => {
+  const renderResponsivePieLabel = ({
+    name,
+    percent,
+    x,
+    y,
+    textAnchor,
+    fill,
+  }) => {
     const labelText = `${name} ${(percent * 100).toFixed(0)}%`;
     const maxCharsPerLine =
       userRoleChartWidth > 430 ? 18 : userRoleChartWidth > 360 ? 14 : 10;
@@ -435,13 +456,13 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
     if (currentLine) lines.push(currentLine);
 
     return (
-        <text
-          x={x}
-          y={y}
-          fill={fill || "#374151"}
-          textAnchor={textAnchor}
-          fontSize={isLargeScreen ? 12 : 14}
-        >
+      <text
+        x={x}
+        y={y}
+        fill={fill || "#374151"}
+        textAnchor={textAnchor}
+        fontSize={isLargeScreen ? 12 : 14}
+      >
         {lines.map((line, index) => (
           <tspan
             key={`${labelText}-${index}`}
@@ -486,7 +507,7 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
         bgColor: "bg-green-50",
         textColor: "text-green-600",
       },
-     
+
       {
         title: "overdue Projects",
         value: stats.overdueProjects,
@@ -517,7 +538,8 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
 
     return statCards
       .filter(
-        (stat) => stat.title !== "Total Tasks" && stat.title !== "Completed Tasks",
+        (stat) =>
+          stat.title !== "Total Tasks" && stat.title !== "Completed Tasks",
       )
       .map((stat) =>
         stat.title === "Project Managers"
@@ -537,7 +559,10 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
     <>
       {welcomeTitle && (
         <div className="mb-6">
-          <DashboardWelcomeBanner title={welcomeTitle} subtitle={welcomeSubtitle} />
+          <DashboardWelcomeBanner
+            title={welcomeTitle}
+            subtitle={welcomeSubtitle}
+          />
         </div>
       )}
 
@@ -545,9 +570,9 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4">
         {visibleStatCards.map((stat, index) => (
           <div
-    key={stat.title}  // Better than index
-    className={`${stat.bgColor} rounded-lg sm:rounded-xl p-2 sm:p-3 lg:p-4 shadow-sm hover:shadow-md transition-shadow`}
-  >
+            key={stat.title} // Better than index
+            className={`${stat.bgColor} rounded-lg sm:rounded-xl p-2 sm:p-3 lg:p-4 shadow-sm hover:shadow-md transition-shadow`}
+          >
             <div className="flex items-center justify-between mb-1 sm:mb-2">
               <span className="text-lg sm:text-xl lg:text-2xl">
                 {stat.icon}
@@ -575,26 +600,26 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
             <div className="h-64 w-full relative">
               <ResponsiveContainer width="100%" height="100%">
                 <div className="ml-4">
-                <PieChart>
-                  <Pie
-                    data={projectStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ name, percent }) =>
-                      `${name} ${(percent * 100).toFixed(0)}%`
-                    }
-                  >
-                    {projectStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
+                  <PieChart>
+                    <Pie
+                      data={projectStatusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      label={({ name, percent }) =>
+                        `${name} ${(percent * 100).toFixed(0)}%`
+                      }
+                    >
+                      {projectStatusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
                 </div>
               </ResponsiveContainer>
             </div>
@@ -632,10 +657,10 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
             <h2 className="text-lg  font-bold text-gray-900 mb-4">
               User Role Distribution
             </h2>
-              <div
-                ref={userRoleChartRef}
-                className={`h-72 sm:h-64 w-full relative p-0.5 ${isLargeScreen ? "text-xs" : "text-base"}`}
-              >
+            <div
+              ref={userRoleChartRef}
+              className={`h-72 sm:h-64 w-full relative p-0.5 ${isLargeScreen ? "text-xs" : "text-base"}`}
+            >
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
@@ -645,11 +670,7 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
                     outerRadius={isMobile ? 70 : 60}
                     dataKey="value"
                     labelLine={false}
-                    label={
-                      isMobile
-                        ? false
-                        : renderResponsivePieLabel
-                    }
+                    label={isMobile ? false : renderResponsivePieLabel}
                   >
                     {userRoleData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
@@ -675,7 +696,9 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
 
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
           <h2 className="text-lg font-bold text-gray-900 mb-4">
-            {isSuperAdmin ? "Monthly Platform Growth (Last 6 Months)" : "Monthly Activity (Last 6 Months)"}
+            {isSuperAdmin
+              ? "Monthly Platform Growth (Last 6 Months)"
+              : "Monthly Activity (Last 6 Months)"}
           </h2>
           <div className="h-64 w-full relative">
             <ResponsiveContainer width="100%" height="100%">
@@ -711,76 +734,96 @@ const DashboardContent = ({ projects, users, teams, tasks, isSuperAdmin = false,
             </ResponsiveContainer>
           </div>
         </div>
-{!isSuperAdmin && teamPerformanceData.length > 0 && (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
-    <h2 className="text-lg font-bold text-gray-900 mb-4">
-      Team Performance (Completion Rate)
-    </h2>
-    <div className="h-80 w-full relative">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={teamPerformanceData}
-          margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis 
-            dataKey="name" 
-            angle={-45}
-            textAnchor="end"
-            height={60}
-            tick={{ fontSize: 12 }}
-            interval={0}
-          />
-          <YAxis 
-            domain={[0, 100]} 
-            label={{ value: 'Completion Rate (%)', angle: -90, position: 'insideLeft' , offset: -5, fontSize: 12, fill: '#555', bottom: 0}}
-          />
-          <Tooltip 
-            formatter={(value, name) => {
-              if (name === 'Completion Rate') return `${value}%`;
-              return value;
-            }}
-          />
-          <Legend />
-          <Bar 
-            dataKey="progress" 
-            name="Completion Rate"
-            fill="#4DA5AD" 
-            radius={[4, 4, 0, 0]}
-          >
-            {teamPerformanceData.map((entry, index) => (
-              <Cell 
-                key={`cell-${index}`} 
-                fill={entry.progress >= 80 ? '#10B981' : entry.progress >= 50 ? '#F59E0B' : '#EF4444'}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
-    {/* Summary stats */}
-    <div className="mt-4 grid grid-cols-3 gap-4 text-center text-sm pt-4 border-t border-gray-100">
-      <div>
-        <div className="font-semibold text-gray-900">
-          {teamPerformanceData.filter(t => t.progress >= 80).length}
-        </div>
-        <div className="text-gray-500">High Performing Teams</div>
-      </div>
-      <div>
-        <div className="font-semibold text-gray-900">
-          {Math.round(teamPerformanceData.reduce((sum, t) => sum + t.progress, 0) / teamPerformanceData.length)}%
-        </div>
-        <div className="text-gray-500">Average Completion</div>
-      </div>
-      <div>
-        <div className="font-semibold text-gray-900">
-          {teamPerformanceData.reduce((sum, t) => sum + t.tasks, 0)}
-        </div>
-        <div className="text-gray-500">Total Tasks</div>
-      </div>
-    </div>
-  </div>
-)}
+        {!isSuperAdmin && teamPerformanceData.length > 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 lg:col-span-2">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">
+              Team Performance (Completion Rate)
+            </h2>
+            <div className="h-80 w-full relative">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={teamPerformanceData}
+                  margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="name"
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                    tick={{ fontSize: 12 }}
+                    interval={0}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    label={{
+                      value: "Completion Rate (%)",
+                      angle: -90,
+                      position: "insideLeft",
+                      offset: -5,
+                      fontSize: 12,
+                      fill: "#555",
+                      bottom: 0,
+                    }}
+                  />
+                  <Tooltip
+                    formatter={(value, name) => {
+                      if (name === "Completion Rate") return `${value}%`;
+                      return value;
+                    }}
+                  />
+                  <Legend />
+                  <Bar
+                    dataKey="progress"
+                    name="Completion Rate"
+                    fill="#4DAD7C"
+                    radius={[4, 4, 0, 0]}
+                  >
+                    {teamPerformanceData.map((entry, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={
+                          entry.progress >= 80
+                            ? "#034a1d"
+                            : entry.progress >= 50
+                              ? "#77b7a2"
+                              : "#EF4444"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Summary stats */}
+            <div className="mt-4 grid grid-cols-3 gap-4 text-center text-sm pt-4 border-t border-gray-100">
+              <div>
+                <div className="font-semibold text-gray-900">
+                  {teamPerformanceData.filter((t) => t.progress >= 80).length}
+                </div>
+                <div className="text-gray-500">High Performing Teams</div>
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">
+                  {Math.round(
+                    teamPerformanceData.reduce(
+                      (sum, t) => sum + t.progress,
+                      0,
+                    ) / teamPerformanceData.length,
+                  )}
+                  %
+                </div>
+                <div className="text-gray-500">Average Completion</div>
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">
+                  {teamPerformanceData.reduce((sum, t) => sum + t.tasks, 0)}
+                </div>
+                <div className="text-gray-500">Total Tasks</div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Projects Overview Section */}
