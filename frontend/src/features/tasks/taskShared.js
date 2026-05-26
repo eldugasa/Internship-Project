@@ -185,7 +185,7 @@ export const calculateTeamMemberTaskStats = (tasks = [], efficiency = 95) => {
   const inProgressTasks = tasks.filter((task) =>
     TEAM_MEMBER_ACTIVE_STATUSES.has(task.status),
   ).length;
-  const pendingTasks = tasks.filter((task) => task.status === "pending").length;
+  const pendingTasks = tasks.filter((task) => task.status === "pending" || task.status === "pending-retest").length;
   const overdueTasks = tasks.filter((task) => isTaskOverdue(task)).length;
 
   return {
