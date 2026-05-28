@@ -13,6 +13,8 @@ import {
 import { createTeam, deleteTeam } from "../../services/teamsService";
 import { isAdminTeamsView, resolveCanManageTeams } from "./teamAccess";
 
+const getUserSkillLabel = (user) => user?.skill || user?.skills || "No skill listed";
+
 const TeamsSkeleton = () => (
   <div className="space-y-6">
     <div className="flex items-center justify-between">
@@ -70,7 +72,8 @@ const TeamFormModal = ({ onClose, onToast, users }) => {
       (member) =>
         member?.name?.toLowerCase().includes(query) ||
         member?.email?.toLowerCase().includes(query) ||
-        member?.role?.toLowerCase().includes(query),
+        member?.role?.toLowerCase().includes(query) ||
+        getUserSkillLabel(member).toLowerCase().includes(query),
     );
   }, [memberSearchQuery, users]);
 
@@ -277,6 +280,9 @@ const TeamFormModal = ({ onClose, onToast, users }) => {
                       <span className="font-medium">{user.name}</span>
                       <span className="ml-2 text-sm text-gray-600">({user.role})</span>
                       {user.email && <div className="mt-0.5 text-xs text-gray-400">{user.email}</div>}
+                      <div className="mt-0.5 text-xs text-gray-500">
+                        Skill: {getUserSkillLabel(user)}
+                      </div>
                     </div>
                     {newTeam.selectedMembers.includes(user.id) && (
                       <span className="font-bold text-blue-600">Selected</span>

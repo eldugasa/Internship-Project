@@ -13,6 +13,8 @@ import { deleteProject } from "../../services/projectsService";
 import { addMemberToTeam, removeMemberFromTeam } from "../../services/teamsService";
 import { getTeamsBasePath, isAdminTeamsView, resolveCanManageTeams } from "./teamAccess";
 
+const getUserSkillLabel = (user) => user?.skill || user?.skills || "No skill listed";
+
 const TeamDetailsSkeleton = () => (
   <div className="p-6">
     <div className="mb-8 flex items-center justify-between">
@@ -319,6 +321,9 @@ const SharedTeamDetailsPage = () => {
                                 <p className="mt-1 text-xs capitalize text-gray-400">
                                   {member.role?.replace(/[_-]/g, " ")}
                                 </p>
+                                <p className="mt-1 text-xs text-gray-500">
+                                  Skill: {getUserSkillLabel(member)}
+                                </p>
                               </div>
                             </div>
                             {canManageTeams && (
@@ -448,6 +453,9 @@ const SharedTeamDetailsPage = () => {
                                     <p className="text-sm text-gray-500">{userItem.email}</p>
                                     <p className="mt-1 text-xs capitalize text-gray-400">
                                       {userItem.role?.replace(/[_-]/g, " ")}
+                                    </p>
+                                    <p className="mt-1 text-xs text-gray-500">
+                                      Skill: {getUserSkillLabel(userItem)}
                                     </p>
                                   </div>
                                 </div>

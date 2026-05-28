@@ -69,13 +69,18 @@ const TeamMemberDashboard = () => {
   // Employee data from auth context
   const employee = useMemo(() => {
     if (!user) return null;
+    const teamName =
+      typeof user.team === "object" && user.team !== null
+        ? user.team.name
+        : user.team;
+
     return {
       id: user.id,
       name: user.name,
       role: user.role,
       avatar: user.name?.[0] || "U",
       teamId: user.teamId,
-      team: user.team || "Engineering Team",
+      team: teamName || "Engineering Team",
       email: user.email,
       joinDate: user.joinDate,
       efficiency: 95,

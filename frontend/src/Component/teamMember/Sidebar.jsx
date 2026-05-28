@@ -40,7 +40,7 @@ const Sidebar = ({
         ) : (
           <h1 className="flex items-center gap-0 text-xl font-bold mx-auto lg:mx-0">
   <span style={{ color: '#0f5841' }}>
-    {userRole === "team-member" ? "Team" : "Q"}
+    {userRole === "team-member" ? "T" : "Q"}
   </span>
   <span style={{ color: '#194f87' }}>
     {userRole === "team-member" ? "M" : "T"}

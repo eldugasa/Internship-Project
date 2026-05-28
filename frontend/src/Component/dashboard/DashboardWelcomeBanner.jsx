@@ -1,6 +1,14 @@
 import React from "react";
 import { Users, Award, TrendingUp } from "lucide-react";
 
+const formatMetaLabel = (label) => {
+  if (label === null || label === undefined) return "";
+  if (typeof label === "object") {
+    return label.name || label.title || "";
+  }
+  return label;
+};
+
 const DashboardWelcomeBanner = ({
   title,
   subtitle,
@@ -40,7 +48,7 @@ const DashboardWelcomeBanner = ({
                   ) : (
                     <Users className="w-4 h-4 opacity-90" />
                   )}
-                  <span>{item.label}</span>
+                  <span>{formatMetaLabel(item.label)}</span>
                 </div>
               ))}
             </div>
